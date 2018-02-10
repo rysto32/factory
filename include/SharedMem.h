@@ -24,23 +24,26 @@
  * SUCH DAMAGE.
  */
 
-#ifndef INTERPOSE_H
-#define INTERPOSE_H
+#ifndef SHARED_MEM_H
+#define SHARED_MEM_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <sys/param.h>
 
-typedef int (execve_t)(const char *path, char * const argv[], char * const orig_envp[]);
-typedef int (fexecve_t)(int fd, char * const argv[], char * const orig_envp[]);
+#define SHARED_MEM_FD 3
+#define SHARED_MEM_API_NUM 1
 
-extern execve_t * real_execve;
-extern fexecve_t * real_fexecve;
+struct FactoryShmHeader
+{
+	// These two field *must* never be moved or resized
+	size_t size;
+	int api_num;
+};
 
-extern struct FactoryShm *shm;
+struct FactoryShm
+{
+	struct FactoryShmHeader header;
 
-#ifdef __cplusplus
-}
-#endif
+	char sandbox_lib[PATH_MAX];
+};
 
 #endif

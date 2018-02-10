@@ -30,11 +30,9 @@
 #include <unistd.h>
 
 #include "interpose.h"
+#include "SharedMem.h"
 
 #define LD_PRELOAD_NAME "LD_PRELOAD"
-
-// XXX need to pass this from parent
-#define LIB_LOCATION "/tmp/libfactory_wrapper.so.1"
 
 static char *
 fix_ld_preload(const char * orig_var, char **var_val)
@@ -42,13 +40,15 @@ fix_ld_preload(const char * orig_var, char **var_val)
 	const char *start;
 	char *dest;
 	int i, orig_len, len, preload_set, lib_len, copied_libname;
+	size_t sandbox_len;
 
 	if (orig_var != NULL)
 		orig_len = strlen(orig_var);
 	else
 		orig_len = 0;
 
-	len = orig_len + sizeof(LD_PRELOAD_NAME"=") + sizeof(":"LIB_LOCATION) + 1;
+	sandbox_len = strlen(shm->sandbox_lib) + 1;
+	len = orig_len + sizeof(':') + sandbox_len;
 	dest = malloc(len);
 
 	/*
@@ -84,8 +84,9 @@ fix_ld_preload(const char * orig_var, char **var_val)
 			}
 
 			lib_len = (orig_var + i) - start;
-			if (lib_len == sizeof(LIB_LOCATION) - 1) {
-				if (memcmp(start, LIB_LOCATION, sizeof(LIB_LOCATION) - 1) == 0)
+			if (lib_len == sandbox_len - 1) {
+				// Don't compare the NULL terminator
+				if (memcmp(start, shm->sandbox_lib, sandbox_len - 1) == 0)
 					preload_set = 1;
 			}
 
@@ -110,7 +111,7 @@ fix_ld_preload(const char * orig_var, char **var_val)
 			dest[0] = ':';
 			dest++;
 		}
-		memcpy(dest, LIB_LOCATION, sizeof(LIB_LOCATION));
+		memcpy(dest, shm->sandbox_lib, sandbox_len);
 	}
 
 	return (*var_val);

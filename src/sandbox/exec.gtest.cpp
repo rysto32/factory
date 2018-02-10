@@ -27,6 +27,7 @@
 #include "mock/GlobalMock.h"
 
 #include "interpose.h"
+#include "SharedMem.h"
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
@@ -189,15 +190,15 @@ public:
 	}
 };
 
-bool fail_calloc = false;
+static bool fail_calloc = false;
 
 extern "C" {
-int mock_execve(const char * path, char * const argv[], char *const envp[])
+static int mock_execve(const char * path, char * const argv[], char *const envp[])
 {
 	return MockExec::MockObj().exec(path, argv, envp);
 }
 
-int mock_fexecve(int fd, char * const argv[], char *const envp[])
+static int mock_fexecve(int fd, char * const argv[], char *const envp[])
 {
 	return MockExec::MockObj().fexec(fd, argv, envp);
 }
@@ -215,6 +216,15 @@ int wrapped_fexecve(int fd, char *const argv[], char *const envp[]);
 
 execve_t * real_execve = mock_execve;
 fexecve_t * real_fexecve = mock_fexecve;
+
+static struct FactoryShm mock_shm = {
+	.header = {
+		.size = sizeof(struct FactoryShm),
+		.api_num = SHARED_MEM_API_NUM,
+	},
+};
+
+struct FactoryShm *shm = &mock_shm;
 }
 
 static int
@@ -244,18 +254,18 @@ public:
 	}
 };
 
-static const std::string WRAPPER_PATH("/tmp/libfactory_wrapper.so.1");
-
 TEST_F(ExecTestSuite, ExecNullEnv)
 {
 	GlobalMockExec mockExec;
 	std::string path("/bin/false");
 	std::vector<const char *> args;
 	ExecEnvironment env;
+	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
+	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
 	args.push_back(path.c_str());
 
-	env.emplace_back("LD_PRELOAD", WRAPPER_PATH);
+	env.emplace_back("LD_PRELOAD", wrapper_path);
 
 	mockExec.ExpectExec(path, args, env, 0);
 
@@ -268,11 +278,13 @@ TEST_F(ExecTestSuite, ExecEmptyEnv)
 	std::string path("/bin/false");
 	std::vector<const char *> args;
 	ExecEnvironment env;
+	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
+	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
 	args.push_back(path.c_str());
 
 	std::vector<char *> environ = env.GetEnviron();
-	env.emplace_back("LD_PRELOAD", WRAPPER_PATH);
+	env.emplace_back("LD_PRELOAD", wrapper_path);
 
 	mockExec.ExpectExec(path, args, env, 0);
 
@@ -285,6 +297,8 @@ TEST_F(ExecTestSuite, ExecNoPreloadEnv)
 	std::string path("/bin/false");
 	std::vector<const char *> args;
 	ExecEnvironment env;
+	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
+	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
 	args.push_back(path.c_str());
 
@@ -293,7 +307,7 @@ TEST_F(ExecTestSuite, ExecNoPreloadEnv)
 	env.emplace_back("HOME", "/root");
 
 	std::vector<char *> environ = env.GetEnviron();
-	env.emplace_back("LD_PRELOAD", WRAPPER_PATH);
+	env.emplace_back("LD_PRELOAD", wrapper_path);
 
 	mockExec.ExpectExec(path, args, env, 0);
 
@@ -306,6 +320,8 @@ TEST_F(ExecTestSuite, ExecPreloadSingle)
 	std::string path("/bin/false");
 	std::vector<const char *> args;
 	ExecEnvironment env;
+	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
+	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
 	args.push_back(path.c_str());
 
@@ -318,7 +334,7 @@ TEST_F(ExecTestSuite, ExecPreloadSingle)
 	env.emplace_back("HOME", "/root");
 
 	std::vector<char *> environ = env.GetEnviron();
-	env.at(preload_index) = EnvVar("LD_PRELOAD", "/lib/libthr.so.3:" + WRAPPER_PATH);
+	env.at(preload_index) = EnvVar("LD_PRELOAD", "/lib/libthr.so.3:" + wrapper_path);
 
 	mockExec.ExpectExec(path, args, env, 0);
 
@@ -331,6 +347,8 @@ TEST_F(ExecTestSuite, ExecPreloadMulti)
 	std::string path("/bin/false");
 	std::vector<const char *> args;
 	ExecEnvironment env;
+	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
+	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
 	args.push_back(path.c_str());
 
@@ -343,7 +361,7 @@ TEST_F(ExecTestSuite, ExecPreloadMulti)
 	// Pass a path that is the same length as the wrapper path into LD_PRELOAD
 	// and ensure that execve() probably detects that the wrapper hasn't
 	// already been passed
-	std::string almost_wrapper(WRAPPER_PATH);
+	std::string almost_wrapper(wrapper_path);
 	almost_wrapper[10] = 'd';
 
 	env.emplace_back("LD_PRELOAD", "/lib/libthr.so.3:" + almost_wrapper + ":/usr/lib/libdtrace.so.1");
@@ -351,7 +369,7 @@ TEST_F(ExecTestSuite, ExecPreloadMulti)
 	env.emplace_back("HOME", "/root");
 
 	std::vector<char *> environ = env.GetEnviron();
-	env.at(preload_index) = EnvVar("LD_PRELOAD", "/lib/libthr.so.3:" + almost_wrapper + ":/usr/lib/libdtrace.so.1:" + WRAPPER_PATH);
+	env.at(preload_index) = EnvVar("LD_PRELOAD", "/lib/libthr.so.3:" + almost_wrapper + ":/usr/lib/libdtrace.so.1:" + wrapper_path);
 
 	mockExec.ExpectExec(path, args, env, 0);
 
@@ -364,6 +382,8 @@ TEST_F(ExecTestSuite, ExecEmptyPreloadEnv)
 	std::string path("/bin/false");
 	std::vector<const char *> args;
 	ExecEnvironment env;
+	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
+	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
 	args.push_back(path.c_str());
 
@@ -376,7 +396,7 @@ TEST_F(ExecTestSuite, ExecEmptyPreloadEnv)
 	env.emplace_back("HOME", "/root");
 
 	std::vector<char *> environ = env.GetEnviron();
-	env.at(preload_index) = EnvVar("LD_PRELOAD", WRAPPER_PATH);
+	env.at(preload_index) = EnvVar("LD_PRELOAD", wrapper_path);
 
 	mockExec.ExpectExec(path, args, env, 0);
 
@@ -389,12 +409,14 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadedOnly)
 	std::string path("/bin/false");
 	std::vector<const char *> args;
 	ExecEnvironment env;
+	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
+	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
 	args.push_back(path.c_str());
 
 	env.emplace_back("PATH", "/bin:/sbin:/usr/bin:/usr/sbin");
 	env.emplace_back("USER", "root");
-	env.emplace_back("LD_PRELOAD", WRAPPER_PATH);
+	env.emplace_back("LD_PRELOAD", wrapper_path);
 	env.emplace_back("HOME", "/root");
 
 	std::vector<char *> environ = env.GetEnviron();
@@ -410,12 +432,14 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadedFirst)
 	std::string path("/bin/false");
 	std::vector<const char *> args;
 	ExecEnvironment env;
+	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
+	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
 	args.push_back(path.c_str());
 
 	env.emplace_back("PATH", "/bin:/sbin:/usr/bin:/usr/sbin");
 	env.emplace_back("USER", "root");
-	env.emplace_back("LD_PRELOAD", WRAPPER_PATH + ":/usr/lib/libcam.so.2");
+	env.emplace_back("LD_PRELOAD", wrapper_path + ":/usr/lib/libcam.so.2");
 	env.emplace_back("HOME", "/root");
 
 	std::vector<char *> environ = env.GetEnviron();
@@ -431,12 +455,14 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadedMiddle)
 	std::string path("/bin/false");
 	std::vector<const char *> args;
 	ExecEnvironment env;
+	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
+	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
 	args.push_back(path.c_str());
 
 	env.emplace_back("PATH", "/bin:/sbin:/usr/bin:/usr/sbin");
 	env.emplace_back("USER", "root");
-	env.emplace_back("LD_PRELOAD", "/lib/libc.so.7 " + WRAPPER_PATH + " /usr/lib/libcam.so.2");
+	env.emplace_back("LD_PRELOAD", "/lib/libc.so.7 " + wrapper_path + " /usr/lib/libcam.so.2");
 	env.emplace_back("HOME", "/root");
 
 	std::vector<char *> environ = env.GetEnviron();
@@ -452,6 +478,8 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadedEnd)
 	std::string path("/bin/false");
 	std::vector<const char *> args;
 	ExecEnvironment env;
+	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
+	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
 	args.push_back(path.c_str());
 
@@ -460,10 +488,115 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadedEnd)
 
 	// The double colon here is intentional.  We're testing that we pass
 	// allong to execve() faithfully.
-	env.emplace_back("LD_PRELOAD", "/usr/lib/libzma.so.7::/usr/lib/libpmc.so.3:/usr/lib/libhdb.so.11:" + WRAPPER_PATH);
+	env.emplace_back("LD_PRELOAD", "/usr/lib/libzma.so.7::/usr/lib/libpmc.so.3:/usr/lib/libhdb.so.11:" + wrapper_path);
 	env.emplace_back("HOME", "/root");
 
 	std::vector<char *> environ = env.GetEnviron();
+
+	mockExec.ExpectExec(path, args, env, 0);
+
+	call_wrapped_execve(path.c_str(), &args[0], &environ[0]);
+}
+
+TEST_F(ExecTestSuite, ExecWrapperPreloadLastCharMismatch)
+{
+	GlobalMockExec mockExec;
+	std::string path("/bin/false");
+	std::vector<const char *> args;
+	ExecEnvironment env;
+	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
+	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
+
+	args.push_back(path.c_str());
+
+	env.emplace_back("PATH", "/bin:/sbin:/usr/bin:/usr/sbin");
+	env.emplace_back("USER", "root");
+
+	size_t preload_index = env.size();
+
+
+	// Pass a path that is the same length as the wrapper path into LD_PRELOAD
+	// and ensure that execve() probably detects that the wrapper hasn't
+	// already been passed
+	std::string almost_wrapper(wrapper_path);
+	almost_wrapper.back() = '9';
+
+	env.emplace_back("LD_PRELOAD", "/lib/libthr.so.3:" + almost_wrapper + ":/usr/lib/libdtrace.so.1");
+
+	env.emplace_back("HOME", "/root");
+
+	std::vector<char *> environ = env.GetEnviron();
+	env.at(preload_index) = EnvVar("LD_PRELOAD", "/lib/libthr.so.3:" + almost_wrapper + ":/usr/lib/libdtrace.so.1:" + wrapper_path);
+
+	mockExec.ExpectExec(path, args, env, 0);
+
+	call_wrapped_execve(path.c_str(), &args[0], &environ[0]);
+}
+
+TEST_F(ExecTestSuite, ExecWrapperPreloadLibTooShort)
+{
+	GlobalMockExec mockExec;
+	std::string path("/bin/false");
+	std::vector<const char *> args;
+	ExecEnvironment env;
+	std::string wrapper_path("/tmp/libfactory_wrapper.so.22");
+	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
+
+	args.push_back(path.c_str());
+
+	env.emplace_back("PATH", "/bin:/sbin:/usr/bin:/usr/sbin");
+	env.emplace_back("USER", "root");
+
+	size_t preload_index = env.size();
+
+
+	// Pass a path that is the same length as the wrapper path into LD_PRELOAD
+	// and ensure that execve() probably detects that the wrapper hasn't
+	// already been passed
+	std::string almost_wrapper(wrapper_path);
+	almost_wrapper.pop_back();
+
+	env.emplace_back("LD_PRELOAD", "/lib/libthr.so.3:" + almost_wrapper);
+
+	env.emplace_back("HOME", "/root");
+
+	std::vector<char *> environ = env.GetEnviron();
+	env.at(preload_index) = EnvVar("LD_PRELOAD", "/lib/libthr.so.3:" + almost_wrapper + ":" + wrapper_path);
+
+	mockExec.ExpectExec(path, args, env, 0);
+
+	call_wrapped_execve(path.c_str(), &args[0], &environ[0]);
+}
+
+TEST_F(ExecTestSuite, ExecWrapperPreloadLibTooLong)
+{
+	GlobalMockExec mockExec;
+	std::string path("/bin/false");
+	std::vector<const char *> args;
+	ExecEnvironment env;
+	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
+	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
+
+	args.push_back(path.c_str());
+
+	env.emplace_back("PATH", "/bin:/sbin:/usr/bin:/usr/sbin");
+	env.emplace_back("USER", "root");
+
+	size_t preload_index = env.size();
+
+
+	// Pass a path that is the same length as the wrapper path into LD_PRELOAD
+	// and ensure that execve() probably detects that the wrapper hasn't
+	// already been passed
+	std::string almost_wrapper(wrapper_path);
+	almost_wrapper.push_back('5');
+
+	env.emplace_back("LD_PRELOAD", "/lib/libthr.so.3:" + almost_wrapper);
+
+	env.emplace_back("HOME", "/root");
+
+	std::vector<char *> environ = env.GetEnviron();
+	env.at(preload_index) = EnvVar("LD_PRELOAD", "/lib/libthr.so.3:" + almost_wrapper + ":" + wrapper_path);
 
 	mockExec.ExpectExec(path, args, env, 0);
 

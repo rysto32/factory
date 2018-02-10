@@ -26,7 +26,11 @@
 
 #include "interpose.h"
 
+#include "SharedMem.h"
+
 #include <dlfcn.h>
+#include <err.h>
+#include <sys/mman.h>
 #include <unistd.h>
 
 static void initialize(void) __attribute__((constructor));
@@ -34,9 +38,34 @@ static void initialize(void) __attribute__((constructor));
 execve_t * real_execve;
 fexecve_t * real_fexecve;
 
+struct FactoryShm *shm;
+
 static void
 initialize(void)
 {
+	long page_size = sysconf(_SC_PAGE_SIZE);
+
+	void *mem = mmap(NULL, page_size, PROT_READ, MAP_SHARED, SHARED_MEM_FD, 0);
+	if (mem == MAP_FAILED) {
+		err(1, "Failed to map shared memory header.");
+	}
+
+	struct FactoryShmHeader *header = mem;
+	if (header->api_num != SHARED_MEM_API_NUM) {
+		errx(1, "factory: shared memory api mismatch!");
+	}
+
+	size_t size = header->size;
+	munmap(mem, page_size);
+
+	mem = mmap(NULL, size, PROT_READ, MAP_SHARED, SHARED_MEM_FD, 0);
+	if (mem == MAP_FAILED) {
+		err(1, "Failed to map shared memory.");
+	}
+	shm = mem;
+
 	real_execve = (execve_t *)dlsym(RTLD_NEXT, "execve");
 	real_fexecve = (fexecve_t *)dlsym(RTLD_NEXT, "fexecve");
+
+// 	write(2, "initialize\n", sizeof("initialize\n"));
 }
