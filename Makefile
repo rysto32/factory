@@ -10,9 +10,9 @@ STACK=x
 OUTDIR:=$(TOPDIR)/obj
 OBJDIR:=$(OUTDIR)/objects
 LIBDIR:=$(OUTDIR)/lib
-INSTALLDIR:=$(OUTDIR)/staging/
-DEPENDDIR:=$(OUTDIR)/depend/
-SDEPENDDIR:=$(OUTDIR)/sdepend/
+INSTALLDIR:=$(OUTDIR)/staging
+DEPENDDIR:=$(OUTDIR)/depend
+SDEPENDDIR:=$(OUTDIR)/sdepend
 TESTOBJDIR:=$(OUTDIR)/test_obj
 TESTDIR:=$(OUTDIR)/test
 
