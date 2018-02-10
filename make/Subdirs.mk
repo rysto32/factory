@@ -7,6 +7,7 @@ define include_template
  OBJS:=
  LIB:=
  LOCAL_INCLUDE:=
+ SHLIB_NEEDED:=
 
  PROG_TARGET:=
  PROG:=

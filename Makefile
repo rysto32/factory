@@ -1,7 +1,7 @@
 
 .DEFAULT_GOAL:=all
 
-all: programs test
+all: programs libraries test
 
 TOPDIR:=.
 CURDIR:=.
@@ -12,6 +12,7 @@ OBJDIR:=$(OUTDIR)/objects
 LIBDIR:=$(OUTDIR)/lib
 INSTALLDIR:=$(OUTDIR)/staging/
 DEPENDDIR:=$(OUTDIR)/depend/
+SDEPENDDIR:=$(OUTDIR)/sdepend/
 TESTOBJDIR:=$(OUTDIR)/test_obj
 TESTDIR:=$(OUTDIR)/test
 
@@ -29,3 +30,7 @@ test: $(TEST_PROGS) | programs
 .PHONY: nothing
 nothing:
 	@true
+
+programs::
+
+libraries::
