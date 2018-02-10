@@ -25,6 +25,6 @@ clean_prog_$(PROG_TARGET):
 	$(RM) $($(subst clean_prog_,,$@)_DEST)
 
 .PHONY: programs
-programs: $(PROG_TARGET)
+programs:: $(PROG_TARGET)
 
 endif

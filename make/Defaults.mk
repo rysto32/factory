@@ -3,6 +3,7 @@ CC:=cc
 CXX:=c++
 LD:=c++
 LD_C:=/usr/local/bin/ld
+AR:=ar
 
 #CWARNFLAGS.gcc += -Wno-expansion-to-defined -Wno-extra -Wno-unused-but-set-variable
 
