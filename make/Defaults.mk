@@ -16,3 +16,5 @@ CXX_WARNFLAGS:=-Wno-user-defined-literals
 
 CFLAGS:=-I/usr/local/include -I$(TOPDIR)/include $(C_OPTIM) -g $(C_WARNFLAGS)
 CXXFLAGS:=$(CXX_STD) $(CXX_WARNFLAGS)
+
+LDFLAGS := -L/usr/local/lib

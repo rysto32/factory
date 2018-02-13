@@ -5,4 +5,6 @@ SUBDIRS := \
 LIB :=	job
 
 SRCS := \
-	Exec.cpp \
+	Job.cpp \
+	JobManager.cpp \
+	JobSharedMemory.cpp

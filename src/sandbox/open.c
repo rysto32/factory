@@ -24,32 +24,68 @@
  * SUCH DAMAGE.
  */
 
-#ifndef SHARED_MEM_H
-#define SHARED_MEM_H
+#include "interpose.h"
+#include "SharedMem.h"
+#include "MsgType.h"
 
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/socket.h>
-#include <sys/un.h>
+#include <errno.h>
+#include <err.h>
+#include <fcntl.h>
+#include <sys/nv.h>
 
-#define SHARED_MEM_FD 3
-
-#define SHARED_MEM_API_NUM 1
-
-struct FactoryShmHeader
+int
+open(const char * path, int flags, ...)
 {
-	// These two field *must* never be moved or resized
-	size_t size;
-	int api_num;
-};
+	nvlist_t *msg;
+	mode_t mode;
+	int error;
 
-struct FactoryShm
-{
-	struct FactoryShmHeader header;
+	msg = nvlist_create(NV_FLAG_IGNORE_CASE);
+	if (msg == NULL) {
+		errno = ENOMEM;
+		return (-1);
+	}
 
-	char sandbox_lib[PATH_MAX];
-	struct sockaddr_un msg_socket_path;
-	uint64_t jobId;
-};
+	nvlist_add_number(msg, "type", MSG_TYPE_OPEN_REQUEST);
+	nvlist_add_string(msg, "path", path);
+	nvlist_add_number(msg, "flags", flags);
 
-#endif
+	error = nvlist_error(msg);
+	if (error != 0) {
+		errno = error;
+		return (-1);
+	}
+
+	error = nvlist_send(msg_sock_fd, msg);
+	if (error != 0) {
+		err(1, "Failed to send to factory");
+	}
+
+	nvlist_destroy(msg);
+
+	msg = nvlist_recv(msg_sock_fd, NV_FLAG_IGNORE_CASE);
+	if (msg == NULL)
+		err(1, "Failed to receive response from factory");
+
+	if (nvlist_error(msg) != 0)
+		err(1, "Response from factory had an error");
+
+	error = nvlist_get_number(msg, "error");
+	nvlist_destroy(msg);
+
+	if (error != 0) {
+		errno = error;
+		return (-1);
+	}
+
+	if (flags & O_CREAT) {
+		va_list va;
+
+		va_start(va, flags);
+		mode = va_arg(va, int);
+
+		return (real_open(path, flags, mode));
+	} else {
+		return (real_open(path, flags));
+	}
+}

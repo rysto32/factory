@@ -18,10 +18,12 @@ $(LIB)_DEPDIR := $(DEPENDDIR)/$(CURDIR)
 $(LIB)_SDEPDIR := $(SDEPENDDIR)/$(CURDIR)
 DEPFILES := $(call src_to_dep,$($(LIB)_DEPDIR)/,$(SRCS))
 $(LIB)_CLEAN := $($(LIB)_DOBJS) $($(LIB)_LIBRARY)
+$(LIB)_STDLIBS := $(addprefix -l,$(SHLIB_STDLIBS))
 SHLIB_VERSION ?= 1
 
 $($(LIB)_LIBRARY): $($(LIB)_DOBJS)
 	mkdir -p $(dir $@)
+	rm -f $@
 	$(AR) -crs $@ $^
 
 $($(LIB)_DOBJS): LOCAL_INCLUDE := $(LOCAL_INCLUDE)
@@ -51,7 +53,7 @@ $(LIB)_CLEAN := $($(LIB)_CLEAN) $($(LIB)_SHLIB) $($(LIB)_SOBJS)
 
 $($(LIB)_SHLIB): $($(LIB)_SOBJS)
 	mkdir -p $(dir $@)
-	$(LD_C) -shared $(LDFLAGS) -o $@ -soname $($(LIB)_SONAME) $^
+	$(LD_C) -shared $(LDFLAGS) -o $@ -soname $($(LIB)_SONAME) $^ $($(LIB)_STDLIBS)
 
 libraries:: $($(LIB)_SHLIB)
 

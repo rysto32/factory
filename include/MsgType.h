@@ -24,32 +24,16 @@
  * SUCH DAMAGE.
  */
 
-#ifndef SHARED_MEM_H
-#define SHARED_MEM_H
+#ifndef MSG_TYPE_H
+#define MSG_TYPE_H
 
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-
-#define SHARED_MEM_FD 3
-
-#define SHARED_MEM_API_NUM 1
-
-struct FactoryShmHeader
+enum MsgType
 {
-	// These two field *must* never be moved or resized
-	size_t size;
-	int api_num;
-};
+	MSG_TYPE_INIT,
+	MSG_TYPE_OPEN_REQUEST,
 
-struct FactoryShm
-{
-	struct FactoryShmHeader header;
-
-	char sandbox_lib[PATH_MAX];
-	struct sockaddr_un msg_socket_path;
-	uint64_t jobId;
+	/* Must be last */
+	MSG_TYPE_MAX
 };
 
 #endif

@@ -1,0 +1,167 @@
+// Copyright (c) 2018 Ryan Stone.  All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+// 1. Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+// 2. Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+// OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+// HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+// LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+// OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+// SUCH DAMAGE.
+
+#include "JobManager.h"
+
+#include "EventLoop.h"
+#include "Job.h"
+#include "JobSharedMemory.h"
+#include "MsgSocket.h"
+#include "SharedMem.h"
+#include "TempFile.h"
+
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+
+#include <err.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+
+#include <cassert>
+#include <memory>
+#include <string>
+#include <vector>
+
+// Not defined by any header(!)
+extern char ** environ;
+
+static int
+StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, int shm_fd) __attribute__((noreturn));
+
+static int
+StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, int shm_fd)
+{
+	int fd = dup2(shm_fd, SHARED_MEM_FD);
+	if (fd < 0) {
+		perror("Could not dup shm_fd");
+		exit(1);
+	}
+
+	int error = fcntl(SHARED_MEM_FD, F_SETFD, 0);
+	if (error < 0) {
+		perror("Could not disable close-on-exec");
+		exit(1);
+	}
+
+	closefrom(SHARED_MEM_FD + 1);
+	execve(argp.at(0), &argp[0], &envp[0]);
+	err(1, "execve %s failed", argp.at(0));
+	_exit(1);
+}
+
+JobManager::JobManager(EventLoop & loop, TempFile *msgSock)
+  : msgSock(msgSock),
+    next_job_id(0)
+
+{
+	loop.RegisterSignal(this, SIGCHLD);
+}
+
+JobManager::~JobManager()
+{
+}
+
+uint64_t
+JobManager::AllocJobId()
+{
+	next_job_id++;
+	return next_job_id;
+}
+
+Job*
+JobManager::StartJob(JobCompletion & completer, const ArgList & argList)
+{
+	std::vector<char *>  argp;
+
+	for (const std::string & arg : argList) {
+		// Blame POSIX for the const_cast :()
+		argp.push_back(const_cast<char*>(arg.c_str()));
+	}
+	argp.push_back(NULL);
+
+	std::vector<char *> envp;
+	for (int i = 0; environ[i] != NULL; ++i) {
+		envp.push_back(environ[i]);
+	}
+	char ld_preload[] = "LD_PRELOAD=" LIB_LOCATION;
+	envp.push_back(ld_preload);
+	envp.push_back(NULL);
+
+	uint64_t jobId = AllocJobId();
+	auto shm = std::make_unique<JobSharedMemory>(msgSock, jobId);
+
+	pid_t child = fork();
+	if (child < 0)
+		return NULL;
+
+	if (child == 0) {
+		StartChild(argp, envp, shm->GetFD());
+	} else {
+		auto job = std::make_unique<Job>(completer, jobId, child);
+
+		pidMap.insert(std::make_pair(child, job.get()));
+		auto ins = jobMap.insert(std::make_pair(jobId, std::move(job)));
+		assert (ins.second);
+		return ins.first->second.get();
+	}
+}
+
+void
+JobManager::Dispatch(int sig, short flags)
+{
+	assert (sig == SIGCHLD);
+
+	while (1) {
+		int status;
+		pid_t pid = wait3(&status, WEXITED | WNOHANG, NULL);
+		if (pid == -1)
+			break;
+
+		auto it = pidMap.find(pid);
+		if (it == pidMap.end()) {
+			fprintf(stderr, "Unknown child %d exited!\n", pid);
+			continue;
+		}
+
+		it->second->Complete(status);
+		jobMap.erase(it->second->GetJobId());
+		pidMap.erase(it);
+	}
+}
+
+Job *
+JobManager::RegisterSocket(uint64_t jobId, std::unique_ptr<MsgSocket> sock)
+{
+	auto it = jobMap.find(jobId);
+	if (it == jobMap.end())
+		err(1, "Process attempted to register against non-existnt job %ld",
+		    jobId);
+
+	it->second->RegisterSocket(std::move(sock));
+	return it->second.get();
+}

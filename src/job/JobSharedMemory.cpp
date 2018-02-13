@@ -21,28 +21,18 @@
 // OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 // SUCH DAMAGE.
 
+#include "JobSharedMemory.h"
+
 #include "SharedMem.h"
+#include "TempFile.h"
 
 #include <sys/types.h>
-#include <sys/param.h>
 #include <sys/mman.h>
-#include <sys/wait.h>
+#include <sys/un.h>
 
 #include <err.h>
 #include <fcntl.h>
 #include <unistd.h>
-
-#include <cassert>
-#include <memory>
-#include <string>
-#include <vector>
-
-typedef std::vector<std::string> ArgList;
-
-// Not defined by any header(!)
-extern char ** environ;
-
-#define LIB_LOCATION "/tmp/libfactory_sandbox.so.1"
 
 template<typename T, typename U>
 T RoundUp(T value, U mult)
@@ -50,89 +40,45 @@ T RoundUp(T value, U mult)
 	return ((value + (mult - 1)) / mult) * mult;
 }
 
-static int InitSharedMem(int shm_fd)
+JobSharedMemory::JobSharedMemory(TempFile *msgSock, uint64_t jobId)
 {
+	shm_fd = shm_open(SHM_ANON, O_CREAT | O_TRUNC | O_RDWR, 0600);
+	if (shm_fd < 0)
+		err(1, "shm_open failed");
+
 	long page_size = sysconf(_SC_PAGE_SIZE);
 
 	size_t size = RoundUp(sizeof(struct FactoryShm), page_size);
 
 	int error = ftruncate(shm_fd, size);
 	if (error < 0)
-		return error;
+		err(1, "Failed to set size of shared memory region");
 
 	void *mem = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 	if (mem == MAP_FAILED)
-		return (-1);
+		err(1, "Failed to map shared memory region");
 
 	auto * shm = static_cast<struct FactoryShm*>(mem);
 
 	shm->header.size = size;
 	shm->header.api_num = SHARED_MEM_API_NUM;
 	strlcpy(shm->sandbox_lib, LIB_LOCATION, sizeof(shm->sandbox_lib));
+	InitUnixAddr(shm->msg_socket_path, msgSock);
+	shm->jobId = jobId;
 
 	munmap(shm, size);
-	return (0);
 }
 
-static int
-StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, int shm_fd) __attribute__((noreturn));
-
-static int
-StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, int shm_fd)
+JobSharedMemory::~JobSharedMemory()
 {
-	int fd = dup2(shm_fd, SHARED_MEM_FD);
-	if (fd < 0) {
-		perror("Could not dup shm_fd");
-		exit(1);
-	}
-
-	int error = fcntl(SHARED_MEM_FD, F_SETFD, 0);
-	if (error < 0) {
-		perror("Could not disable close-on-exec");
-		exit(1);
-	}
-
-	closefrom(SHARED_MEM_FD + 1);
-	execve(argp.at(0), &argp[0], &envp[0]);
-	err(1, "execve %s failed", argp.at(0));
-	_exit(1);
+	close(shm_fd);
+	shm_fd = -1;
 }
 
-int RunJob(const ArgList & argList)
+void
+JobSharedMemory::InitUnixAddr(struct sockaddr_un &addr, TempFile *msgSock)
 {
-	std::vector<char *>  argp;
-
-	for (const std::string & arg : argList) {
-		// Blame POSIX for the const_cast :()
-		argp.push_back(const_cast<char*>(arg.c_str()));
-	}
-	argp.push_back(NULL);
-
-	std::vector<char *> envp;
-	for (int i = 0; environ[i] != NULL; ++i) {
-		envp.push_back(environ[i]);
-	}
-	char ld_preload[] = "LD_PRELOAD=" LIB_LOCATION;
-	envp.push_back(ld_preload);
-	envp.push_back(NULL);
-
-	int shm_fd = shm_open(SHM_ANON, O_CREAT | O_TRUNC | O_RDWR, 0600);
-	if (shm_fd < 0)
-		return (shm_fd);
-
-	int error = InitSharedMem(shm_fd);
-	if (error != 0)
-		return (error);
-
-	pid_t child = fork();
-	if (child < 0)
-		return child;
-
-	if (child == 0) {
-		StartChild(argp, envp, shm_fd);
-	} else {
-		int status;
-		waitpid(child, &status, WEXITED);
-		return (status);
-	}
+	addr.sun_len = sizeof(addr);
+	addr.sun_family = AF_UNIX;
+	strlcpy(addr.sun_path, msgSock->GetPath().c_str(), sizeof(addr.sun_path));
 }
