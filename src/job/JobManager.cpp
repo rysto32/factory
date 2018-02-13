@@ -99,7 +99,8 @@ JobManager::AllocJobId()
 }
 
 Job*
-JobManager::StartJob(JobCompletion & completer, const ArgList & argList)
+JobManager::StartJob(const PermissionList & perm, JobCompletion & completer,
+    const ArgList & argList)
 {
 	std::vector<char *>  argp;
 
@@ -127,7 +128,7 @@ JobManager::StartJob(JobCompletion & completer, const ArgList & argList)
 	if (child == 0) {
 		StartChild(argp, envp, shm->GetFD());
 	} else {
-		auto job = std::make_unique<Job>(completer, jobId, child);
+		auto job = std::make_unique<Job>(perm, completer, jobId, child);
 
 		pidMap.insert(std::make_pair(child, job.get()));
 		auto ins = jobMap.insert(std::make_pair(jobId, std::move(job)));

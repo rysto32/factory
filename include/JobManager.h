@@ -42,6 +42,7 @@ class EventLoop;
 class Job;
 class JobCompletion;
 class MsgSocket;
+class PermissionList;
 class TempFile;
 
 typedef std::vector<std::string> ArgList;
@@ -69,7 +70,7 @@ public:
 	JobManager & operator=(const JobManager &) = delete;
 	JobManager & operator=(JobManager &&) = delete;
 
-	Job * StartJob(JobCompletion &, const ArgList &);
+	Job * StartJob(const PermissionList &, JobCompletion &, const ArgList &);
 
 	void Dispatch(int fd, short flags) override;
 

@@ -39,17 +39,21 @@
 
 class JobCompletion;
 class MsgSocket;
+class PermissionList;
 
 class Job
 {
 private:
+	const PermissionList &perm;
 	JobCompletion &completer;
 	std::vector<std::unique_ptr<MsgSocket>> sockets;
 	uint64_t jobId;
 	pid_t pid;
 
+	void SendResponse(MsgSocket * sock, nvlist_t *resp, int error);
+
 public:
-	Job(JobCompletion &, int id, pid_t pid);
+	Job(const PermissionList &, JobCompletion &, int id, pid_t pid);
 	~Job();
 
 	Job(const Job &) = delete;

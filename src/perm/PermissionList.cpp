@@ -26,72 +26,53 @@
  * SUCH DAMAGE.
  */
 
-#include "Job.h"
-
-#include "JobCompletion.h"
-#include "MsgSocket.h"
 #include "PermissionList.h"
 
-#include <cstdlib>
 #include <errno.h>
-#include <err.h>
-#include <sys/dnv.h>
-
-Job::Job(const PermissionList &perm, JobCompletion &c, int id, pid_t pid)
-  : perm(perm),
-    completer(c),
-    jobId(id),
-    pid(pid)
-{
-}
-
-Job::~Job()
-{
-}
+#include <fcntl.h>
 
 void
-Job::Complete(int status)
+PermissionList::AddFilePermission(const std::string &path, Permission p)
 {
-	completer.JobComplete(this, status);
+	filePerm.insert(std::make_pair(path, p));
 }
 
-void
-Job::RegisterSocket(std::unique_ptr<MsgSocket> sock)
+Permission
+PermissionList::ModeToPermission(mode_t mode)
 {
-	sockets.push_back(std::move(sock));
-}
+	Permission p = Permission::NONE;
 
-void
-Job::SendResponse(MsgSocket * sock, nvlist_t *resp, int error)
-{
-	nvlist_add_number(resp, "error", error);
-	sock->Send(resp);
-}
-
-void
-Job::HandleMessage(MsgSocket * sock, MsgType type, nvlist_t *msg)
-{
-	nvlist_t *resp = nvlist_create(NV_FLAG_IGNORE_CASE);
-	if (msg == NULL)
-		err(1, "Could not allocate nvlist message");
-
-	if (!nvlist_exists_number(msg, "flags")) {
-		SendResponse(sock, resp, EPROTO);
-		return;
-	}
-	mode_t mode = nvlist_take_number(msg, "flags");
-
-	auto path = std::unique_ptr<char[], decltype(&std::free)>(
-		dnvlist_take_string(msg, "path", NULL), &std::free);
-	if (path == NULL) {
-		SendResponse(sock, resp, EPROTO);
-		return;
+	switch (mode & O_ACCMODE) {
+	case O_RDONLY:
+		p = Permission::READ;
+		break;
+	case O_WRONLY:
+		p = Permission::WRITE;
+		break;
+	case O_RDWR:
+		p = Permission::READ | Permission::WRITE;
+		break;
 	}
 
-	if (!nvlist_empty(msg)) {
-		SendResponse(sock, resp, EPROTO);
-		return;
+	if (mode & O_EXEC)
+		p |= Permission::EXEC;
+
+	return (p);
+}
+
+int
+PermissionList::IsPermitted(const std::string & path, mode_t mode) const
+{
+	fprintf(stderr, "open %s mode %x\n", path.c_str(), mode);
+	auto it = filePerm.find(path);
+	if (it == filePerm.end()) {
+		return (EPERM);
 	}
 
-	SendResponse(sock, resp, perm.IsPermitted(path.get(), mode));
+	Permission allowed = it->second;
+	Permission requested = ModeToPermission(mode);
+	if ((allowed & requested) != requested)
+		return (EPERM);
+
+	return (0);
 }

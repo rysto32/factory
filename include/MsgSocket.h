@@ -45,7 +45,6 @@ private:
 	MsgSocketServer *server;
 	Job *job;
 
-	struct FactoryMsg msg;
 	uint8_t *next;
 	size_t msg_left;
 
@@ -69,7 +68,7 @@ public:
 		return fd;
 	}
 
-	void Send(const struct FactoryMsg & msg);
+	void Send(nvlist_t * msg);
 };
 
 #endif

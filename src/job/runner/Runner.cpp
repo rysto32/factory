@@ -31,12 +31,15 @@
 #include "JobCompletion.h"
 #include "JobManager.h"
 #include "MsgSocketServer.h"
+#include "Permission.h"
+#include "PermissionList.h"
 #include "TempFileManager.h"
 #include "TempFile.h"
 
 #include <err.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #include <string>
 #include <vector>
@@ -68,15 +71,65 @@ public:
 	}
 };
 
+static void
+ParsePermission(const std::string & opt, PermissionList & perms)
+{
+	auto pos = opt.find_first_of(":");
+	if (pos == std::string::npos) {
+		perms.AddFilePermission(opt, Permission::READ);
+		return;
+	}
+
+	Permission p = Permission::NONE;
+	std::string path(opt.substr(0, pos));
+	pos++;
+	while (pos < opt.length()) {
+		switch (opt.at(pos)) {
+		case 'a':
+			p |= Permission::READ | Permission::WRITE | Permission::EXEC;
+			break;
+		case 'r':
+			p |= Permission::READ;
+			break;
+		case 'w':
+			p |= Permission::WRITE;
+			break;
+		case 'x':
+			p |= Permission::EXEC;
+			break;
+		default:
+			errx(1, "Unknown permission flag '%c' in '%s'", opt.at(pos), opt.c_str());
+			break;
+		}
+		++pos;
+	}
+
+	perms.AddFilePermission(opt, p);
+}
+
 int main(int argc, char **argv)
 {
+	PermissionList perms;
 	ArgList list;
+	int ch;
+
+	while ((ch = getopt(argc, argv, "a:")) != -1) {
+		switch (ch) {
+		case 'a':
+			ParsePermission(optarg, perms);
+			perms.AddFilePermission(optarg, Permission::READ);
+			break;
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
 
 	if (argc < 2) {
 		errx(1, "Usage: %s <prog> [args...]", argv[0]);
 	}
 
-	for (int i = 1; i < argc; ++i)
+	for (int i = 0; i < argc; ++i)
 		list.push_back(argv[i]);
 
 	EventLoop loop;
@@ -89,7 +142,7 @@ int main(int argc, char **argv)
 	MsgSocketServer server(std::move(msgSock), loop, jobManager);
 	SimpleCompletion completer(loop);
 
-	Job * job = jobManager.StartJob(completer, list);
+	Job * job = jobManager.StartJob(perms, completer, list);
 	if (job == NULL)
 		err(1, "Failed to start job");
 

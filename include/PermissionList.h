@@ -26,72 +26,30 @@
  * SUCH DAMAGE.
  */
 
-#include "Job.h"
+#ifndef PERMSSION_LIST_H
+#define PERMSSION_LIST_H
 
-#include "JobCompletion.h"
-#include "MsgSocket.h"
-#include "PermissionList.h"
+#include "Permission.h"
 
-#include <cstdlib>
-#include <errno.h>
-#include <err.h>
-#include <sys/dnv.h>
+#include <sys/types.h>
 
-Job::Job(const PermissionList &perm, JobCompletion &c, int id, pid_t pid)
-  : perm(perm),
-    completer(c),
-    jobId(id),
-    pid(pid)
+#include <memory>
+#include <string>
+#include <unordered_map>
+
+class PermissionList
 {
-}
+private:
+	typedef std::unordered_map<std::string, Permission> PermMap;
 
-Job::~Job()
-{
-}
+	PermMap filePerm;
 
-void
-Job::Complete(int status)
-{
-	completer.JobComplete(this, status);
-}
+	static Permission ModeToPermission(mode_t);
 
-void
-Job::RegisterSocket(std::unique_ptr<MsgSocket> sock)
-{
-	sockets.push_back(std::move(sock));
-}
+public:
+	void AddFilePermission(const std::string &, Permission);
 
-void
-Job::SendResponse(MsgSocket * sock, nvlist_t *resp, int error)
-{
-	nvlist_add_number(resp, "error", error);
-	sock->Send(resp);
-}
+	int IsPermitted(const std::string &, mode_t) const;
+};
 
-void
-Job::HandleMessage(MsgSocket * sock, MsgType type, nvlist_t *msg)
-{
-	nvlist_t *resp = nvlist_create(NV_FLAG_IGNORE_CASE);
-	if (msg == NULL)
-		err(1, "Could not allocate nvlist message");
-
-	if (!nvlist_exists_number(msg, "flags")) {
-		SendResponse(sock, resp, EPROTO);
-		return;
-	}
-	mode_t mode = nvlist_take_number(msg, "flags");
-
-	auto path = std::unique_ptr<char[], decltype(&std::free)>(
-		dnvlist_take_string(msg, "path", NULL), &std::free);
-	if (path == NULL) {
-		SendResponse(sock, resp, EPROTO);
-		return;
-	}
-
-	if (!nvlist_empty(msg)) {
-		SendResponse(sock, resp, EPROTO);
-		return;
-	}
-
-	SendResponse(sock, resp, perm.IsPermitted(path.get(), mode));
-}
+#endif

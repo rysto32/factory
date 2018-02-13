@@ -26,72 +26,47 @@
  * SUCH DAMAGE.
  */
 
-#include "Job.h"
+#ifndef PERMISSION_H
+#define PERMISSION_H
 
-#include "JobCompletion.h"
-#include "MsgSocket.h"
-#include "PermissionList.h"
+#include <type_traits>
 
-#include <cstdlib>
-#include <errno.h>
-#include <err.h>
-#include <sys/dnv.h>
-
-Job::Job(const PermissionList &perm, JobCompletion &c, int id, pid_t pid)
-  : perm(perm),
-    completer(c),
-    jobId(id),
-    pid(pid)
+enum class Permission
 {
+	NONE = 0x00,
+	READ = 0x01,
+	WRITE = 0x02,
+	EXEC = 0x04,
+};
+
+template <typename T>
+auto
+EnumToInt(T t)
+{
+	return static_cast<typename std::underlying_type<T>::type>(t);
 }
 
-Job::~Job()
+inline Permission operator|(Permission a, Permission b)
 {
+	return static_cast<Permission>(
+	    EnumToInt(a) | EnumToInt(b));
 }
 
-void
-Job::Complete(int status)
+inline Permission operator&(Permission a, Permission b)
 {
-	completer.JobComplete(this, status);
+	return static_cast<Permission>(
+	    EnumToInt(a) & EnumToInt(b));
 }
 
-void
-Job::RegisterSocket(std::unique_ptr<MsgSocket> sock)
+inline Permission operator~(Permission a)
 {
-	sockets.push_back(std::move(sock));
+	return static_cast<Permission>(~EnumToInt(a));
 }
 
-void
-Job::SendResponse(MsgSocket * sock, nvlist_t *resp, int error)
+inline Permission operator|=(Permission & a, Permission b)
 {
-	nvlist_add_number(resp, "error", error);
-	sock->Send(resp);
+	a = a | b;
+	return a;
 }
 
-void
-Job::HandleMessage(MsgSocket * sock, MsgType type, nvlist_t *msg)
-{
-	nvlist_t *resp = nvlist_create(NV_FLAG_IGNORE_CASE);
-	if (msg == NULL)
-		err(1, "Could not allocate nvlist message");
-
-	if (!nvlist_exists_number(msg, "flags")) {
-		SendResponse(sock, resp, EPROTO);
-		return;
-	}
-	mode_t mode = nvlist_take_number(msg, "flags");
-
-	auto path = std::unique_ptr<char[], decltype(&std::free)>(
-		dnvlist_take_string(msg, "path", NULL), &std::free);
-	if (path == NULL) {
-		SendResponse(sock, resp, EPROTO);
-		return;
-	}
-
-	if (!nvlist_empty(msg)) {
-		SendResponse(sock, resp, EPROTO);
-		return;
-	}
-
-	SendResponse(sock, resp, perm.IsPermitted(path.get(), mode));
-}
+#endif
