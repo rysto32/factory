@@ -37,7 +37,6 @@
 
 static void initialize(void) __attribute__((constructor));
 
-execve_t * real_execve;
 fexecve_t * real_fexecve;
 open_t *real_open;
 
@@ -69,7 +68,6 @@ initialize(void)
 	}
 	shm = mem;
 
-	real_execve = (execve_t *)dlsym(RTLD_NEXT, "execve");
 	real_fexecve = (fexecve_t *)dlsym(RTLD_NEXT, "fexecve");
 	real_open = (open_t *)dlsym(RTLD_NEXT, "open");
 

@@ -25,6 +25,7 @@
  */
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -157,27 +158,15 @@ fix_envp(char * const orig_envp[], char **var_val)
 }
 
 int
-_execve(const char *path, char * const argv[], char * const orig_envp[])
+_execve(const char *path, char * const argv[], char * const envp[])
 {
-	char * var_val;
-	char ** envp;
-	int error;
+	int fd;
 
-// 	write(2, "execve ", sizeof("execve"));
-// 	write(2, path, strlen(path));
-// 	write(2, "\n", 1);
-	envp = fix_envp(orig_envp, &var_val);
-
-	if (envp == NULL) {
-		errno = ENOMEM;
+	fd = open(path, O_EXEC);
+	if (fd < 0)
 		return (-1);
-	}
 
-	error = real_execve(path, argv, envp);
-
-	free(var_val);
-	free(envp);
-	return (error);
+	return (fexecve(fd, argv, envp));
 }
 
 int

@@ -33,11 +33,9 @@
 extern "C" {
 #endif
 
-typedef int execve_t(const char *path, char * const argv[], char * const orig_envp[]);
 typedef int fexecve_t(int fd, char * const argv[], char * const orig_envp[]);
 typedef int open_t(const char * path, int flags, ...);
 
-extern execve_t * real_execve;
 extern fexecve_t * real_fexecve;
 extern open_t * real_open;
 

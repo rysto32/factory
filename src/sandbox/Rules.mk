@@ -23,4 +23,5 @@ TEST_EXEC_WRAPFUNCS := \
 	_execve=wrapped_execve \
 	fexecve=wrapped_fexecve \
 	calloc=mock_calloc \
+	open=mock_open \
 

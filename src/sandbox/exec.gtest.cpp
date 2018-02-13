@@ -29,9 +29,12 @@
 #include "interpose.h"
 #include "SharedMem.h"
 
+#include "mock/MockOpen.h"
+
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -43,7 +46,6 @@ using namespace testing;
 class MockExec : public GlobalMockBase<MockExec>
 {
 public:
-	MOCK_METHOD3(exec, int (std::string , char * const argv[], char *const envp[]));
 	MOCK_METHOD3(fexec, int (int, char * const argv[], char *const envp[]));
 };
 
@@ -180,11 +182,11 @@ public:
 class GlobalMockExec : private GlobalMock<MockExec>
 {
 public:
-	void ExpectExec(const std::string & path,
+	void ExpectFexec(int fd,
 	    const std::vector<const char *> & args, const ExecEnvironment & env,
 	    int error)
 	{
-		EXPECT_CALL(**this, exec(path, ResultOf(ArgMatcher(args), true), ResultOf(EnvMatcher(env), true)))
+		EXPECT_CALL(**this, fexec(fd, ResultOf(ArgMatcher(args), true), ResultOf(EnvMatcher(env), true)))
 		    .Times(1)
 		    .WillOnce(Return(error));
 	}
@@ -193,10 +195,6 @@ public:
 static bool fail_calloc = false;
 
 extern "C" {
-static int mock_execve(const char * path, char * const argv[], char *const envp[])
-{
-	return MockExec::MockObj().exec(path, argv, envp);
-}
 
 static int mock_fexecve(int fd, char * const argv[], char *const envp[])
 {
@@ -214,7 +212,6 @@ void * mock_calloc(size_t size, size_t nobjs)
 int wrapped_execve(const char * path, char *const argv[], char *const envp[]);
 int wrapped_fexecve(int fd, char *const argv[], char *const envp[]);
 
-execve_t * real_execve = mock_execve;
 fexecve_t * real_fexecve = mock_fexecve;
 
 static struct FactoryShm mock_shm = {
@@ -263,11 +260,16 @@ TEST_F(ExecTestSuite, ExecNullEnv)
 	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
 	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
+	GlobalMockOpen mockOpen;
+	int fd = 5;
+
+	mockOpen.ExpectOpen(path, O_EXEC, fd);
+
 	args.push_back(path.c_str());
 
 	env.emplace_back("LD_PRELOAD", wrapper_path);
 
-	mockExec.ExpectExec(path, args, env, 0);
+	mockExec.ExpectFexec(fd, args, env, 0);
 
 	call_wrapped_execve(path.c_str(), &args[0], NULL);
 }
@@ -281,12 +283,17 @@ TEST_F(ExecTestSuite, ExecEmptyEnv)
 	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
 	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
+	GlobalMockOpen mockOpen;
+	int fd = 5;
+
+	mockOpen.ExpectOpen(path, O_EXEC, fd);
+
 	args.push_back(path.c_str());
 
 	std::vector<char *> environ = env.GetEnviron();
 	env.emplace_back("LD_PRELOAD", wrapper_path);
 
-	mockExec.ExpectExec(path, args, env, 0);
+	mockExec.ExpectFexec(fd, args, env, 0);
 
 	call_wrapped_execve(path.c_str(), &args[0], &environ[0]);
 }
@@ -300,6 +307,11 @@ TEST_F(ExecTestSuite, ExecNoPreloadEnv)
 	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
 	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
+	GlobalMockOpen mockOpen;
+	int fd = 5;
+
+	mockOpen.ExpectOpen(path, O_EXEC, fd);
+
 	args.push_back(path.c_str());
 
 	env.emplace_back("PATH", "/bin:/sbin:/usr/bin:/usr/sbin");
@@ -309,7 +321,7 @@ TEST_F(ExecTestSuite, ExecNoPreloadEnv)
 	std::vector<char *> environ = env.GetEnviron();
 	env.emplace_back("LD_PRELOAD", wrapper_path);
 
-	mockExec.ExpectExec(path, args, env, 0);
+	mockExec.ExpectFexec(fd, args, env, 0);
 
 	call_wrapped_execve(path.c_str(), &args[0], &environ[0]);
 }
@@ -322,6 +334,11 @@ TEST_F(ExecTestSuite, ExecPreloadSingle)
 	ExecEnvironment env;
 	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
 	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
+
+	GlobalMockOpen mockOpen;
+	int fd = 5;
+
+	mockOpen.ExpectOpen(path, O_EXEC, fd);
 
 	args.push_back(path.c_str());
 
@@ -336,7 +353,7 @@ TEST_F(ExecTestSuite, ExecPreloadSingle)
 	std::vector<char *> environ = env.GetEnviron();
 	env.at(preload_index) = EnvVar("LD_PRELOAD", "/lib/libthr.so.3:" + wrapper_path);
 
-	mockExec.ExpectExec(path, args, env, 0);
+	mockExec.ExpectFexec(fd, args, env, 0);
 
 	call_wrapped_execve(path.c_str(), &args[0], &environ[0]);
 }
@@ -349,6 +366,11 @@ TEST_F(ExecTestSuite, ExecPreloadMulti)
 	ExecEnvironment env;
 	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
 	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
+
+	GlobalMockOpen mockOpen;
+	int fd = 5;
+
+	mockOpen.ExpectOpen(path, O_EXEC, fd);
 
 	args.push_back(path.c_str());
 
@@ -371,7 +393,7 @@ TEST_F(ExecTestSuite, ExecPreloadMulti)
 	std::vector<char *> environ = env.GetEnviron();
 	env.at(preload_index) = EnvVar("LD_PRELOAD", "/lib/libthr.so.3:" + almost_wrapper + ":/usr/lib/libdtrace.so.1:" + wrapper_path);
 
-	mockExec.ExpectExec(path, args, env, 0);
+	mockExec.ExpectFexec(fd, args, env, 0);
 
 	call_wrapped_execve(path.c_str(), &args[0], &environ[0]);
 }
@@ -384,6 +406,11 @@ TEST_F(ExecTestSuite, ExecEmptyPreloadEnv)
 	ExecEnvironment env;
 	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
 	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
+
+	GlobalMockOpen mockOpen;
+	int fd = 5;
+
+	mockOpen.ExpectOpen(path, O_EXEC, fd);
 
 	args.push_back(path.c_str());
 
@@ -398,7 +425,7 @@ TEST_F(ExecTestSuite, ExecEmptyPreloadEnv)
 	std::vector<char *> environ = env.GetEnviron();
 	env.at(preload_index) = EnvVar("LD_PRELOAD", wrapper_path);
 
-	mockExec.ExpectExec(path, args, env, 0);
+	mockExec.ExpectFexec(fd, args, env, 0);
 
 	call_wrapped_execve(path.c_str(), &args[0], &environ[0]);
 }
@@ -412,6 +439,11 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadedOnly)
 	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
 	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
+	GlobalMockOpen mockOpen;
+	int fd = 5;
+
+	mockOpen.ExpectOpen(path, O_EXEC, fd);
+
 	args.push_back(path.c_str());
 
 	env.emplace_back("PATH", "/bin:/sbin:/usr/bin:/usr/sbin");
@@ -421,7 +453,7 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadedOnly)
 
 	std::vector<char *> environ = env.GetEnviron();
 
-	mockExec.ExpectExec(path, args, env, 0);
+	mockExec.ExpectFexec(fd, args, env, 0);
 
 	call_wrapped_execve(path.c_str(), &args[0], &environ[0]);
 }
@@ -435,6 +467,11 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadedFirst)
 	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
 	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
+	GlobalMockOpen mockOpen;
+	int fd = 5;
+
+	mockOpen.ExpectOpen(path, O_EXEC, fd);
+
 	args.push_back(path.c_str());
 
 	env.emplace_back("PATH", "/bin:/sbin:/usr/bin:/usr/sbin");
@@ -444,7 +481,7 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadedFirst)
 
 	std::vector<char *> environ = env.GetEnviron();
 
-	mockExec.ExpectExec(path, args, env, 0);
+	mockExec.ExpectFexec(fd, args, env, 0);
 
 	call_wrapped_execve(path.c_str(), &args[0], &environ[0]);
 }
@@ -458,6 +495,11 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadedMiddle)
 	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
 	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
+	GlobalMockOpen mockOpen;
+	int fd = 5;
+
+	mockOpen.ExpectOpen(path, O_EXEC, fd);
+
 	args.push_back(path.c_str());
 
 	env.emplace_back("PATH", "/bin:/sbin:/usr/bin:/usr/sbin");
@@ -467,7 +509,7 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadedMiddle)
 
 	std::vector<char *> environ = env.GetEnviron();
 
-	mockExec.ExpectExec(path, args, env, 0);
+	mockExec.ExpectFexec(fd, args, env, 0);
 
 	call_wrapped_execve(path.c_str(), &args[0], &environ[0]);
 }
@@ -481,6 +523,11 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadedEnd)
 	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
 	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
 
+	GlobalMockOpen mockOpen;
+	int fd = 5;
+
+	mockOpen.ExpectOpen(path, O_EXEC, fd);
+
 	args.push_back(path.c_str());
 
 	env.emplace_back("PATH", "/bin:/sbin:/usr/bin:/usr/sbin");
@@ -493,7 +540,7 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadedEnd)
 
 	std::vector<char *> environ = env.GetEnviron();
 
-	mockExec.ExpectExec(path, args, env, 0);
+	mockExec.ExpectFexec(fd, args, env, 0);
 
 	call_wrapped_execve(path.c_str(), &args[0], &environ[0]);
 }
@@ -506,6 +553,11 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadLastCharMismatch)
 	ExecEnvironment env;
 	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
 	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
+
+	GlobalMockOpen mockOpen;
+	int fd = 5;
+
+	mockOpen.ExpectOpen(path, O_EXEC, fd);
 
 	args.push_back(path.c_str());
 
@@ -528,7 +580,7 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadLastCharMismatch)
 	std::vector<char *> environ = env.GetEnviron();
 	env.at(preload_index) = EnvVar("LD_PRELOAD", "/lib/libthr.so.3:" + almost_wrapper + ":/usr/lib/libdtrace.so.1:" + wrapper_path);
 
-	mockExec.ExpectExec(path, args, env, 0);
+	mockExec.ExpectFexec(fd, args, env, 0);
 
 	call_wrapped_execve(path.c_str(), &args[0], &environ[0]);
 }
@@ -541,6 +593,11 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadLibTooShort)
 	ExecEnvironment env;
 	std::string wrapper_path("/tmp/libfactory_wrapper.so.22");
 	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
+
+	GlobalMockOpen mockOpen;
+	int fd = 5;
+
+	mockOpen.ExpectOpen(path, O_EXEC, fd);
 
 	args.push_back(path.c_str());
 
@@ -563,7 +620,7 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadLibTooShort)
 	std::vector<char *> environ = env.GetEnviron();
 	env.at(preload_index) = EnvVar("LD_PRELOAD", "/lib/libthr.so.3:" + almost_wrapper + ":" + wrapper_path);
 
-	mockExec.ExpectExec(path, args, env, 0);
+	mockExec.ExpectFexec(fd, args, env, 0);
 
 	call_wrapped_execve(path.c_str(), &args[0], &environ[0]);
 }
@@ -576,6 +633,11 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadLibTooLong)
 	ExecEnvironment env;
 	std::string wrapper_path("/tmp/libfactory_wrapper.so.1");
 	strlcpy(shm->sandbox_lib, wrapper_path.c_str(), sizeof(shm->sandbox_lib));
+
+	GlobalMockOpen mockOpen;
+	int fd = 5;
+
+	mockOpen.ExpectOpen(path, O_EXEC, fd);
 
 	args.push_back(path.c_str());
 
@@ -598,7 +660,7 @@ TEST_F(ExecTestSuite, ExecWrapperPreloadLibTooLong)
 	std::vector<char *> environ = env.GetEnviron();
 	env.at(preload_index) = EnvVar("LD_PRELOAD", "/lib/libthr.so.3:" + almost_wrapper + ":" + wrapper_path);
 
-	mockExec.ExpectExec(path, args, env, 0);
+	mockExec.ExpectFexec(fd, args, env, 0);
 
 	call_wrapped_execve(path.c_str(), &args[0], &environ[0]);
 }
