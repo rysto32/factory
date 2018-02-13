@@ -89,3 +89,9 @@ open(const char * path, int flags, ...)
 		return (real_open(path, flags));
 	}
 }
+
+int
+_open(const char * path, int flags, mode_t mode)
+{
+	return (open(path, flags, mode));
+}
