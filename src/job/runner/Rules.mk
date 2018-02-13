@@ -11,7 +11,6 @@ PROG_LIBS := \
 
 PROG_STDLIBS := \
 	event_core \
-	nv \
 
 LIB :=	runner
 

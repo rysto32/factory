@@ -28,21 +28,19 @@
 
 #include "interpose.h"
 
+#include "msgsock.h"
 #include "MsgType.h"
 #include "SharedMem.h"
 
 #include <dlfcn.h>
 #include <err.h>
 #include <sys/mman.h>
-#include <sys/nv.h>
 #include <unistd.h>
 
 static void initialize(void) __attribute__((constructor));
 
 fexecve_t * real_fexecve;
 open_t *real_open;
-
-int msg_sock_fd;
 
 struct FactoryShm *shm;
 
@@ -73,25 +71,7 @@ initialize(void)
 	real_fexecve = (fexecve_t *)dlsym(RTLD_NEXT, "fexecve");
 	real_open = (open_t *)dlsym(RTLD_NEXT, "open");
 
-	msg_sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-	if (msg_sock_fd < 0)
-		err(1, "Could not create msg socket");
-
-	int error = connect(msg_sock_fd, (struct sockaddr*)&shm->msg_socket_path,
-	    sizeof(shm->msg_socket_path));
-	if (error != 0)
-		err(1, "Could not connect msg socket");
-
-	nvlist_t *msg = nvlist_create(NV_FLAG_IGNORE_CASE);
-	if (msg == NULL)
-		err(1, "Could not alloc nvlist msg");
-
-	nvlist_add_number(msg, "type", MSG_TYPE_INIT);
-	nvlist_add_number(msg, "jid", shm->jobId);
-
-	error = nvlist_send(msg_sock_fd, msg);
-	if (error != 0)
-		err(1, "Could not send init msg");
+	msgsock_init(&shm->msg_socket_path, shm->jobId);
 
 // 	write(2, "initialize\n", sizeof("initialize\n"));
 }

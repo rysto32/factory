@@ -27,56 +27,40 @@
  */
 
 #include "interpose.h"
-#include "SharedMem.h"
+
+#include "msgsock.h"
 #include "MsgType.h"
+#include "SharedMem.h"
 
 #include <errno.h>
 #include <err.h>
 #include <fcntl.h>
-#include <sys/nv.h>
+#include <stdarg.h>
+#include <string.h>
 
 int
 open(const char * path, int flags, ...)
 {
-	nvlist_t *msg;
+	struct FactoryMsg msg;
 	mode_t mode;
 	int error;
 
-	msg = nvlist_create(NV_FLAG_IGNORE_CASE);
-	if (msg == NULL) {
-		errno = ENOMEM;
-		return (-1);
-	}
+	msg.type = MSG_TYPE_OPEN_REQUEST;
 
-	nvlist_add_number(msg, "type", MSG_TYPE_OPEN_REQUEST);
-	nvlist_add_string(msg, "path", path);
-	nvlist_add_number(msg, "flags", flags);
+	strlcpy(msg.open.path, path, sizeof(msg.open.path));
+	msg.open.flags = flags;
 
-	error = nvlist_error(msg);
-	if (error != 0) {
-		errno = error;
-		return (-1);
-	}
-
-	error = nvlist_send(msg_sock_fd, msg);
+	error = msgsock_send(&msg);
 	if (error != 0) {
 		err(1, "Failed to send to factory");
 	}
 
-	nvlist_destroy(msg);
-
-	msg = nvlist_recv(msg_sock_fd, NV_FLAG_IGNORE_CASE);
-	if (msg == NULL)
+	error = msgsock_recv(&msg);
+	if (error != 0)
 		err(1, "Failed to receive response from factory");
 
-	if (nvlist_error(msg) != 0)
-		err(1, "Response from factory had an error");
-
-	error = nvlist_get_number(msg, "error");
-	nvlist_destroy(msg);
-
-	if (error != 0) {
-		errno = error;
+	if (msg.resp.error != 0) {
+		errno = msg.resp.error;
 		return (-1);
 	}
 

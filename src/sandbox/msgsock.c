@@ -1,6 +1,4 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause
- *
  * Copyright (c) 2018 Ryan Stone
  * All rights reserved.
  *
@@ -26,48 +24,70 @@
  * SUCH DAMAGE.
  */
 
-#ifndef MSG_SOCKET_H
-#define MSG_SOCKET_H
+#include "msgsock.h"
 
-#include "Event.h"
 #include "MsgType.h"
 
-class EventLoop;
-class MsgSocketServer;
-class Job;
+#include <sys/socket.h>
+#include <sys/un.h>
 
-class MsgSocket : public Event
+#include <err.h>
+#include <unistd.h>
+
+static int msg_sock_fd;
+
+void
+msgsock_init(const struct sockaddr_un *addr, uint64_t jobId)
 {
-private:
-	int fd;
-	MsgSocketServer *server;
-	Job *job;
-
 	struct FactoryMsg msg;
+
+	msg_sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (msg_sock_fd < 0)
+		err(1, "Could not create msg socket");
+
+	int error = connect(msg_sock_fd, (struct sockaddr*)addr, sizeof(*addr));
+	if (error != 0)
+		err(1, "Could not connect msg socket");
+
+
+	msg.type = MSG_TYPE_INIT;
+	msg.init.jobId = jobId;
+
+	error = msgsock_send(&msg);
+	if (error != 0)
+		err(1, "Could not send init msg");
+}
+
+int
+msgsock_send(const struct FactoryMsg *msg)
+{
+	ssize_t sent;
+
+	sent = send(msg_sock_fd, msg, sizeof(*msg), 0);
+	if (sent != sizeof(*msg))
+		return (-1);
+
+	return (0);
+}
+
+int
+msgsock_recv(struct FactoryMsg *msg)
+{
 	uint8_t *next;
-	size_t msg_left;
+	ssize_t recvd;
+	size_t size;
 
-	int Recv(struct FactoryMsg & msg);
+	next = (uint8_t*)msg;
+	size = sizeof(*msg);
 
-	void ReinitBuf();
+	do {
+		recvd = recv(msg_sock_fd, next, size, 0);
+		if (recvd < 0)
+			return (-1);
 
-public:
-	MsgSocket(int fd, MsgSocketServer *, EventLoop &);
-	~MsgSocket();
+		next += recvd;
+		size -= recvd;
+	} while (size > 0);
 
-	MsgSocket(const MsgSocket&) = delete;
-	MsgSocket(MsgSocket &&) = delete;
-	MsgSocket & operator=(const MsgSocket &) = delete;
-	MsgSocket & operator=(MsgSocket &&) = delete;
-
-	void Dispatch(int fd, short flags) override;
-
-	int GetFD() const
-	{
-		return fd;
-	}
-
-	void Send(const struct FactoryMsg & msg);
-};
-
-#endif
+	return (0);
+}

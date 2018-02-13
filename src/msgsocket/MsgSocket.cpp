@@ -43,6 +43,7 @@ MsgSocket::MsgSocket(int fd, MsgSocketServer *server, EventLoop &loop)
     job(NULL)
 {
 	loop.RegisterSocket(this, fd);
+	ReinitBuf();
 }
 
 MsgSocket::~MsgSocket()
@@ -57,57 +58,58 @@ MsgSocket::Dispatch(int fd, short flags)
 {
 	assert (this->fd == fd);
 
-	nvlist_t *msg = nvlist_recv(this->fd, NV_FLAG_IGNORE_CASE);
+	int error = Recv(msg);
+	if (error != 0)
+		return;
 
-	// XXX should these err() calls be handled better?
-	if (msg == NULL) {
-		if (errno == ENOTCONN)
-			return;
-		err(1, "Got invalid message from fd %d (flags=%x)\n", this->fd, flags);
-	}
+	if (msg.type >= MSG_TYPE_MAX)
+		errx(1, "Got message of invalid type %d from fd %d", msg.type, this->fd);
 
-	if (!nvlist_exists_number(msg, "type")) {
-		nvlist_fdump(msg, stderr);
-		errx(1, "Got message without type from fd %d\n", this->fd);
-	}
-
-	int t = nvlist_take_number(msg, "type");
-	if (t >= MSG_TYPE_MAX)
-		errx(1, "Got message of invalid type %d from fd %d", t, this->fd);
-
-	if (t == MSG_TYPE_INIT) {
+	if (msg.type == MSG_TYPE_INIT) {
 		if (job != NULL)
 			errx(1, "Got duplicate init message from fd %d", this->fd);
 
-		if (!nvlist_exists_number(msg, "jid"))
-			errx(1, "Got init message without jid from fd %d", this->fd);
-
-		uint64_t jobId = nvlist_take_number(msg, "jid");
-
-		if (!nvlist_empty(msg)) {
-			void *cookie;
-			const char * first = nvlist_next(msg, NULL, &cookie);
-			errx(1, "Got init message with unexpected field '%s' from fd %d",
-			    first, this->fd);
-		}
-
-		job = server->CompleteSocket(this, jobId);
+		job = server->CompleteSocket(this, msg.init.jobId);
 	} else {
 		if (job == NULL)
-			errx(1, "Got unexpected message type %d from fd %d", t, this->fd);
+			errx(1, "Got unexpected message type %d from fd %d", msg.type, this->fd);
 
-		job->HandleMessage(this, static_cast<MsgType>(t), msg);
+		job->HandleMessage(this, msg);
 	}
-
-	nvlist_destroy(msg);
 }
 
 void
-MsgSocket::Send(nvlist_t * msg)
+MsgSocket::ReinitBuf()
 {
-	int error = nvlist_send(fd, msg);
-	if (error != 0)
-		err(1, "Could not send message to job");
+	next = reinterpret_cast<uint8_t*>(&msg);
+	msg_left = sizeof(msg);
+}
 
-	nvlist_destroy(msg);
+int
+MsgSocket::Recv(struct FactoryMsg & msg)
+{
+	ssize_t recvd;
+
+	do {
+		recvd = recv(fd, next, msg_left, 0);
+		if (recvd < 0)
+			err(1, "Could not receive message");
+
+		if (recvd == 0)
+			return (-1);
+
+		next += recvd;
+		msg_left -= recvd;
+	} while (msg_left > 0);
+
+	ReinitBuf();
+	return (0);
+}
+
+void
+MsgSocket::Send(const struct FactoryMsg & msg)
+{
+	ssize_t sent = (send(fd, &msg, sizeof(msg), 0));
+	if (sent != sizeof(msg))
+		err(1, "Did not send message to job");
 }

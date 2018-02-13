@@ -1,6 +1,4 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause
- *
  * Copyright (c) 2018 Ryan Stone
  * All rights reserved.
  *
@@ -29,45 +27,13 @@
 #ifndef MSG_SOCKET_H
 #define MSG_SOCKET_H
 
-#include "Event.h"
-#include "MsgType.h"
+#include <stdint.h>
 
-class EventLoop;
-class MsgSocketServer;
-class Job;
+struct sockaddr_un;
+struct FactoryMsg;
 
-class MsgSocket : public Event
-{
-private:
-	int fd;
-	MsgSocketServer *server;
-	Job *job;
-
-	struct FactoryMsg msg;
-	uint8_t *next;
-	size_t msg_left;
-
-	int Recv(struct FactoryMsg & msg);
-
-	void ReinitBuf();
-
-public:
-	MsgSocket(int fd, MsgSocketServer *, EventLoop &);
-	~MsgSocket();
-
-	MsgSocket(const MsgSocket&) = delete;
-	MsgSocket(MsgSocket &&) = delete;
-	MsgSocket & operator=(const MsgSocket &) = delete;
-	MsgSocket & operator=(MsgSocket &&) = delete;
-
-	void Dispatch(int fd, short flags) override;
-
-	int GetFD() const
-	{
-		return fd;
-	}
-
-	void Send(const struct FactoryMsg & msg);
-};
+void msgsock_init(const struct sockaddr_un *addr, uint64_t jobId);
+int msgsock_send(const struct FactoryMsg *);
+int msgsock_recv(struct FactoryMsg *);
 
 #endif

@@ -29,6 +29,9 @@
 #ifndef MSG_TYPE_H
 #define MSG_TYPE_H
 
+#include <sys/param.h>
+#include <stdint.h>
+
 enum MsgType
 {
 	MSG_TYPE_INIT,
@@ -36,6 +39,32 @@ enum MsgType
 
 	/* Must be last */
 	MSG_TYPE_MAX
+};
+
+struct FactoryInitMsg
+{
+	uint64_t jobId;
+};
+
+struct FactoryOpenMsg
+{
+	char path[PATH_MAX];
+	int flags;
+};
+
+struct FactoryResp
+{
+	int error;
+};
+
+struct FactoryMsg
+{
+	enum MsgType type;
+	union {
+		struct FactoryInitMsg init;
+		struct FactoryOpenMsg open;
+		struct FactoryResp resp;
+	};
 };
 
 #endif

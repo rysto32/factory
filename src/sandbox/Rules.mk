@@ -2,12 +2,10 @@
 LIB :=	factory_sandbox
 SHLIB_NEEDED := 1
 
-SHLIB_STDLIBS := \
-	nv \
-
 SRCS := \
 	exec.c \
 	interpose.c \
+	msgsock.c \
 	open.c \
 
 TESTS := \
