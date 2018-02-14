@@ -71,17 +71,17 @@ public:
 	}
 };
 
-static void
-ParsePermission(const std::string & opt, PermissionList & perms)
+static Permission
+ParsePermission(const std::string & opt, std::string &path)
 {
-	auto pos = opt.find_first_of(":");
+	auto pos = opt.find_first_of(':');
 	if (pos == std::string::npos) {
-		perms.AddFilePermission(opt, Permission::READ);
-		return;
+		path = opt;
+		return Permission::READ;
 	}
 
 	Permission p = Permission::NONE;
-	std::string path(opt.substr(0, pos));
+	path = opt.substr(0, pos);
 	pos++;
 	while (pos < opt.length()) {
 		switch (opt.at(pos)) {
@@ -104,7 +104,7 @@ ParsePermission(const std::string & opt, PermissionList & perms)
 		++pos;
 	}
 
-	perms.AddFilePermission(opt, p);
+	return p;
 }
 
 int main(int argc, char **argv)
@@ -113,11 +113,18 @@ int main(int argc, char **argv)
 	ArgList list;
 	int ch;
 
-	while ((ch = getopt(argc, argv, "a:")) != -1) {
+	while ((ch = getopt(argc, argv, "a:d:")) != -1) {
+		std::string permPath;
+		Permission p;
+
 		switch (ch) {
 		case 'a':
-			ParsePermission(optarg, perms);
-			perms.AddFilePermission(optarg, Permission::READ);
+			p = ParsePermission(optarg, permPath);
+			perms.AddFilePermission(permPath, p);
+			break;
+		case 'd':
+			p = ParsePermission(optarg, permPath);
+			perms.AddDirPermission(permPath, p);
 			break;
 		}
 	}

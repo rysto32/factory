@@ -36,18 +36,44 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 class PermissionList
 {
 private:
+	struct DirectoryPerm
+	{
+		std::string path;
+		Permission perm;
+
+		DirectoryPerm(const std::string & path, Permission perm)
+		  : path(path), perm(perm)
+		{
+		}
+
+		bool operator<(const DirectoryPerm & other) const
+		{
+			return path < other.path;
+		}
+
+		bool Matches(const std::string &) const;
+	};
+
 	typedef std::unordered_map<std::string, Permission> PermMap;
+	typedef std::vector<DirectoryPerm> DirPermList;
 
 	PermMap filePerm;
+	DirPermList dirPerm;
 
 	static Permission ModeToPermission(mode_t);
 
+	int CheckDirPerms(const std::string & path, mode_t mode) const;
+	int CheckPerm(Permission allowed, mode_t mode) const;
+
 public:
 	void AddFilePermission(const std::string &, Permission);
+	void AddDirPermission(const std::string &, Permission);
+	void Finalize();
 
 	int IsPermitted(const std::string &, mode_t) const;
 };

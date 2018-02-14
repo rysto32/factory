@@ -37,6 +37,18 @@ PermissionList::AddFilePermission(const std::string &path, Permission p)
 	filePerm.insert(std::make_pair(path, p));
 }
 
+void
+PermissionList::AddDirPermission(const std::string & path, Permission p)
+{
+	dirPerm.emplace_back(path, p);
+}
+
+void
+PermissionList::Finalize()
+{
+	std::sort(dirPerm.rbegin(), dirPerm.rend());
+}
+
 Permission
 PermissionList::ModeToPermission(mode_t mode)
 {
@@ -61,18 +73,46 @@ PermissionList::ModeToPermission(mode_t mode)
 }
 
 int
-PermissionList::IsPermitted(const std::string & path, mode_t mode) const
+PermissionList::CheckDirPerms(const std::string & path, mode_t mode) const
 {
-	fprintf(stderr, "open %s mode %x\n", path.c_str(), mode);
-	auto it = filePerm.find(path);
-	if (it == filePerm.end()) {
-		return (EPERM);
+	for (auto & perm : dirPerm) {
+		if (perm.Matches(path))
+			return CheckPerm(perm.perm, mode);
 	}
 
-	Permission allowed = it->second;
+	return (EPERM);
+}
+
+int
+PermissionList::CheckPerm(Permission allowed, mode_t mode) const
+{
 	Permission requested = ModeToPermission(mode);
 	if ((allowed & requested) != requested)
 		return (EPERM);
 
 	return (0);
+}
+
+int
+PermissionList::IsPermitted(const std::string & path, mode_t mode) const
+{
+	auto it = filePerm.find(path);
+	if (it == filePerm.end())
+		return (CheckDirPerms(path, mode));
+
+	return (CheckPerm(it->second, mode));
+}
+
+bool PermissionList::DirectoryPerm::Matches(const std::string & candidate) const
+{
+	if (path == candidate)
+		return true;
+
+	if (candidate.length() <= path.length())
+		return false;
+
+	if (candidate.substr(0, path.length()) == path && candidate.at(path.length()) == '/')
+		return true;
+
+	return false;
 }

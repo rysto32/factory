@@ -51,6 +51,8 @@ $(LIB)_SHLIB := $(LIBDIR)/$($(LIB)_SONAME)
 
 $(LIB)_CLEAN := $($(LIB)_CLEAN) $($(LIB)_SHLIB) $($(LIB)_SOBJS)
 
+$($(LIB)_SHLIB): LIB := $(LIB)
+
 $($(LIB)_SHLIB): $($(LIB)_SOBJS)
 	mkdir -p $(dir $@)
 	$(LD_C) -shared $(LDFLAGS) -o $@ -soname $($(LIB)_SONAME) $^ $($(LIB)_STDLIBS)
