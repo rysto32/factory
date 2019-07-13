@@ -65,17 +65,17 @@ private:
 	PermMap filePerm;
 	DirPermList dirPerm;
 
-	static Permission ModeToPermission(mode_t);
+	static Permission ModeToPermission(int);
 
-	int CheckDirPerms(const std::string & path, mode_t mode) const;
-	int CheckPerm(Permission allowed, mode_t mode) const;
+	int CheckDirPerms(const std::string & path, int mode) const;
+	int CheckPerm(Permission allowed, int mode) const;
 
 public:
 	void AddFilePermission(const std::string &, Permission);
 	void AddDirPermission(const std::string &, Permission);
 	void Finalize();
 
-	int IsPermitted(const std::string &, mode_t) const;
+	int IsPermitted(const std::string &, int) const;
 };
 
 #endif

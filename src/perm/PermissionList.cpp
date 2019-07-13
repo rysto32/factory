@@ -51,7 +51,7 @@ PermissionList::Finalize()
 }
 
 Permission
-PermissionList::ModeToPermission(mode_t mode)
+PermissionList::ModeToPermission(int mode)
 {
 	Permission p = Permission::NONE;
 
@@ -74,7 +74,7 @@ PermissionList::ModeToPermission(mode_t mode)
 }
 
 int
-PermissionList::CheckDirPerms(const std::string & path, mode_t mode) const
+PermissionList::CheckDirPerms(const std::string & path, int mode) const
 {
 	for (auto & perm : dirPerm) {
 		if (perm.Matches(path))
@@ -85,7 +85,7 @@ PermissionList::CheckDirPerms(const std::string & path, mode_t mode) const
 }
 
 int
-PermissionList::CheckPerm(Permission allowed, mode_t mode) const
+PermissionList::CheckPerm(Permission allowed, int mode) const
 {
 	Permission requested = ModeToPermission(mode);
 	if ((allowed & requested) != requested)
@@ -95,7 +95,7 @@ PermissionList::CheckPerm(Permission allowed, mode_t mode) const
 }
 
 int
-PermissionList::IsPermitted(const std::string & path, mode_t mode) const
+PermissionList::IsPermitted(const std::string & path, int mode) const
 {
 	auto it = filePerm.find(path);
 	if (it == filePerm.end())
