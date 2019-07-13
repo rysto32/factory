@@ -44,6 +44,8 @@ class ProductManager
 	JobQueue & jobQueue;
 	std::unordered_set<Product*> fullyBuilt;
 
+	bool NeedsBuild(const Product*) const;
+
 public:
 	ProductManager(JobQueue &);
 
@@ -51,7 +53,7 @@ public:
 	void AddDependency(Product * dependant, Product * dependee);
 
 	void SubmitLeafJobs();
-	void SetNeedsBuild(Product*);
+	void SetNeedsBuild(const Product*);
 
 	void ProductReady(Product *);
 };

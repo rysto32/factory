@@ -72,6 +72,11 @@ public:
 	{
 		return pendingJob.get();
 	}
+
+	const std::vector<Product*> & GetDependees() const
+	{
+		return dependees;
+	}
 };
 
 #endif

@@ -61,6 +61,11 @@ ProductManager::AddDependency(Product * dependant, Product * dependee)
 
 	dependant->AddDependency(dependee);
 
+	if (NeedsBuild(dependee)) {
+		SetNeedsBuild(dependant);
+		return;
+	}
+
 	error = stat(dependee->GetPath().c_str(), &statDependee);
 	if (error != 0) {
 		SetNeedsBuild(dependant);
@@ -83,10 +88,20 @@ ProductManager::AddDependency(Product * dependant, Product * dependee)
 }
 
 void
-ProductManager::SetNeedsBuild(Product *p)
+ProductManager::SetNeedsBuild(const Product *p)
 {
 	fprintf(stderr, "'%s' needs build\n", p->GetPath().c_str());
-	fullyBuilt.erase(p);
+	if (fullyBuilt.erase(const_cast<Product*>(p)) > 0) {
+		for (const Product * d : p->GetDependees()) {
+			SetNeedsBuild(d);
+		}
+	}
+}
+
+bool
+ProductManager::NeedsBuild(const Product *p) const
+{
+	return fullyBuilt.count(const_cast<Product*>(p)) == 0;
 }
 
 void
@@ -100,6 +115,6 @@ ProductManager::SubmitLeafJobs()
 void
 ProductManager::ProductReady(Product *p)
 {
-	if (fullyBuilt.count(p) == 0)
+	if (NeedsBuild(p))
 		jobQueue.Submit(p->GetPendingJob());
 }
