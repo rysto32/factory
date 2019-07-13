@@ -40,7 +40,8 @@ PermissionList::AddFilePermission(const std::string &path, Permission p)
 void
 PermissionList::AddDirPermission(const std::string & path, Permission p)
 {
-	dirPerm.emplace_back(path, p);
+	auto lastChar = path.find_last_not_of("/") + 1;
+	dirPerm.emplace_back(path.substr(0, lastChar), p);
 }
 
 void
