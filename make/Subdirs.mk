@@ -8,6 +8,7 @@ define include_template
  LIB:=
  LOCAL_INCLUDE:=
  SHLIB_NEEDED:=
+ SRCS:=
 
  PROG_TARGET:=
  PROG:=
