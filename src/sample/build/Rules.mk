@@ -1,8 +1,13 @@
 
-PROG :=	bin/runner
+LIB := build_sample
+
+SRCS := \
+	main.cpp \
+
+PROG := bin/build
 
 PROG_LIBS := \
-	runner \
+	build_sample \
 	job \
 	perm \
 	product \
@@ -14,7 +19,3 @@ PROG_STDLIBS := \
 	event_core \
 	nv \
 
-LIB :=	runner
-
-SRCS := \
-	Runner.cpp \

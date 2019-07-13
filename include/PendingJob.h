@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018 Ryan Stone
+ * Copyright (c) 2019 Ryan Stone
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,58 +26,52 @@
  * SUCH DAMAGE.
  */
 
-#ifndef JOB_MANAGER_H
-#define JOB_MANAGER_H
+#ifndef PENDING_JOB_H
+#define PENDING_JOB_H
 
-#include "Event.h"
-#include "PendingJob.h"
-
-#include <sys/types.h>
-
-#include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
-class EventLoop;
+#include "JobCompletion.h"
+
 class Job;
-class JobCompletion;
-class JobQueue;
-class MsgSocket;
+class Product;
 class PermissionList;
-class TempFile;
 
-class JobManager : private Event
+typedef std::vector<Product*> ProductList;
+typedef std::vector<std::string> ArgList;
+
+class PendingJob : public JobCompletion
 {
-private:
-	typedef std::unordered_map<uint64_t, std::unique_ptr<Job>> JobMap;
-	typedef std::unordered_map<pid_t, Job*> PidMap;
+	std::vector<Product*> products;
 
-	JobMap jobMap;
-	PidMap pidMap;
-	EventLoop &loop;
-	TempFile *msgSock;
-	JobQueue & jobQueue;
-
-	uint64_t next_job_id;
-
-	uint64_t AllocJobId();
+	ArgList argList;
+	const PermissionList & permissions;
 
 public:
-	JobManager(EventLoop &, TempFile *, JobQueue &);
-	~JobManager();
+	PendingJob(ProductList && products, ArgList && a, const PermissionList & p);
+	virtual ~PendingJob() = default;
 
-	JobManager(const JobManager &) = delete;
-	JobManager(JobManager &&) = delete;
-	JobManager & operator=(const JobManager &) = delete;
-	JobManager & operator=(JobManager &&) = delete;
+	PendingJob(const PendingJob &) = delete;
+	PendingJob(PendingJob &&) = delete;
 
-	Job * StartJob(PendingJob &, JobCompletion &);
+	PendingJob & operator=(const PendingJob &) = delete;
+	PendingJob & operator=(PendingJob &&) = delete;
 
-	void Dispatch(int fd, short flags) override;
-	bool ScheduleJob();
+	virtual void JobComplete(Job * job, int status) override;
 
-	Job *RegisterSocket(uint64_t jobId, std::unique_ptr<MsgSocket>);
+	const ArgList & GetArgList() const
+	{
+		return argList;
+	}
+
+	const PermissionList & GetPermissions() const
+	{
+		return permissions;
+	}
 };
 
+typedef std::unique_ptr<PendingJob> PendingJobPtr;
+
 #endif
+

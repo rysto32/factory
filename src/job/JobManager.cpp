@@ -30,6 +30,7 @@
 
 #include "EventLoop.h"
 #include "Job.h"
+#include "JobQueue.h"
 #include "JobSharedMemory.h"
 #include "MsgSocket.h"
 #include "SharedMem.h"
@@ -49,6 +50,7 @@
 
 #include <cassert>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -79,8 +81,10 @@ StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, i
 	_exit(1);
 }
 
-JobManager::JobManager(EventLoop & loop, TempFile *msgSock)
-  : msgSock(msgSock),
+JobManager::JobManager(EventLoop & loop, TempFile *msgSock, JobQueue &q)
+  : loop(loop),
+    msgSock(msgSock),
+    jobQueue(q),
     next_job_id(0)
 
 {
@@ -99,16 +103,20 @@ JobManager::AllocJobId()
 }
 
 Job*
-JobManager::StartJob(const PermissionList & perm, JobCompletion & completer,
-    const ArgList & argList)
+JobManager::StartJob(PendingJob & pending, JobCompletion & completer)
 {
 	std::vector<char *>  argp;
+	const ArgList & argList = pending.GetArgList();
+	std::ostringstream command;
 
 	for (const std::string & arg : argList) {
 		// Blame POSIX for the const_cast :()
 		argp.push_back(const_cast<char*>(arg.c_str()));
+		command << arg << " ";
 	}
 	argp.push_back(NULL);
+
+	printf("Run: %s\n", command.str().c_str());
 
 	std::vector<char *> envp;
 	for (int i = 0; environ[i] != NULL; ++i) {
@@ -128,7 +136,7 @@ JobManager::StartJob(const PermissionList & perm, JobCompletion & completer,
 	if (child == 0) {
 		StartChild(argp, envp, shm->GetFD());
 	} else {
-		auto job = std::make_unique<Job>(perm, completer, jobId, child);
+		auto job = std::make_unique<Job>(pending.GetPermissions(), completer, jobId, child);
 
 		pidMap.insert(std::make_pair(child, job.get()));
 		auto ins = jobMap.insert(std::make_pair(jobId, std::move(job)));
@@ -145,8 +153,15 @@ JobManager::Dispatch(int sig, short flags)
 	while (1) {
 		int status;
 		pid_t pid = wait3(&status, WEXITED | WNOHANG, NULL);
-		if (pid == -1)
+		if (pid == 0)
 			break;
+
+		if (pid == -1) {
+			if (errno == ECHILD)
+				break;
+			else
+				err(1, "wait3 failed");
+		}
 
 		auto it = pidMap.find(pid);
 		if (it == pidMap.end()) {
@@ -157,7 +172,24 @@ JobManager::Dispatch(int sig, short flags)
 		it->second->Complete(status);
 		jobMap.erase(it->second->GetJobId());
 		pidMap.erase(it);
+
+		ScheduleJob();
 	}
+}
+
+bool
+JobManager::ScheduleJob()
+{
+	PendingJob * pending = jobQueue.RemoveNext();
+
+	if (pending == nullptr) {
+		if (jobMap.empty())
+			loop.SignalExit();
+		return false;
+	}
+
+	StartJob(*pending, *pending);
+	return true;
 }
 
 Job *

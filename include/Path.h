@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018 Ryan Stone
+ * Copyright (c) 2019 Ryan Stone
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,58 +26,12 @@
  * SUCH DAMAGE.
  */
 
-#ifndef JOB_MANAGER_H
-#define JOB_MANAGER_H
+#ifndef PATH_H
+#define PATH_H
 
-#include "Event.h"
-#include "PendingJob.h"
-
-#include <sys/types.h>
-
-#include <memory>
 #include <string>
-#include <unordered_map>
-#include <vector>
 
-class EventLoop;
-class Job;
-class JobCompletion;
-class JobQueue;
-class MsgSocket;
-class PermissionList;
-class TempFile;
-
-class JobManager : private Event
-{
-private:
-	typedef std::unordered_map<uint64_t, std::unique_ptr<Job>> JobMap;
-	typedef std::unordered_map<pid_t, Job*> PidMap;
-
-	JobMap jobMap;
-	PidMap pidMap;
-	EventLoop &loop;
-	TempFile *msgSock;
-	JobQueue & jobQueue;
-
-	uint64_t next_job_id;
-
-	uint64_t AllocJobId();
-
-public:
-	JobManager(EventLoop &, TempFile *, JobQueue &);
-	~JobManager();
-
-	JobManager(const JobManager &) = delete;
-	JobManager(JobManager &&) = delete;
-	JobManager & operator=(const JobManager &) = delete;
-	JobManager & operator=(JobManager &&) = delete;
-
-	Job * StartJob(PendingJob &, JobCompletion &);
-
-	void Dispatch(int fd, short flags) override;
-	bool ScheduleJob();
-
-	Job *RegisterSocket(uint64_t jobId, std::unique_ptr<MsgSocket>);
-};
+typedef std::string Path;
 
 #endif
+

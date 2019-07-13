@@ -30,7 +30,9 @@
 #include "Job.h"
 #include "JobCompletion.h"
 #include "JobManager.h"
+#include "JobQueue.h"
 #include "MsgSocketServer.h"
+#include "PendingJob.h"
 #include "Permission.h"
 #include "PermissionList.h"
 #include "TempFileManager.h"
@@ -133,7 +135,7 @@ int main(int argc, char **argv)
 	argv += optind;
 
 	if (argc < 2) {
-		errx(1, "Usage: %s <prog> [args...]", argv[0]);
+		errx(1, "Usage: %s <prog> [args...]", getprogname());
 	}
 
 	for (int i = 0; i < argc; ++i)
@@ -145,11 +147,13 @@ int main(int argc, char **argv)
 	if (!msgSock)
 		err(1, "Failed to get msgsock");
 
-	JobManager jobManager(loop, msgSock.get());
+	JobQueue jobQueue;
+	JobManager jobManager(loop, msgSock.get(), jobQueue);
 	MsgSocketServer server(std::move(msgSock), loop, jobManager);
 	SimpleCompletion completer(loop);
+	PendingJob pending({}, std::move(list), perms);
 
-	Job * job = jobManager.StartJob(perms, completer, list);
+	Job * job = jobManager.StartJob(pending, completer);
 	if (job == NULL)
 		err(1, "Failed to start job");
 

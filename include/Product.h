@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018 Ryan Stone
+ * Copyright (c) 2019 Ryan Stone
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,58 +26,52 @@
  * SUCH DAMAGE.
  */
 
-#ifndef JOB_MANAGER_H
-#define JOB_MANAGER_H
+#ifndef PRODUCT_H
+#define PRODUCT_H
 
-#include "Event.h"
+#include "Path.h"
 #include "PendingJob.h"
 
-#include <sys/types.h>
-
-#include <memory>
-#include <string>
-#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
-class EventLoop;
-class Job;
-class JobCompletion;
 class JobQueue;
-class MsgSocket;
-class PermissionList;
-class TempFile;
+class ProductManager;
 
-class JobManager : private Event
+class Product
 {
-private:
-	typedef std::unordered_map<uint64_t, std::unique_ptr<Job>> JobMap;
-	typedef std::unordered_map<pid_t, Job*> PidMap;
+	Path path;
+	PendingJobPtr pendingJob;
+	ProductManager & productManager;
 
-	JobMap jobMap;
-	PidMap pidMap;
-	EventLoop &loop;
-	TempFile *msgSock;
-	JobQueue & jobQueue;
+	std::unordered_set<const Product*> dependencies;
+	std::vector<Product*> dependees;
 
-	uint64_t next_job_id;
-
-	uint64_t AllocJobId();
 
 public:
-	JobManager(EventLoop &, TempFile *, JobQueue &);
-	~JobManager();
+	Product(const Path & p, ProductManager & mgr);
 
-	JobManager(const JobManager &) = delete;
-	JobManager(JobManager &&) = delete;
-	JobManager & operator=(const JobManager &) = delete;
-	JobManager & operator=(JobManager &&) = delete;
+	Product(const Product &) = delete;
+	Product(Product &&) = delete;
 
-	Job * StartJob(PendingJob &, JobCompletion &);
+	Product &operator=(const Product&) = delete;
+	Product &operator=(Product &&) = delete;
 
-	void Dispatch(int fd, short flags) override;
-	bool ScheduleJob();
+	bool SetPendingJob(PendingJobPtr && j);
+	void AddDependency(Product *);
 
-	Job *RegisterSocket(uint64_t jobId, std::unique_ptr<MsgSocket>);
+	void BuildComplete(int status);
+	void DependencyComplete(const Product *);
+
+	const Path & GetPath() const
+	{
+		return path;
+	}
+
+	PendingJob * GetPendingJob()
+	{
+		return pendingJob.get();
+	}
 };
 
 #endif
