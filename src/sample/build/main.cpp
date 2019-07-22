@@ -53,7 +53,7 @@ AddSourceFile(const std::string & name, JobQueue &jq, ProductManager & productMa
 {
 	std::ostringstream srcPath, objPath;
 
-	srcPath << "/home/rstone/src/tcplat" << "/" << name;
+	srcPath << "/home/rstone/src/tcplat/" << name;
 
 	Product *src = productManager.GetProduct(srcPath.str());
 
