@@ -1,5 +1,6 @@
 
 SUBDIRS := \
+	config \
 	eventloop \
 	job \
 	msgsocket \
