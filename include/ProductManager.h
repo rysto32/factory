@@ -49,6 +49,11 @@ class ProductManager
 public:
 	ProductManager(JobQueue &);
 
+	ProductManager(const ProductManager &) = delete;
+	ProductManager(ProductManager &&) = delete;
+	ProductManager &operator=(const ProductManager &) = delete;
+	ProductManager &operator=(ProductManager &&) = delete;
+
 	Product * GetProduct(const Path &);
 	void AddDependency(Product * dependant, Product * dependee);
 

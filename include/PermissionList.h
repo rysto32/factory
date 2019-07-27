@@ -71,6 +71,11 @@ private:
 	int CheckPerm(Permission allowed, int mode) const;
 
 public:
+	PermissionList(const PermissionList &) = delete;
+	PermissionList(PermissionList &&) = delete;
+	PermissionList &operator=(const PermissionList&) = delete;
+	PermissionList &operator=(PermissionList &&) = delete;
+
 	void AddFilePermission(const std::string &, Permission);
 	void AddDirPermission(const std::string &, Permission);
 	void Finalize();
