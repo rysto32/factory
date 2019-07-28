@@ -89,7 +89,7 @@ Product::BuildComplete(int status)
 		exit(1);
 	} else {
 		fprintf(stderr, "%s: job terminated on unknown code %d\n",
-		     path.c_str(), WTERMSIG(status));
+		     path.c_str(), status);
 		exit(1);
 	}
 }
