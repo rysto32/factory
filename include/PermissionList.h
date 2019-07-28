@@ -71,6 +71,7 @@ private:
 	int CheckPerm(Permission allowed, int mode) const;
 
 public:
+	PermissionList() = default;
 	PermissionList(const PermissionList &) = delete;
 	PermissionList(PermissionList &&) = delete;
 	PermissionList &operator=(const PermissionList&) = delete;
