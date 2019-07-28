@@ -34,6 +34,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <err.h>
+#include <errno.h>
+
 ProductManager::ProductManager(JobQueue & jq)
   : jobQueue(jq)
 {
@@ -107,7 +110,17 @@ ProductManager::NeedsBuild(const Product *p) const
 void
 ProductManager::SubmitLeafJobs()
 {
+	struct stat sb;
+	int error;
+
 	for (Product * p : fullyBuilt) {
+		error = stat(p->GetPath().c_str(), &sb);
+		if (error != 0) {
+			if (errno == ENOENT) {
+				errx(1, "No rule to build file '%s'", p->GetPath().c_str());
+			}
+			err(1, "Failed to stat '%s'", p->GetPath().c_str());
+		}
 		p->BuildComplete(0);
 	}
 }
