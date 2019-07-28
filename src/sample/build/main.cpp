@@ -27,6 +27,8 @@
  * SUCH DAMAGE.
  */
 
+#include "ConfigNode.h"
+#include "ConfigParser.h"
 #include "EventLoop.h"
 #include "Job.h"
 #include "JobCompletion.h"
@@ -49,26 +51,195 @@
 #include <vector>
 
 Product *
-AddSourceFile(const std::string & name, JobQueue &jq, ProductManager & productManager, PermissionList & perms)
+AddSourceFile(const std::string & name, const std::vector<std::string> cflags, ProductManager & productMgr, PermissionList & perms)
 {
 	std::ostringstream srcPath, objPath;
 
 	srcPath << "/home/rstone/src/tcplat/" << name;
 
-	Product *src = productManager.GetProduct(srcPath.str());
+	Product *src = productMgr.GetProduct(srcPath.str());
 
 	auto suffixIndex = name.find_last_of(".");
 
-	objPath << "/tmp/factory/" << name.substr(0, suffixIndex) << ".o";
+	objPath << "/tmp/tcplat/" << name.substr(0, suffixIndex) << ".o";
 
-	Product *obj = productManager.GetProduct(objPath.str());
+	Product *obj = productMgr.GetProduct(objPath.str());
 
 	auto job = std::make_unique<PendingJob>(ProductList{obj},
-	    ArgList{"/usr/local/bin/g++", "-c", "-O2", "-o", objPath.str(), srcPath.str()}, perms);
+	    ArgList{"/usr/local/bin/clang++80", "-c", "-O2", "-o", objPath.str(), srcPath.str()}, perms);
 	obj->SetPendingJob(std::move(job));
-	productManager.AddDependency(obj, src);
+	productMgr.AddDependency(obj, src);
 
 	return obj;
+}
+
+std::string GetArchivePath(const std::string & libname)
+{
+	std::ostringstream arName;
+	arName << "/tmp/tcplat/lib" << libname << ".a";
+
+	return arName.str();
+}
+
+void GetStringList(std::vector<std::string> & list, const ConfigNode::ValueType & conf)
+{
+	if (std::holds_alternative<std::string>(conf)) {
+		list.push_back(std::get<std::string>(conf));
+		return;
+	}
+
+	auto confList = std::get_if<ConfigNodeList>(&conf);
+
+	if (!confList) {
+		errx(1, "Needed a list or a string");
+	}
+
+	for (const ConfigNodePtr & node : *confList) {
+		const ConfigNode::ValueType & value = node->GetValue();
+
+		if (!std::holds_alternative<std::string>(value)) {
+			errx(1, "string list contains non-string");
+		}
+
+		list.emplace_back(std::get<std::string>(value));
+	}
+}
+
+void GetLibList(std::vector<Product*> & list, const ConfigNode::ValueType & conf, ProductManager & productMgr)
+{
+	if (std::holds_alternative<std::string>(conf)) {
+		std::string arName(GetArchivePath(std::get<std::string>(conf)));
+		list.push_back(productMgr.GetProduct(arName));
+		return;
+	}
+
+	auto confList = std::get_if<ConfigNodeList>(&conf);
+
+	if (!confList) {
+		errx(1, "Needed a list or a string");
+	}
+
+	for (const ConfigNodePtr & node : *confList) {
+		const ConfigNode::ValueType & value = node->GetValue();
+
+		if (!std::holds_alternative<std::string>(value)) {
+			errx(1, "string list contains non-string");
+		}
+
+		std::string arName(GetArchivePath(std::get<std::string>(value)));
+		list.push_back(productMgr.GetProduct(arName));
+	}
+}
+
+void AddLibraryDef(const ConfigNode & node, ProductManager & productMgr, PermissionList & perms)
+{
+	std::string libname;
+	std::vector<std::string> cflags;
+	std::vector<std::string> srcs;
+
+	const auto & config = node.GetValue();
+
+	auto pairs = std::get_if<ConfigPairMap>(&config);
+	if (!pairs) {
+		errx(1, "library must be an object");
+	}
+
+	//const ConfigPairMap & pairs = *pairsPtr;
+	for (const auto & [name, value] : *pairs) {
+		const auto & valueConf = value->GetValue();
+		if (name == "name") {
+			if (!std::holds_alternative<std::string>(valueConf))
+				errx(1, "library name must be a string");
+			libname = std::get<std::string>(valueConf);
+		} else if (name == "cflags") {
+			GetStringList(cflags, valueConf);
+		} else if (name == "srcs") {
+			GetStringList(srcs, valueConf);
+		}
+	}
+
+	std::vector<Product*> objList;
+	for (const std::string & file : srcs) {
+		objList.push_back(AddSourceFile(file, cflags, productMgr, perms));
+	}
+
+	std::string arName(GetArchivePath(libname));
+	Product *archive = productMgr.GetProduct(arName);
+
+	ArgList args{"/usr/bin/ar", "crs", arName};
+	for (Product * o : objList) {
+		args.push_back(o->GetPath());
+	}
+	auto job = std::make_unique<PendingJob>(ProductList{archive},
+	    std::move(args), perms);
+	archive->SetPendingJob(std::move(job));
+	for (Product * o : objList) {
+		productMgr.AddDependency(archive, o);
+	}
+}
+
+void AddProgramDef(const ConfigNode & node, ProductManager & productMgr, PermissionList & perms)
+{
+	std::string path;
+	std::vector<Product*> libList;
+	std::vector<std::string> stdlibs;
+
+	const auto & config = node.GetValue();
+
+	auto pairs = std::get_if<ConfigPairMap>(&config);
+	if (!pairs) {
+		errx(1, "library must be an object");
+	}
+
+	//const ConfigPairMap & pairs = *pairsPtr;
+	for (const auto & [name, value] : *pairs) {
+		const auto & valueConf = value->GetValue();
+		if (name == "path") {
+			if (!std::holds_alternative<std::string>(valueConf))
+				errx(1, "program path must be a string");
+			path = std::get<std::string>(valueConf);
+		} else if (name == "stdlibs") {
+			GetStringList(stdlibs, valueConf);
+		} else if (name == "libs") {
+			GetLibList(libList, valueConf, productMgr);
+		}
+	}
+
+	Product * exe = productMgr.GetProduct(path);
+
+	ArgList args{"/usr/local/bin/clang++80"};
+	for (Product * a : libList) {
+		args.push_back(a->GetPath());
+	}
+	for (const std::string & lib : stdlibs) {
+		args.push_back("-l" + lib);
+	}
+	args.push_back("-o");
+	args.push_back(exe->GetPath());
+
+	auto job = std::make_unique<PendingJob>(ProductList{exe}, std::move(args), perms);
+	exe->SetPendingJob(std::move(job));
+
+	for (Product * a : libList) {
+		productMgr.AddDependency(exe, a);
+	}
+}
+
+void FindRules(const ConfigNode & node, ProductManager & productMgr, PermissionList & perms)
+{
+	const auto & config = node.GetValue();
+
+	const auto & pairs = std::get<ConfigPairMap>(config);
+
+	for (const auto & [name, value] : pairs) {
+		if (name == "library") {
+			AddLibraryDef(*value, productMgr, perms);
+		} else if (name == "program") {
+			AddProgramDef(*value, productMgr, perms);
+		} else {
+			errx(1, "Unrecognized object name '%s'", name.c_str());
+		}
+	}
 }
 
 int main(int argc, char **argv)
@@ -85,47 +256,21 @@ int main(int argc, char **argv)
 	JobQueue jq;
 	JobManager jobManager(loop, msgSock.get(), jq);
 	MsgSocketServer server(std::move(msgSock), loop, jobManager);
-	ProductManager productManager(jq);
+	ProductManager productMgr(jq);
 
 	perms.AddDirPermission("/", Permission::READ | Permission::WRITE | Permission::EXEC);
 
-	std::vector<std::string> srcList{
-	    "HistoInfo.cpp",
-	    "KernelController.cpp",
-	    "MsgSocket.cpp",
-	    "RequestClient.cpp",
-	    "SlaveControlStrategy.cpp",
-	    "SlaveServer.cpp",
-	    "SocketThread.cpp",
-	    "tcplat.cpp",
-	    "TestMaster.cpp",
-	    "TestSlave.cpp",
-	    "Thread.cpp",
-	    "UserController.cpp"};
+	ConfigParser parser("/home/rstone/repos/factory/src/sample/build/build.ucl");
 
-	for (auto srcFile : srcList) {
-		Product * object = AddSourceFile(srcFile, jq, productManager, perms);
-		objects.push_back(object);
+	std::string errors;
+	if (!parser.Parse(errors)) {
+		errx(1, "Could not parse build definition: %s", errors.c_str());
 	}
 
-	Product * exe = productManager.GetProduct("/tmp/factory/tcplat");
+	const ConfigNode & config = parser.GetConfig();
+	FindRules(config, productMgr, perms);
 
-	ArgList args{"/usr/local/bin/g++"};
-	for (Product * o : objects) {
-		args.push_back(o->GetPath());
-	}
-	args.push_back("-lpthread");
-	args.push_back("-o");
-	args.push_back(exe->GetPath());
-
-	auto job = std::make_unique<PendingJob>(ProductList{exe}, std::move(args), perms);
-	exe->SetPendingJob(std::move(job));
-
-	for (Product * o : objects) {
-		productManager.AddDependency(exe, o);
-	}
-
-	productManager.SubmitLeafJobs();
+	productMgr.SubmitLeafJobs();
 
 	if (!jobManager.ScheduleJob()) {
 		printf("No work to build target\n");

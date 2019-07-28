@@ -1,0 +1,31 @@
+
+
+program : {
+	path : "/tmp/tcplat/tcplat"
+	libs : [
+		"tcplat",
+	]
+
+	stdlibs : [
+		"pthread",
+	]
+}
+
+library : {
+	name : "tcplat"
+	srcs : [
+		"HistoInfo.cpp",
+		"KernelController.cpp",
+		"MsgSocket.cpp",
+		"RequestClient.cpp",
+		"SlaveControlStrategy.cpp",
+		"SlaveServer.cpp",
+		"SocketThread.cpp",
+		"tcplat.cpp",
+		"TestMaster.cpp",
+		"TestSlave.cpp",
+		"Thread.cpp",
+		"UserController.cpp"
+	]
+	cflags : ["-O2", "-g", "-Wall"]
+}

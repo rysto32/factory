@@ -13,9 +13,12 @@ PROG_LIBS := \
 	product \
 	msgsocket \
 	eventloop \
+	config \
 	temp_files \
 
 PROG_STDLIBS := \
 	event_core \
 	nv \
+	ucl \
+
 
