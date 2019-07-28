@@ -38,14 +38,28 @@
 class ConfigParser
 {
 	std::string filename;
-	ConfigNode top;
+	ConfigNodePtr top;
 
-	static bool WalkConfig(const ucl_object_t *obj, ConfigNode & node, std::string & errors);
+	template <typename Container, typename AddNodeFunc>
+	static bool WalkConfig(const ucl_object_t *obj, Container & node, std::string & errors, const AddNodeFunc & AddNode);
 
 public:
-	ConfigParser(const std::string & file);
+	ConfigParser(const std::string & file)
+	  : filename(file)
+	{
+	}
+
+	ConfigParser(const ConfigParser &) = delete;
+	ConfigParser(ConfigParser &&) = delete;
+	ConfigParser &operator=(const ConfigParser &) = delete;
+	ConfigParser &operator=(ConfigParser &&) = delete;
 
 	bool Parse(std::string & errors);
+
+	const ConfigNode & GetConfig() const
+	{
+		return *top;
+	}
 };
 
 #endif

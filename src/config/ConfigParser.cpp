@@ -46,6 +46,34 @@ struct UclObjectDeleter
 	}
 };
 
+static auto
+AddKeyValue()
+{
+	return [](ConfigPairMap & parent, const ucl_object_t *obj, ConfigNode::ValueType && value, std::string & errors)
+	{
+		const char *key = ucl_object_key(obj);
+		auto child = std::make_unique<ConfigNode>(std::move(value));
+		auto success = parent.emplace(std::string(key), std::move(child));
+		if (!success.second) {
+			errors = std::string("key ") + key + " repeated";
+			return false;
+		}
+		fprintf(stderr, "Add key %s\n", key);
+		return true;
+	};
+}
+
+static auto
+AppendList()
+{
+	return [](ConfigNodeList & parent, const ucl_object_t *obj, ConfigNode::ValueType && value, std::string & errors)
+	{
+		auto child = std::make_unique<ConfigNode>(std::move(value));
+		parent.emplace_back(std::move(child));
+		return true;
+	};
+}
+
 bool
 ConfigParser::Parse(std::string & errors)
 {
@@ -67,44 +95,61 @@ ConfigParser::Parse(std::string & errors)
 		return false;
 	}
 
+	ConfigPairMap pairs;
 	auto obj = std::unique_ptr<ucl_object_t, UclObjectDeleter>(ucl_parser_get_object(parser.get()));
-	return WalkConfig(obj.get(), top, errors);
+	if (ucl_object_type(obj.get()) != UCL_OBJECT) {
+		errors = "Illegal top-level node (must be OBJECT)";
+		return false;
+	}
+
+	bool success = WalkConfig(obj.get(), pairs, errors, AddKeyValue());
+	if (!success)
+		return false;
+
+	top = std::make_unique<ConfigNode>(std::move(pairs));
+	return true;
 }
 
+template <typename Container, typename AddNodeFunc>
 bool
-ConfigParser::WalkConfig(const ucl_object_t *parentObj, ConfigNode & parent, std::string & errors)
+ConfigParser::WalkConfig(const ucl_object_t *parentObj, Container & parent, std::string & errors, const AddNodeFunc & AddNode)
 {
-	ucl_object_iter_t it;
+	ucl_object_iter_t it = nullptr;
 	const ucl_object_t *obj;
-	const char *key;
 
 	while ((obj = ucl_iterate_object(parentObj, &it, true)) != nullptr) {
-		key = ucl_object_key(obj);
-
 		switch (ucl_object_type(obj)) {
-			case UCL_OBJECT:
-			case UCL_ARRAY: {
-				auto child = std::make_unique<ConfigNode>();
+			case UCL_OBJECT:{
+				ConfigPairMap pairs;
 
-				bool success = WalkConfig(obj, *child, errors);
+				bool success = WalkConfig(obj, pairs, errors, AddKeyValue());
 				if (!success)
 					return false;
 
-				if (!parent.AddPair(key, std::move(child))) {
-					errors = std::string("key ") + key + " repeated";
+				if (!AddNode(parent, obj, std::move(pairs), errors)) {
+					return false;
+				}
+				break;
+			}
+			case UCL_ARRAY:  {
+				ConfigNodeList list;
+
+				bool success = WalkConfig(obj, list, errors, AppendList());
+				if (!success)
+					return false;
+
+				if (!AddNode(parent, obj, std::move(list), errors)) {
 					return false;
 				}
 				break;
 			}
 			case UCL_INT:
-				if (!parent.AddPair(key, ucl_object_toint(obj))) {
-					errors = std::string("key ") + key + " repeated";
+				if (!AddNode(parent, obj, ucl_object_toint(obj), errors)) {
 					return false;
 				}
 				break;
 			case UCL_STRING:
-				if (!parent.AddPair(key, ucl_object_tostring(obj))) {
-					errors = std::string("key ") + key + " repeated";
+				if (!AddNode(parent, obj, ucl_object_tostring(obj), errors)) {
 					return false;
 				}
 				break;

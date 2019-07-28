@@ -40,26 +40,33 @@ class ConfigNode;
 
 typedef std::unique_ptr<ConfigNode> ConfigNodePtr;
 typedef std::vector<ConfigNodePtr> ConfigNodeList;
+typedef std::unordered_map<std::string, ConfigNodePtr> ConfigPairMap;
 
 class ConfigNode
 {
-	typedef std::variant<int, std::string, ConfigNodeList, ConfigNodePtr> ValueType;
-	typedef std::unordered_map<std::string, ValueType> PairMap;
+public:
+	typedef std::variant<int, std::string, ConfigNodeList, ConfigPairMap> ValueType;
 
-	PairMap pairs;
+private:
+
+	ValueType value;
 
 public:
-	ConfigNode() = default;
+	ConfigNode(ValueType && v)
+	  : value(std::move(v))
+	{
+
+	}
+
 	ConfigNode(const ConfigNode &) = delete;
 	ConfigNode(ConfigNode &&) = default;
 
 	ConfigNode & operator=(const ConfigNode &) = delete;
 	ConfigNode & operator=(ConfigNode &&) = delete;
 
-	bool AddPair(std::string && name, ValueType && v)
+	const ValueType & GetValue() const
 	{
-		auto success = pairs.emplace(std::move(name), std::move(v));
-		return success.second;
+		return value;
 	}
 };
 
