@@ -11,10 +11,10 @@ C_OPTIM:=-O3 -fno-omit-frame-pointer
 
 C_WARNFLAGS := -Wall -Werror
 
-CXX_STD:=-std=c++17
+CXX_STD:=-std=c++17 -ftemplate-backtrace-limit=0
 CXX_WARNFLAGS:=-Wno-user-defined-literals
 
-CFLAGS:=-I/usr/local/include -I$(TOPDIR)/include $(C_OPTIM) -g $(C_WARNFLAGS)
+CFLAGS:=-I/usr/local/include -I/usr/local/include/lua53 -I$(TOPDIR)/include $(C_OPTIM) -g $(C_WARNFLAGS)
 CXXFLAGS:=$(CXX_STD) $(CXX_WARNFLAGS)
 
 LDFLAGS := -L/usr/local/lib

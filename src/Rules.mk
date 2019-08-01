@@ -2,6 +2,8 @@
 SUBDIRS := \
 	config \
 	eventloop \
+	ingest \
+	interpreter \
 	job \
 	msgsocket \
 	perm \
