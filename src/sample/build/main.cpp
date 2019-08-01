@@ -1,4 +1,3 @@
-
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
@@ -30,6 +29,8 @@
 #include "ConfigNode.h"
 #include "ConfigParser.h"
 #include "EventLoop.h"
+#include "IngestManager.h"
+#include "Interpreter.h"
 #include "Job.h"
 #include "JobCompletion.h"
 #include "JobManager.h"
@@ -49,6 +50,7 @@
 #include <string>
 #include <vector>
 
+#if 0
 Product *
 AddSourceFile(const std::string & name, const std::vector<std::string> cflags, ProductManager & productMgr, PermissionList & perms)
 {
@@ -240,6 +242,7 @@ void FindRules(const ConfigNode & node, ProductManager & productMgr, PermissionL
 		}
 	}
 }
+#endif
 
 int main(int argc, char **argv)
 {
@@ -257,6 +260,9 @@ int main(int argc, char **argv)
 	MsgSocketServer server(std::move(msgSock), loop, jobManager);
 	ProductManager productMgr(jq);
 
+	IngestManager ingestMgr;
+	Interpreter interp(ingestMgr);
+
 	perms.AddDirPermission("/", Permission::READ | Permission::WRITE | Permission::EXEC);
 
 	ConfigParser parser("/home/rstone/repos/factory/src/sample/build/build.ucl");
@@ -266,8 +272,10 @@ int main(int argc, char **argv)
 		errx(1, "Could not parse build definition: %s", errors.c_str());
 	}
 
+	interp.RunFile("/home/rstone/repos/factory/src/sample/build/factory.lua");
+
 	const ConfigNode & config = parser.GetConfig();
-	FindRules(config, productMgr, perms);
+	interp.ProcessConfig(config);
 
 	productMgr.SubmitLeafJobs();
 

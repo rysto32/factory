@@ -8,6 +8,8 @@ PROG := bin/build
 
 PROG_LIBS := \
 	build_sample \
+	ingest \
+	interpreter \
 	job \
 	perm \
 	product \
@@ -20,5 +22,6 @@ PROG_STDLIBS := \
 	event_core \
 	nv \
 	ucl \
+	lua-5.3 \
 
 
