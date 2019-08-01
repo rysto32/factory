@@ -34,8 +34,12 @@
 
 #include <lua.hpp>
 #include <memory>
+#include <unordered_map>
+#include <vector>
 
+class CommandFactory;
 class IngestManager;
+class PermissionList;
 
 class Interpreter
 {
@@ -67,6 +71,7 @@ class Interpreter
 	typedef std::unique_ptr<lua_State, LuaStateFree> LuaStatePtr;
 	LuaStatePtr luaState;
 	IngestManager & ingestMgr;
+	CommandFactory & commandFactory;
 
 	void RegisterModules();
 
@@ -86,8 +91,13 @@ class Interpreter
 
 	void AddStringValuePair(const char * name, const char * value);
 
+	std::vector<std::string> GetStringList(int stackIndex);
+	std::unordered_map<std::string, std::vector<std::string>> GetInputs(int stackIndex);
+
+	static int LuaAbsoluteIndex(lua_State *lua, int index);
+
 public:
-	Interpreter(IngestManager &);
+	Interpreter(IngestManager &, CommandFactory &);
 	~Interpreter();
 
 	Interpreter(const Interpreter &) = delete;

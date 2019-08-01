@@ -80,11 +80,18 @@ function factory.add_definitions(definitions)
 end
 --]]
 
+function make_lib_path(lib)
+	return "/home/rstone/obj/tcplat/lib" .. lib .. ".a"
+end
+
 definitions = {
 	{
 		name = "library",
 		process = function(parent_config, defs)
-			libpath = "/tmp/tcplat/lib" .. defs["name"] .. ".a"
+			libpath = make_lib_path(defs["name"])
+			objdir = "/home/rstone/obj/tcplat/"
+
+			factory.define_command({objdir}, {}, {"/bin/mkdir", "-p", objdir})
 
 			objs = {}
 			for i, src in ipairs(defs["srcs"]) do
@@ -92,7 +99,7 @@ definitions = {
 				srcpath=srcdir .. src
 
 				objname = string.gsub(src, "%.[a-zA-Z0-9]+$", ".o")
-				objpath = "/tmp/tcplat/" .. objname
+				objpath = objdir .. objname
 
 				arglist = { parent_config["CXX"], "-c" }
 				factory.array_concat(arglist, defs["cflags"])
@@ -101,12 +108,69 @@ definitions = {
 				table.insert(arglist, srcpath)
 
 				inputs = {
-					rw = { "/tmp" },
-					ro = {"/usr/include/", srcdir},
+					rw = { objpath, objdir },
+					ro = {
+						"/usr/include/",
+						"/usr/local/llvm80",
+						"/usr/local/bin",
+						"/lib",
+						"/usr/lib",
+						"/usr/local/lib",
+						srcdir,
+						srcpath
+					},
 				}
 
 				factory.define_command({objpath}, inputs, arglist)
+
+				table.insert(objs, objpath)
 			end
+
+			arglist = { parent_config["AR"], "crs", libpath}
+			factory.array_concat(arglist, objs)
+
+			inputs = {
+				rw = {libpath, objdir},
+				ro = objs
+			}
+
+			factory.define_command(libpath, inputs, arglist)
+		end
+	},
+	{
+		name = "program",
+		process = function(parent_config, config)
+			libpaths = {}
+			read_paths = {
+				"/usr/local/llvm80",
+				"/usr/local/bin",
+				"/lib",
+				"/usr/lib",
+				"/usr/local/lib",
+			}
+
+			for _, lib in ipairs(config["libs"]) do
+				libpath = make_lib_path(lib)
+				table.insert(libpaths, libpath)
+				table.insert(read_paths, libpath)
+			end
+
+			stdlibs = {}
+			for _, lib in ipairs(config["stdlibs"]) do
+				table.insert(stdlibs, "-l" .. lib)
+			end
+
+			prog_path = config["path"]
+			arglist = {parent_config["LD"], "-o", prog_path}
+			factory.array_concat(arglist, libpaths)
+			factory.array_concat(arglist, stdlibs)
+
+			inputs = {
+				rw = {prog_path},
+				ro = read_paths
+			}
+
+			factory.define_command(prog_path, inputs, arglist)
 		end
 	}
 }

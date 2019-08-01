@@ -40,19 +40,18 @@ Product::Product(const Path & p, ProductManager & mgr)
 }
 
 bool
-Product::SetCommand(CommandPtr && j)
+Product::SetCommand(Command * c)
 {
 	if (command)
 		return false;
 
-	command = std::move(j);
+	command = std::move(c);
 	return true;
 }
 
 void
 Product::AddDependency(Product *d)
 {
-	assert (command);
 
 	dependencies.insert(d);
 	d->dependees.push_back(this);

@@ -26,23 +26,31 @@
  * SUCH DAMAGE.
  */
 
-#include "Command.h"
+#ifndef COMMAND_FACTORY_H
+#define COMMAND_FACTORY_H
 
-#include "Product.h"
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
+class Command;
+class PermissionList;
+class ProductManager;
 
-Command::Command(ProductList && products, ArgList && a, PermissionList && perm)
-  : products(products), argList(a), permissions(std::move(perm))
+class CommandFactory
 {
-	for (Product * p : products) {
-		p->SetCommand(this);
-	}
-}
+	ProductManager &productManager;
+	std::vector<std::unique_ptr<Command>> commandList;
 
-void
-Command::JobComplete(Job * job, int status)
-{
-	for (Product *p : products) {
-		p->BuildComplete(status);
-	}
-}
+	static bool IsDirectory(const std::string & path);
+
+public:
+	CommandFactory(ProductManager &);
+	void AddCommand(const std::vector<std::string> & products,
+	    const std::unordered_map<std::string, std::vector<std::string>> & permMap,
+	    std::vector<std::string> && argList);
+};
+
+#endif
+

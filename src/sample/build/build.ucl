@@ -1,7 +1,7 @@
 
 
 program : {
-	path : "/tmp/tcplat/tcplat"
+	path : "/tmp/tcplat"
 	libs : [
 		"tcplat",
 	]

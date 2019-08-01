@@ -33,10 +33,10 @@
 #include <vector>
 
 #include "JobCompletion.h"
+#include "PermissionList.h"
 
 class Job;
 class Product;
-class PermissionList;
 
 typedef std::vector<Product*> ProductList;
 typedef std::vector<std::string> ArgList;
@@ -46,10 +46,10 @@ class Command : public JobCompletion
 	std::vector<Product*> products;
 
 	ArgList argList;
-	const PermissionList & permissions;
+	PermissionList permissions;
 
 public:
-	Command (ProductList && products, ArgList && a, const PermissionList & p);
+	Command (ProductList && products, ArgList && a, PermissionList && p);
 	virtual ~Command() = default;
 
 	Command (const Command &) = delete;

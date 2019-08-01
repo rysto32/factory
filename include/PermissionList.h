@@ -72,8 +72,9 @@ private:
 
 public:
 	PermissionList() = default;
+	PermissionList(PermissionList &&) = default;
+
 	PermissionList(const PermissionList &) = delete;
-	PermissionList(PermissionList &&) = delete;
 	PermissionList &operator=(const PermissionList&) = delete;
 	PermissionList &operator=(PermissionList &&) = delete;
 

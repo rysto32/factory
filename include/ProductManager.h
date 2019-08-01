@@ -34,6 +34,7 @@
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 class Product;
 class JobQueue;
@@ -43,8 +44,11 @@ class ProductManager
 	std::unordered_map<Path, std::unique_ptr<Product>> products;
 	JobQueue & jobQueue;
 	std::unordered_set<Product*> fullyBuilt;
+	std::vector<Product*> readyProducts;
 
 	bool NeedsBuild(const Product*) const;
+	bool FileExists(const std::string &) const;
+	void AddDependency(Product * product, Product * input);
 
 public:
 	ProductManager(JobQueue &);
@@ -55,7 +59,7 @@ public:
 	ProductManager &operator=(ProductManager &&) = delete;
 
 	Product * GetProduct(const Path &);
-	void AddDependency(Product * dependant, Product * dependee);
+	void SetInputs(Product * product, const std::vector<Product*> & inputs);
 
 	void SubmitLeafJobs();
 	void SetNeedsBuild(const Product*);

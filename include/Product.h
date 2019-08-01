@@ -41,7 +41,7 @@ class ProductManager;
 class Product
 {
 	Path path;
-	CommandPtr command;
+	Command *command;
 	ProductManager & productManager;
 
 	std::unordered_set<const Product*> dependencies;
@@ -57,7 +57,7 @@ public:
 	Product &operator=(const Product&) = delete;
 	Product &operator=(Product &&) = delete;
 
-	bool SetCommand(CommandPtr && j);
+	bool SetCommand(Command * j);
 	void AddDependency(Product *);
 
 	void BuildComplete(int status);
@@ -70,7 +70,8 @@ public:
 
 	Command * GetPendingJob()
 	{
-		return command.get();
+		assert (command);
+		return command;
 	}
 
 	const std::vector<Product*> & GetDependees() const

@@ -28,11 +28,15 @@
 
 #include "Interpreter.h"
 
+#include "CommandFactory.h"
 #include "ConfigNode.h"
 #include "IngestManager.h"
+#include "PermissionList.h"
 
 #include <cassert>
+#include <memory>
 #include <string>
+#include <vector>
 
 #include <err.h>
 
@@ -50,9 +54,10 @@ Interpreter::LuaStateFree::operator()(lua_State *luaState)
 	lua_close(luaState);
 }
 
-Interpreter::Interpreter(IngestManager &ingest)
+Interpreter::Interpreter(IngestManager &ingest, CommandFactory & c)
   : luaState(LuaStatePtr(luaL_newstate())),
-    ingestMgr(ingest)
+    ingestMgr(ingest),
+    commandFactory(c)
 {
 	// XXX this adds the io standard lib -- do we want that?
 	luaL_openlibs(luaState.get());
@@ -249,10 +254,70 @@ Interpreter::AddDefinitions()
 	return 0;
 }
 
+/*
+ * Conver an index to an equivalant absolute index that references the same object
+ * even as the stack is pushed or popped.
+ */
+int
+Interpreter::LuaAbsoluteIndex(lua_State *lua, int relative)
+{
+	return (relative > 0 || relative <= LUA_REGISTRYINDEX) ? relative
+	    : lua_gettop(lua) + relative + 1;
+}
+
+std::vector<std::string>
+Interpreter::GetStringList(int relative)
+{
+	lua_State * lua = luaState.get();
+	int stackIndex = LuaAbsoluteIndex(lua, relative);
+
+	if (lua_isstring(lua, stackIndex)) {
+		std::string str = lua_tostring(lua, stackIndex);
+		return {str};
+	}
+
+	luaL_checktype(lua, stackIndex, LUA_TTABLE);
+
+	std::vector<std::string> list;
+
+	/* Start with the first entry in table */
+	lua_pushnil(lua);
+	while (lua_next(lua, stackIndex) != 0) {
+		luaL_checktype(lua, -1, LUA_TSTRING);
+		list.push_back(lua_tostring(lua, -1));
+		lua_pop(lua, 1);
+	}
+	return list;
+}
+
+std::unordered_map<std::string, std::vector<std::string>>
+Interpreter::GetInputs(int stackIndex)
+{
+	lua_State * lua = luaState.get();
+	std::unordered_map<std::string, std::vector<std::string>> inputList;
+
+	lua_pushnil(lua);
+	while (lua_next(lua, stackIndex) != 0) {
+		luaL_checktype(lua, -2, LUA_TSTRING);
+		std::string permType = lua_tostring(lua, -2);
+		std::vector<std::string> paths = GetStringList(-1);
+		lua_pop(lua, 1);
+
+		inputList.emplace(std::move(permType), std::move(paths));
+	}
+
+	return inputList;
+}
+
 // factory.define_command(products, inputs, arglist)
 int
 Interpreter::DefineCommand()
 {
+	std::vector<std::string> products = GetStringList(1);
+	auto perms = GetInputs(2);
+	std::vector<std::string> argList = GetStringList(3);
+
+	commandFactory.AddCommand(products, perms, std::move(argList));
 
 	return 0;
 }

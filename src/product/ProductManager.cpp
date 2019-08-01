@@ -81,19 +81,49 @@ ProductManager::AddDependency(Product * dependant, Product * dependee)
 		return;
 	}
 
-	printf("Dependant: mtime %ld.%09ld %s\n", statDependant.st_mtim.tv_sec, statDependant.st_mtim.tv_nsec, dependant->GetPath().c_str());
-	printf("Dependee:  mtime %ld.%09ld %s\n", statDependee.st_mtim.tv_sec, statDependee.st_mtim.tv_nsec, dependee->GetPath().c_str());
+	/*printf("Dependant: mtime %ld.%09ld %s\n", statDependant.st_mtim.tv_sec, statDependant.st_mtim.tv_nsec, dependant->GetPath().c_str());
+	printf("Dependee:  mtime %ld.%09ld %s\n", statDependee.st_mtim.tv_sec, statDependee.st_mtim.tv_nsec, dependee->GetPath().c_str());*/
 	if (statDependant.st_mtim.tv_sec < statDependee.st_mtim.tv_sec ||
 	    (statDependant.st_mtim.tv_sec == statDependee.st_mtim.tv_sec &&
 	    statDependant.st_mtim.tv_nsec < statDependee.st_mtim.tv_nsec)) {
-		    SetNeedsBuild(dependant);
+		SetNeedsBuild(dependant);
+	}
+}
+
+bool
+ProductManager::FileExists(const std::string & path) const
+{
+	struct stat sb;
+	int error;
+
+	error = stat(path.c_str(), &sb);
+	return error == 0;
+}
+
+void
+ProductManager::SetInputs(Product * product, const std::vector<Product*> & inputs)
+{
+	int count = 0;
+	for (Product * input : inputs) {
+		if (product == input) {
+			continue;
+		}
+		AddDependency(product, input);
+		count++;
+	}
+
+	if (count == 0) {
+		if (!FileExists(product->GetPath())) {
+			SetNeedsBuild(product);
+			readyProducts.push_back(product);
+		}
+		return;
 	}
 }
 
 void
 ProductManager::SetNeedsBuild(const Product *p)
 {
-	fprintf(stderr, "'%s' needs build\n", p->GetPath().c_str());
 	if (fullyBuilt.erase(const_cast<Product*>(p)) > 0) {
 		for (const Product * d : p->GetDependees()) {
 			SetNeedsBuild(d);
@@ -122,6 +152,10 @@ ProductManager::SubmitLeafJobs()
 			err(1, "Failed to stat '%s'", p->GetPath().c_str());
 		}
 		p->BuildComplete(0);
+	}
+
+	for (Product * p : readyProducts)  {
+		ProductReady(p);
 	}
 }
 

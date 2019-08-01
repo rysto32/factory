@@ -26,6 +26,7 @@
  * SUCH DAMAGE.
  */
 
+#include "CommandFactory.h"
 #include "ConfigNode.h"
 #include "ConfigParser.h"
 #include "EventLoop.h"
@@ -259,9 +260,10 @@ int main(int argc, char **argv)
 	JobManager jobManager(loop, msgSock.get(), jq);
 	MsgSocketServer server(std::move(msgSock), loop, jobManager);
 	ProductManager productMgr(jq);
+	CommandFactory commandFactory(productMgr);
 
 	IngestManager ingestMgr;
-	Interpreter interp(ingestMgr);
+	Interpreter interp(ingestMgr, commandFactory);
 
 	perms.AddDirPermission("/", Permission::READ | Permission::WRITE | Permission::EXEC);
 
