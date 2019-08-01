@@ -2,7 +2,7 @@
 LIB := product
 
 SRCS := \
-	PendingJob.cpp \
+	Command.cpp \
 	Product.cpp \
 	ProductManager.cpp \
 

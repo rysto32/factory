@@ -29,19 +29,19 @@
 
 #include "JobQueue.h"
 
-PendingJob *
+Command *
 JobQueue::RemoveNext()
 {
 	if (queue.empty())
 		return nullptr;
 
-	PendingJob *j = queue.front();
+	Command *j = queue.front();
 	queue.pop_front();
 	return j;
 }
 
 void
-JobQueue::Submit(PendingJob *j)
+JobQueue::Submit(Command *j)
 {
 	queue.push_back(j);
 }

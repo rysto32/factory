@@ -30,7 +30,7 @@
 #define JOB_MANAGER_H
 
 #include "Event.h"
-#include "PendingJob.h"
+#include "Command.h"
 
 #include <sys/types.h>
 
@@ -72,7 +72,7 @@ public:
 	JobManager & operator=(const JobManager &) = delete;
 	JobManager & operator=(JobManager &&) = delete;
 
-	Job * StartJob(PendingJob &, JobCompletion &);
+	Job * StartJob(Command &, JobCompletion &);
 
 	void Dispatch(int fd, short flags) override;
 	bool ScheduleJob();

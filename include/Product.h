@@ -30,7 +30,7 @@
 #define PRODUCT_H
 
 #include "Path.h"
-#include "PendingJob.h"
+#include "Command.h"
 
 #include <unordered_set>
 #include <vector>
@@ -41,7 +41,7 @@ class ProductManager;
 class Product
 {
 	Path path;
-	PendingJobPtr pendingJob;
+	CommandPtr command;
 	ProductManager & productManager;
 
 	std::unordered_set<const Product*> dependencies;
@@ -57,7 +57,7 @@ public:
 	Product &operator=(const Product&) = delete;
 	Product &operator=(Product &&) = delete;
 
-	bool SetPendingJob(PendingJobPtr && j);
+	bool SetCommand(CommandPtr && j);
 	void AddDependency(Product *);
 
 	void BuildComplete(int status);
@@ -68,9 +68,9 @@ public:
 		return path;
 	}
 
-	PendingJob * GetPendingJob()
+	Command * GetPendingJob()
 	{
-		return pendingJob.get();
+		return command.get();
 	}
 
 	const std::vector<Product*> & GetDependees() const

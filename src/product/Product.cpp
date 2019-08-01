@@ -40,19 +40,19 @@ Product::Product(const Path & p, ProductManager & mgr)
 }
 
 bool
-Product::SetPendingJob(PendingJobPtr && j)
+Product::SetCommand(CommandPtr && j)
 {
-	if (pendingJob)
+	if (command)
 		return false;
 
-	pendingJob = std::move(j);
+	command = std::move(j);
 	return true;
 }
 
 void
 Product::AddDependency(Product *d)
 {
-	assert (pendingJob);
+	assert (command);
 
 	dependencies.insert(d);
 	d->dependees.push_back(this);
@@ -61,7 +61,7 @@ Product::AddDependency(Product *d)
 void
 Product::DependencyComplete(const Product * d)
 {
-	assert (pendingJob);
+	assert (command);
 
 	dependencies.erase(d);
 	if (dependencies.empty())

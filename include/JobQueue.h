@@ -31,11 +31,11 @@
 
 #include <deque>
 
-class PendingJob;
+class Command;
 
 class JobQueue
 {
-	std::deque<PendingJob*> queue;
+	std::deque<Command*> queue;
 
 public:
 	JobQueue() = default;
@@ -45,8 +45,8 @@ public:
 	JobQueue & operator=(const JobQueue &) = delete;
 	JobQueue & operator=(JobQueue &&) = delete;
 
-	PendingJob * RemoveNext();
-	void Submit(PendingJob *);
+	Command * RemoveNext();
+	void Submit(Command *);
 };
 
 #endif

@@ -35,7 +35,6 @@
 #include "JobManager.h"
 #include "JobQueue.h"
 #include "MsgSocketServer.h"
-#include "PendingJob.h"
 #include "Permission.h"
 #include "PermissionList.h"
 #include "Product.h"

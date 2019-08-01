@@ -103,20 +103,20 @@ JobManager::AllocJobId()
 }
 
 Job*
-JobManager::StartJob(PendingJob & pending, JobCompletion & completer)
+JobManager::StartJob(Command & command, JobCompletion & completer)
 {
 	std::vector<char *>  argp;
-	const ArgList & argList = pending.GetArgList();
-	std::ostringstream command;
+	const ArgList & argList = command.GetArgList();
+	std::ostringstream commandStr;
 
 	for (const std::string & arg : argList) {
 		// Blame POSIX for the const_cast :()
 		argp.push_back(const_cast<char*>(arg.c_str()));
-		command << arg << " ";
+		commandStr << arg << " ";
 	}
 	argp.push_back(NULL);
 
-	printf("Run: %s\n", command.str().c_str());
+	printf("Run: %s\n", commandStr.str().c_str());
 
 	std::vector<char *> envp;
 	for (int i = 0; environ[i] != NULL; ++i) {
@@ -136,7 +136,7 @@ JobManager::StartJob(PendingJob & pending, JobCompletion & completer)
 	if (child == 0) {
 		StartChild(argp, envp, shm->GetFD());
 	} else {
-		auto job = std::make_unique<Job>(pending.GetPermissions(), completer, jobId, child);
+		auto job = std::make_unique<Job>(command.GetPermissions(), completer, jobId, child);
 
 		pidMap.insert(std::make_pair(child, job.get()));
 		auto ins = jobMap.insert(std::make_pair(jobId, std::move(job)));
@@ -180,15 +180,15 @@ JobManager::Dispatch(int sig, short flags)
 bool
 JobManager::ScheduleJob()
 {
-	PendingJob * pending = jobQueue.RemoveNext();
+	Command * command = jobQueue.RemoveNext();
 
-	if (pending == nullptr) {
+	if (command == nullptr) {
 		if (jobMap.empty())
 			loop.SignalExit();
 		return false;
 	}
 
-	StartJob(*pending, *pending);
+	StartJob(*command, *command);
 	return true;
 }
 

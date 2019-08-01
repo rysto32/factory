@@ -32,7 +32,6 @@
 #include "JobManager.h"
 #include "JobQueue.h"
 #include "MsgSocketServer.h"
-#include "PendingJob.h"
 #include "Permission.h"
 #include "PermissionList.h"
 #include "TempFileManager.h"
@@ -151,7 +150,7 @@ int main(int argc, char **argv)
 	JobManager jobManager(loop, msgSock.get(), jobQueue);
 	MsgSocketServer server(std::move(msgSock), loop, jobManager);
 	SimpleCompletion completer(loop);
-	PendingJob pending({}, std::move(list), perms);
+	Command pending({}, std::move(list), perms);
 
 	Job * job = jobManager.StartJob(pending, completer);
 	if (job == NULL)

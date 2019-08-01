@@ -26,52 +26,21 @@
  * SUCH DAMAGE.
  */
 
-#ifndef PENDING_JOB_H
-#define PENDING_JOB_H
+#include "Command.h"
 
-#include <string>
-#include <vector>
+#include "Product.h"
 
-#include "JobCompletion.h"
 
-class Job;
-class Product;
-class PermissionList;
-
-typedef std::vector<Product*> ProductList;
-typedef std::vector<std::string> ArgList;
-
-class PendingJob : public JobCompletion
+Command::Command(ProductList && products, ArgList && a, const PermissionList & p)
+  : products(products), argList(a), permissions(p)
 {
-	std::vector<Product*> products;
 
-	ArgList argList;
-	const PermissionList & permissions;
+}
 
-public:
-	PendingJob(ProductList && products, ArgList && a, const PermissionList & p);
-	virtual ~PendingJob() = default;
-
-	PendingJob(const PendingJob &) = delete;
-	PendingJob(PendingJob &&) = delete;
-
-	PendingJob & operator=(const PendingJob &) = delete;
-	PendingJob & operator=(PendingJob &&) = delete;
-
-	virtual void JobComplete(Job * job, int status) override;
-
-	const ArgList & GetArgList() const
-	{
-		return argList;
+void
+Command::JobComplete(Job * job, int status)
+{
+	for (Product *p : products) {
+		p->BuildComplete(status);
 	}
-
-	const PermissionList & GetPermissions() const
-	{
-		return permissions;
-	}
-};
-
-typedef std::unique_ptr<PendingJob> PendingJobPtr;
-
-#endif
-
+}
