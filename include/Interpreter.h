@@ -82,6 +82,8 @@ class Interpreter
 	static int AddDefinitionsWrapper(lua_State *);
 	static int DefineCommandWrapper(lua_State *);
 
+	static int ErrorHandler(lua_State *);
+
 	int AddDefinitions();
 	int DefineCommand();
 

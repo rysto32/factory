@@ -172,6 +172,7 @@ Interpreter::ProcessConfig(const ConfigNode & node)
 			continue;
 		}
 
+		lua_pushcfunction(lua, ErrorHandler);
 		lua_rawgeti(lua, LUA_REGISTRYINDEX, ref);
 		lua_newtable(lua);
 		//XXX hardcoded defaults
@@ -180,7 +181,13 @@ Interpreter::ProcessConfig(const ConfigNode & node)
 		AddStringValuePair("LD", "/usr/local/bin/clang++80");
 
 		PushConfig(*value);
-		lua_call(lua, 2, 0);
+		int result = lua_pcall(lua, 2, 0, -4);
+		if (result != LUA_OK) {
+
+			errx(1, "Error running lua callback: %s", lua_tostring(lua, -1));
+		}
+		/* Pop ErrorHandler off the stack. */
+		lua_pop(lua, 1);
 	}
 }
 
@@ -320,4 +327,11 @@ Interpreter::DefineCommand()
 	commandFactory.AddCommand(products, perms, std::move(argList));
 
 	return 0;
+}
+
+int
+Interpreter::ErrorHandler(lua_State *lua)
+{
+	luaL_traceback(lua, lua, "error in lua script", 1);
+	errx(1, "%s", lua_tostring(lua, -1));
 }
