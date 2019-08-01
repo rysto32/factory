@@ -1,7 +1,7 @@
 
 CC:=cc
 CXX:=c++
-LD:=c++
+LD:=$(CXX)
 LD_C:=/usr/local/bin/ld
 AR:=ar
 
