@@ -1,5 +1,5 @@
 
-function factory.replace_stem(file, old, new)
+function factory.replace_ext(file, old, new)
 	return string.gsub(file, "%." .. old .. "$", "." .. new)
 end
 
@@ -69,7 +69,7 @@ definitions = {
 				srcdir="/home/rstone/src/tcplat/"
 				srcpath=srcdir .. src
 
-				objname = factory.replace_stem(src, "[a-zA-Z0-9]+", "o")
+				objname = factory.replace_ext(src, "[a-zA-Z0-9]+", "o")
 				objpath = objdir .. objname
 
 				arglist = factory.flat_list(
