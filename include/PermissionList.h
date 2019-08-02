@@ -29,6 +29,7 @@
 #ifndef PERMSSION_LIST_H
 #define PERMSSION_LIST_H
 
+#include "Path.h"
 #include "Permission.h"
 
 #include <sys/types.h>
@@ -43,10 +44,10 @@ class PermissionList
 private:
 	struct DirectoryPerm
 	{
-		std::string path;
+		Path path;
 		Permission perm;
 
-		DirectoryPerm(const std::string & path, Permission perm)
+		DirectoryPerm(const Path & path, Permission perm)
 		  : path(path), perm(perm)
 		{
 		}
@@ -56,18 +57,17 @@ private:
 			return path < other.path;
 		}
 
-		bool Matches(const std::string &) const;
+		bool Matches(const Path &) const;
 	};
 
-	typedef std::unordered_map<std::string, Permission> PermMap;
-	typedef std::vector<DirectoryPerm> DirPermList;
+	typedef std::unordered_map<Path, Permission> PermMap;
 
 	PermMap filePerm;
-	DirPermList dirPerm;
+	PermMap dirPerm;
 
 	static Permission ModeToPermission(int);
 
-	int CheckDirPerms(const std::string & path, int mode) const;
+	int CheckDirPerms(Path path, int mode) const;
 	int CheckPerm(Permission allowed, int mode) const;
 
 public:
@@ -80,9 +80,8 @@ public:
 
 	void AddFilePermission(const std::string &, Permission);
 	void AddDirPermission(const std::string &, Permission);
-	void Finalize();
 
-	int IsPermitted(const std::string &, int) const;
+	int IsPermitted(const Path &, int) const;
 };
 
 #endif

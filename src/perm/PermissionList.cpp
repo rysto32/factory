@@ -34,20 +34,19 @@
 void
 PermissionList::AddFilePermission(const std::string &path, Permission p)
 {
-	filePerm.insert(std::make_pair(path, p));
+	filePerm.emplace(path, p);
 }
 
 void
 PermissionList::AddDirPermission(const std::string & path, Permission p)
 {
-	auto lastChar = path.find_last_not_of("/") + 1;
-	dirPerm.emplace_back(path.substr(0, lastChar), p);
-}
-
-void
-PermissionList::Finalize()
-{
-	std::sort(dirPerm.rbegin(), dirPerm.rend());
+	auto lastChar = path.find_last_not_of("/");
+	if (lastChar == std::string::npos) {
+		dirPerm.emplace(path, p);
+	} else {
+		Path pathObj(path.substr(0, lastChar + 1));
+		dirPerm.emplace(std::move(pathObj), p);
+	}
 }
 
 Permission
@@ -74,14 +73,22 @@ PermissionList::ModeToPermission(int mode)
 }
 
 int
-PermissionList::CheckDirPerms(const std::string & path, int mode) const
+PermissionList::CheckDirPerms(Path path, int mode) const
 {
-	for (auto & perm : dirPerm) {
-		if (perm.Matches(path))
-			return CheckPerm(perm.perm, mode);
+
+	while (true) {
+		auto it = dirPerm.find(path);
+		if (it != dirPerm.end()) {
+			return (CheckPerm(it->second, mode));
+		}
+
+		if (path == path.root_path()) {
+			return (EPERM);
+		}
+
+		path = path.parent_path();
 	}
 
-	return (EPERM);
 }
 
 int
@@ -95,7 +102,7 @@ PermissionList::CheckPerm(Permission allowed, int mode) const
 }
 
 int
-PermissionList::IsPermitted(const std::string & path, int mode) const
+PermissionList::IsPermitted(const Path & path, int mode) const
 {
 	auto it = filePerm.find(path);
 	if (it == filePerm.end())
@@ -104,16 +111,14 @@ PermissionList::IsPermitted(const std::string & path, int mode) const
 	return (CheckPerm(it->second, mode));
 }
 
-bool PermissionList::DirectoryPerm::Matches(const std::string & candidate) const
+bool PermissionList::DirectoryPerm::Matches(const Path & candidate) const
 {
 	if (path == candidate)
 		return true;
 
-	if (candidate.length() <= path.length())
-		return false;
-
-	if (candidate.substr(0, path.length()) == path && candidate.at(path.length()) == '/')
-		return true;
+	do {
+		Path parent = candidate.parent_path();
+	} while (candidate != candidate.root_path());
 
 	return false;
 }

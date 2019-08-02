@@ -29,9 +29,21 @@
 #ifndef PATH_H
 #define PATH_H
 
-#include <string>
+#include <filesystem>
 
-typedef std::string Path;
+typedef std::filesystem::path Path;
+
+namespace std
+{
+	template<>
+	struct hash<Path>
+	{
+		size_t operator()(const Path & p) const
+		{
+			return std::filesystem::hash_value(p);
+		}
+	};
+};
 
 #endif
 
