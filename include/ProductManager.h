@@ -49,6 +49,7 @@ class ProductManager
 	bool NeedsBuild(const Product*) const;
 	bool FileExists(const std::string &) const;
 	void AddDependency(Product * product, Product * input);
+	void SetNeedsBuild(const Product*);
 
 public:
 	ProductManager(JobQueue &);
@@ -62,7 +63,6 @@ public:
 	void SetInputs(Product * product, const std::vector<Product*> & inputs);
 
 	void SubmitLeafJobs();
-	void SetNeedsBuild(const Product*);
 
 	void ProductReady(Product *);
 };
