@@ -67,8 +67,6 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 		Permission perm;
 		if (permType == "ro") {
 			perm = Permission::READ;
-		} else if (permType == "rw") {
-			perm = Permission::READ | Permission::WRITE;
 		} else {
 			errx(1, "Unrecognized permission type '%s'", permType.c_str());
 		}
@@ -84,13 +82,15 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 		}
 	}
 
-	permList.Finalize();
-
 	for (const std::string & path : productList) {
 		Product * product = productManager.GetProduct(path);
 		products.push_back(product);
 		productManager.SetInputs(product, inputs);
+
+		permList.AddFilePermission(path, Permission::READ | Permission::WRITE);
 	}
+
+	permList.Finalize();
 
 	commandList.emplace_back(std::make_unique<Command>(std::move(products), std::move(argList), std::move(permList)));
 }
