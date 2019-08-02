@@ -332,6 +332,7 @@ Interpreter::DefineCommand()
 int
 Interpreter::ErrorHandler(lua_State *lua)
 {
-	luaL_traceback(lua, lua, "error in lua script", 1);
-	errx(1, "%s", lua_tostring(lua, -1));
+	const char * error = lua_tostring(lua, -1);
+	luaL_traceback(lua, lua, error, 1);
+	errx(1, "error in lua script: %s", lua_tostring(lua, -1));
 }
