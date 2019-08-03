@@ -34,7 +34,7 @@ endif
 
 TEST_GTEST_PREFIX := $$($$(LIB)_OBJDIR)/$1.gtest
 TEST_$$(TEST)_GTEST_OBJ := $$(TEST_GTEST_PREFIX).o
-TEST_$$(TEST)_GTEST_DEPFILE := $$(call src_to_dep,$$(TEST_GTEST_PREFIX).cpp)
+TEST_$$(TEST)_GTEST_DEPFILE := $$(call src_to_dep,$($(LIB)_DEPDIR)/,$$(TEST_GTEST_PREFIX).cpp)
 
 $$(TEST_$$(TEST)_GTEST_OBJ): LIB := $(LIB)
 
