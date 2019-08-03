@@ -48,8 +48,9 @@ private:
 	Type type;
 	Command *command;
 	ProductManager & productManager;
+	bool needsBuild;
 
-	std::unordered_set<const Product*> dependencies;
+	std::unordered_set<Product*> dependencies;
 	std::vector<Product*> dependees;
 
 
@@ -66,7 +67,7 @@ public:
 	void AddDependency(Product *);
 
 	void BuildComplete(int status);
-	void DependencyComplete(const Product *);
+	void DependencyComplete(Product *);
 
 	const Path & GetPath() const
 	{
@@ -84,10 +85,27 @@ public:
 		return dependees;
 	}
 
+	const std::unordered_set<Product *> GetInputs() const
+	{
+		return dependencies;
+	}
+
 	bool IsDir() const
 	{
 		return type == DIR;
 	}
+
+	void SetNeedsBuild()
+	{
+		needsBuild = true;
+	}
+
+	bool NeedsBuild() const
+	{
+		return needsBuild;
+	}
+
+	bool IsReady();
 };
 
 #endif

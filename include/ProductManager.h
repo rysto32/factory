@@ -43,13 +43,12 @@ class ProductManager
 {
 	std::unordered_map<Path, std::unique_ptr<Product>> products;
 	JobQueue & jobQueue;
-	std::unordered_set<Product*> fullyBuilt;
-	std::vector<Product*> readyProducts;
 
-	bool NeedsBuild(const Product*) const;
 	bool ProductExists(const Product * product) const;
 	void AddDependency(Product * product, Product * input);
-	void SetNeedsBuild(const Product*);
+
+	bool CheckNeedsBuild(Product * product, const Product * input);
+	bool CheckNeedsBuild(Product * product);
 
 public:
 	ProductManager(JobQueue &);

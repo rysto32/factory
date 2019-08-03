@@ -54,7 +54,6 @@ ProductManager::GetProduct(const Path & path, Product::Type type)
 	auto product = std::make_unique<Product>(path, type, *this);
 	Product * ptr = product.get();
 	products.insert(std::make_pair(path, std::move(product)));
-	fullyBuilt.insert(ptr);
 
 	Path parent(path.parent_path());
 	std::error_code error;
@@ -69,28 +68,34 @@ ProductManager::GetProduct(const Path & path, Product::Type type)
 void
 ProductManager::AddDependency(Product * product, Product * input)
 {
-	std::error_code error;
+	if (product == input)
+		return;
 
 	product->AddDependency(input);
-	fprintf(stderr, "%s depends on %s\n", product->GetPath().c_str(), input->GetPath().c_str());
+// 	fprintf(stderr, "%s depends on %s\n", product->GetPath().c_str(), input->GetPath().c_str());
+}
 
-	if (NeedsBuild(input)) {
+bool
+ProductManager::CheckNeedsBuild(Product * product, const Product * input)
+{
+
+	if (input->NeedsBuild()) {
 		fprintf(stderr, "'%s' needs build because '%s' needs build\n", product->GetPath().c_str(), input->GetPath().c_str());
-		SetNeedsBuild(product);
-		return;
+		product->SetNeedsBuild();
+		return true;
 	}
 
 	try {
 		if (!ProductExists(product)) {
-			SetNeedsBuild(product);
+			product->SetNeedsBuild();
 			fprintf(stderr, "'%s' needs build because it doesn't exist\n", product->GetPath().c_str());
-			return;
+			return true;
 		}
 
 		if (!ProductExists(input)) {
-			SetNeedsBuild(product);
+			product->SetNeedsBuild();
 			fprintf(stderr, "'%s' needs build because '%s' doesn't exist\n", product->GetPath().c_str(), input->GetPath().c_str());
-			return;
+			return true;
 		}
 
 		if (input->IsDir()) {
@@ -100,20 +105,23 @@ ProductManager::AddDependency(Product * product, Product * input)
 			 * a directory it depends on as that's likely a false
 			 * dependency.
 			 */
-			return;
+			return false;
 		}
 
 		auto inputLast = fs::last_write_time(input->GetPath());
 		auto productLast = fs::last_write_time(product->GetPath());
 
 		if (productLast < inputLast) {
-			SetNeedsBuild(product);
+			product->SetNeedsBuild();
 			fprintf(stderr, "'%s' needs build because it is older than '%s'\n", product->GetPath().c_str(), input->GetPath().c_str());
+			return true;
 		}
 	} catch (fs::filesystem_error &e) {
-		SetNeedsBuild(product);
+		product->SetNeedsBuild();
 		fprintf(stderr, "'%s' needs build because we got an error accessing it: %s\n", product->GetPath().c_str(), e.what());
+		return true;
 	}
+	return false;
 }
 
 bool
@@ -127,67 +135,47 @@ ProductManager::ProductExists(const Product * product) const
 void
 ProductManager::SetInputs(Product * product, const std::vector<Product*> & inputs)
 {
-	int count = 0;
 	for (Product * input : inputs) {
 		if (product == input) {
 			continue;
 		}
 		AddDependency(product, input);
-		count++;
-	}
-
-	if (count == 0) {
-		if (!ProductExists(product)) {
-			SetNeedsBuild(product);
-			fprintf(stderr, "'%s' needs build because it doesn't exist\n", product->GetPath().c_str());
-			readyProducts.push_back(product);
-		}
-		return;
-	}
-}
-
-void
-ProductManager::SetNeedsBuild(const Product *p)
-{
-	if (fullyBuilt.erase(const_cast<Product*>(p)) > 0) {
-		for (const Product * d : p->GetDependees()) {
-			SetNeedsBuild(d);
-		}
 	}
 }
 
 bool
-ProductManager::NeedsBuild(const Product *p) const
+ProductManager::CheckNeedsBuild(Product * product)
 {
-	return fullyBuilt.count(const_cast<Product*>(p)) == 0;
+	for (const Product * input : product->GetInputs()) {
+		if(CheckNeedsBuild(product, input))
+			return true;
+	}
+
+	return false;
 }
 
 void
 ProductManager::SubmitLeafJobs()
 {
-	struct stat sb;
-	int error;
+	std::vector<Product*> outstanding;
 
-	for (Product * p : fullyBuilt) {
-		error = stat(p->GetPath().c_str(), &sb);
-		if (error != 0) {
-			if (errno == ENOENT) {
-				errx(1, "No rule to build file '%s'", p->GetPath().c_str());
-			}
-			err(1, "Failed to stat '%s'", p->GetPath().c_str());
+	for (auto & [path, product] : products) {
+		if(CheckNeedsBuild(product.get())) {
+			outstanding.push_back(product.get());
 		}
-		p->BuildComplete(0);
 	}
 
-	for (Product * p : readyProducts)  {
-		ProductReady(p);
+	for (Product * product : outstanding) {
+		if (product->IsReady()) {
+// 			fprintf(stderr, "%s is ready\n", product->GetPath().c_str());
+			jobQueue.Submit(product->GetPendingJob());
+		}
 	}
 }
 
 void
 ProductManager::ProductReady(Product *p)
 {
-	fprintf(stderr, "%s is ready to build\n", p->GetPath().c_str());
-	if (NeedsBuild(p))
+	if (p->NeedsBuild())
 		jobQueue.Submit(p->GetPendingJob());
 }

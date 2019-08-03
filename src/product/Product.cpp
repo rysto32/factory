@@ -34,7 +34,7 @@
 #include <sys/wait.h>
 
 Product::Product(const Path & p, Type t, ProductManager & mgr)
-  : path(p), type(t), command(nullptr), productManager(mgr)
+  : path(p), type(t), command(nullptr), productManager(mgr), needsBuild(false)
 {
 
 }
@@ -58,7 +58,7 @@ Product::AddDependency(Product *d)
 }
 
 void
-Product::DependencyComplete(const Product * d)
+Product::DependencyComplete(Product * d)
 {
 	assert (command);
 
@@ -91,4 +91,22 @@ Product::BuildComplete(int status)
 		     path.c_str(), status);
 		exit(1);
 	}
+}
+
+bool
+Product::IsReady()
+{
+
+	auto it = dependencies.begin();
+	while (it != dependencies.end()) {
+		Product * input = *it;
+		if (!input->NeedsBuild()) {
+			it = dependencies.erase(it);
+		} else {
+			++it;
+// 			fprintf(stderr, "%s is not ready: %s needs build\n", path.c_str(), input->path.c_str());
+		}
+	}
+
+	return dependencies.empty();
 }
