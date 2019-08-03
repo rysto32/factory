@@ -40,12 +40,8 @@ class ProductManager;
 
 class Product
 {
-public:
-	enum Type { FILE, DIR };
-
 private:
 	Path path;
-	Type type;
 	Command *command;
 	ProductManager & productManager;
 	bool needsBuild;
@@ -55,7 +51,7 @@ private:
 
 
 public:
-	Product(const Path & p, Type t, ProductManager & mgr);
+	Product(const Path & p, ProductManager & mgr);
 
 	Product(const Product &) = delete;
 	Product(Product &&) = delete;
@@ -88,11 +84,6 @@ public:
 	const std::unordered_set<Product *> GetInputs() const
 	{
 		return dependencies;
-	}
-
-	bool IsDir() const
-	{
-		return type == DIR;
 	}
 
 	void SetNeedsBuild();

@@ -58,7 +58,7 @@ AddKeyValue()
 			errors = std::string("key ") + key + " repeated";
 			return false;
 		}
-		fprintf(stderr, "Add key %s\n", key);
+// 		fprintf(stderr, "Add key %s\n", key);
 		return true;
 	};
 }

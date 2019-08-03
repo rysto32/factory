@@ -30,7 +30,6 @@
 #define PRODUCT_MANAGER_H
 
 #include "Path.h"
-#include "Product.h"
 
 #include <memory>
 #include <unordered_map>
@@ -38,6 +37,7 @@
 #include <vector>
 
 class JobQueue;
+class Product;
 
 class ProductManager
 {
@@ -50,12 +50,10 @@ class ProductManager
 	void AddDependency(Product * product, Product * input);
 
 	bool CheckNeedsBuild(Product * product, const Product * input);
-	bool CheckNeedsBuild(Product * product);
+	void CheckNeedsBuild(Product * product);
 
 	Product * FindProduct(const Path &);
 	Product * MakeProduct(const Path &);
-
-	static Product::Type GetType(const Path &);
 
 public:
 	ProductManager(JobQueue &);

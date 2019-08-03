@@ -44,33 +44,10 @@ ProductManager::ProductManager(JobQueue & jq)
 {
 }
 
-Product::Type
-ProductManager::GetType(const Path & path)
-{
-	try {
-		auto status = fs::status(path);
-		if (fs::exists(status) && fs::is_directory(status)) {
-			return Product::Type::DIR;
-		}
-	} catch (fs::filesystem_error & e) {
-
-	}
-
-	/*
-	 * If the product does not exist or we get some kind or error, assume
-	 * a file type.  If we're getting a failure here then the product does
-	 * not exist and anything that depends on it must be rebuilt.  The only
-	 * reason why we care about FILE or DIR is to change the algorithm on
-	 * whether to rebuild dependees, but FILE or DIR doesn't matter if the
-	 * input does not exist.
-	 */
-	return Product::Type::FILE;
-}
-
 Product *
 ProductManager::MakeProduct(const Path & path)
 {
-	auto product = std::make_unique<Product>(path, GetType(path), *this);
+	auto product = std::make_unique<Product>(path, *this);
 	Product * ptr = product.get();
 	products.insert(std::make_pair(path, std::move(product)));
 
@@ -108,7 +85,7 @@ ProductManager::AddDependency(Product * product, Product * input)
 		return;
 
 	product->AddDependency(input);
-	fprintf(stderr, "%s depends on %s\n", product->GetPath().c_str(), input->GetPath().c_str());
+// 	fprintf(stderr, "%s depends on %s\n", product->GetPath().c_str(), input->GetPath().c_str());
 }
 
 bool
@@ -116,25 +93,26 @@ ProductManager::CheckNeedsBuild(Product * product, const Product * input)
 {
 
 	if (input->NeedsBuild()) {
-		fprintf(stderr, "'%s' needs build because '%s' needs build\n", product->GetPath().c_str(), input->GetPath().c_str());
+// 		fprintf(stderr, "'%s' needs build because '%s' needs build\n", product->GetPath().c_str(), input->GetPath().c_str());
 		product->SetNeedsBuild();
 		return true;
 	}
 
 	try {
 		if (!ProductExists(product)) {
+// 			fprintf(stderr, "'%s' needs build because it doesn't exist\n", product->GetPath().c_str());
 			product->SetNeedsBuild();
-			fprintf(stderr, "'%s' needs build because it doesn't exist\n", product->GetPath().c_str());
 			return true;
 		}
 
-		if (!ProductExists(input)) {
+		auto inputStatus = fs::status(input->GetPath());
+		if (!fs::exists(inputStatus)) {
+// 			fprintf(stderr, "'%s' needs build because '%s' doesn't exist\n", product->GetPath().c_str(), input->GetPath().c_str());
 			product->SetNeedsBuild();
-			fprintf(stderr, "'%s' needs build because '%s' doesn't exist\n", product->GetPath().c_str(), input->GetPath().c_str());
 			return true;
 		}
 
-		if (input->IsDir()) {
+		if (fs::is_directory(inputStatus)) {
 			/*
 			 * Directories are updated when any file in them is
 			 * written to; do not rebuild if object is older than
@@ -148,13 +126,13 @@ ProductManager::CheckNeedsBuild(Product * product, const Product * input)
 		auto productLast = fs::last_write_time(product->GetPath());
 
 		if (productLast < inputLast) {
+// 			fprintf(stderr, "'%s' needs build because it is older than '%s'\n", product->GetPath().c_str(), input->GetPath().c_str());
 			product->SetNeedsBuild();
-			fprintf(stderr, "'%s' needs build because it is older than '%s'\n", product->GetPath().c_str(), input->GetPath().c_str());
 			return true;
 		}
 	} catch (fs::filesystem_error &e) {
+// 		fprintf(stderr, "'%s' needs build because we got an error accessing it: %s\n", product->GetPath().c_str(), e.what());
 		product->SetNeedsBuild();
-		fprintf(stderr, "'%s' needs build because we got an error accessing it: %s\n", product->GetPath().c_str(), e.what());
 		return true;
 	}
 	return false;
@@ -185,21 +163,21 @@ ProductManager::SetInputs(Product * product, const std::vector<Product*> & input
 	}
 }
 
-bool
+void
 ProductManager::CheckNeedsBuild(Product * product)
 {
+	if (product->NeedsBuild())
+		return;
+
 	for (const Product * input : product->GetInputs()) {
 		if(CheckNeedsBuild(product, input))
-			return true;
+			return;
 	}
-
-	return false;
 }
 
 void
 ProductManager::SubmitLeafJobs()
 {
-	std::vector<Product*> outstanding;
 
 	for (auto & [path, productPtr] : products) {
 		Product * product = productPtr.get();
@@ -213,13 +191,13 @@ ProductManager::SubmitLeafJobs()
 			errx(1, "No command to make product '%s'", parentPath.c_str());
 		}
 
-		if(CheckNeedsBuild(product)) {
-			outstanding.push_back(product);
-		}
+		CheckNeedsBuild(product);
 	}
 
-	for (Product * product : outstanding) {
-		if (product->IsReady()) {
+	for (auto & [path, productPtr] : products) {
+		Product * product = productPtr.get();
+
+		if (product->NeedsBuild() && product->IsReady()) {
 // 			fprintf(stderr, "%s is ready\n", product->GetPath().c_str());
 			jobQueue.Submit(product->GetPendingJob());
 		}

@@ -34,7 +34,7 @@
 void
 IngestManager::AddIngest(std::string && name, int callbackRef)
 {
-	fprintf(stderr, "Add ingest for '%s'\n", name.c_str());
+// 	fprintf(stderr, "Add ingest for '%s'\n", name.c_str());
 	auto [it, inserted] = callbacks.emplace(std::move(name), callbackRef);
 	if (!inserted) {
 		errx(1, "Multiple definitions for ingesting '%s'", it->first.c_str());

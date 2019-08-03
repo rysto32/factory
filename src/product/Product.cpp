@@ -33,9 +33,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-Product::Product(const Path & p, Type t, ProductManager & mgr)
+Product::Product(const Path & p, ProductManager & mgr)
   : path(p),
-    type(t),
     command(nullptr),
     productManager(mgr),
     needsBuild(false)
@@ -100,8 +99,12 @@ Product::BuildComplete(int status)
 void
 Product::SetNeedsBuild()
 {
+	if (needsBuild)
+		return;
+
 	needsBuild = true;
 	for (Product * p : dependees) {
+// 		fprintf(stderr, "'%s' needs build because '%s' needs build\n", p->path.c_str(), path.c_str());
 		p->SetNeedsBuild();
 	}
 }

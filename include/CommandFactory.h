@@ -44,8 +44,6 @@ class CommandFactory
 	ProductManager &productManager;
 	std::vector<std::unique_ptr<Command>> commandList;
 
-	static bool IsDirectory(const std::string & path);
-
 public:
 	CommandFactory(ProductManager &);
 	void AddCommand(const std::vector<std::string> & products,

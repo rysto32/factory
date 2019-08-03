@@ -30,6 +30,7 @@
 
 #include "Command.h"
 #include "PermissionList.h"
+#include "Product.h"
 #include "ProductManager.h"
 
 #include <filesystem>
@@ -37,26 +38,9 @@
 #include <err.h>
 #include <sys/stat.h>
 
-namespace fs = std::filesystem;
-
 CommandFactory::CommandFactory(ProductManager &p)
   : productManager(p)
 {
-}
-
-bool
-CommandFactory::IsDirectory(const std::string & path)
-{
-	struct stat sb;
-	int error;
-
-	error = stat(path.c_str(), &sb);
-	if (error != 0) {
-		// XXX non-existent paths may be created a directories
-		return false;
-	}
-
-	return sb.st_mode & S_IFDIR;
 }
 
 void
