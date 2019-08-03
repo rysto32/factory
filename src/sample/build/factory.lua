@@ -109,14 +109,6 @@ definitions = {
 	{
 		name = "program",
 		process = function(parent_config, config)
-			read_paths = {
-				"/usr/local/llvm80",
-				"/usr/local/bin",
-				"/lib",
-				"/usr/lib",
-				"/usr/local/lib",
-			}
-
 			libpaths = factory.map(make_lib_path, config["libs"])
 			stdlibs = factory.addprefix("-l", config["stdlibs"])
 
@@ -129,7 +121,11 @@ definitions = {
 			)
 
 			inputs = factory.flat_list(
-				read_paths,
+				"/usr/local/llvm80",
+				"/usr/local/bin",
+				"/lib",
+				"/usr/lib",
+				"/usr/local/lib",
 				libpaths
 			)
 
