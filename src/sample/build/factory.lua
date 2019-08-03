@@ -1,4 +1,43 @@
 
+function factory.add_definitions(...)
+	factory.internal.add_definitions(...)
+end
+
+function factory.internal.qualify_product_list(inList, defaultAccess)
+	outList = {}
+
+	if (type(inList) == 'string') then
+		inList = {inList}
+	end
+
+	for _,i in ipairs(inList) do
+		-- Defaults; may be overridden below
+		entry = {
+			access = defaultAccess,
+			type = 'file'
+		}
+
+		if (type(i) == 'string') then
+			entry['path'] = i
+		elseif (type(i) == 'table') then
+			for k, v in pairs(i) do
+				entry[k] = v
+			end
+		end
+
+		table.insert(outList, entry)
+	end
+
+	return outList
+end
+
+function factory.define_command(productsOrig, inputsOrig, arglist)
+	inputs = factory.internal.qualify_product_list(inputsOrig, "r")
+	products = factory.internal.qualify_product_list(productsOrig, "rw")
+
+	factory.internal.define_command(products, inputs, arglist)
+end
+
 function factory.replace_ext(file, old, new)
 	return string.gsub(file, "%." .. old .. "$", "." .. new)
 end
@@ -62,7 +101,13 @@ definitions = {
 			libpath = make_lib_path(defs["name"])
 			objdir = "/home/rstone/obj/tcplat/"
 
-			factory.define_command({objdir}, {}, {"/bin/mkdir", "-p", objdir})
+			objdirProduct = {
+				{
+					path = objdir,
+					type = "dir"
+				}
+			}
+			factory.define_command(objdirProduct, {}, {"/bin/mkdir", "-p", objdir})
 
 			objs = {}
 			for i, src in ipairs(defs["srcs"]) do
@@ -80,17 +125,23 @@ definitions = {
 					srcpath)
 
 				inputs = {
-					rw = { objpath, objdir },
-					ro = {
-						"/usr/include/",
-						"/usr/local/llvm80",
-						"/usr/local/bin",
-						"/lib",
-						"/usr/lib",
-						"/usr/local/lib",
-						srcdir,
-						srcpath
+					{
+						path = "/usr/local/llvm80",
+						type = "dir",
 					},
+					{
+						path = "/usr/local/bin",
+						type = "dir"
+					},
+					{
+						path = "/usr/include/",
+						type = "dir"
+					},
+					{
+						path = srcdir,
+						type = "dir"
+					},
+					srcpath
 				}
 
 				factory.define_command({objpath}, inputs, arglist)
@@ -101,23 +152,33 @@ definitions = {
 			arglist = { parent_config["AR"], "crs", libpath}
 			factory.array_concat(arglist, objs)
 
-			inputs = {
-				rw = {libpath},
-				ro = objs
-			}
-
-			factory.define_command(libpath, inputs, arglist)
+			factory.define_command(libpath, objs, arglist)
 		end,
 	},
 	{
 		name = "program",
 		process = function(parent_config, config)
 			read_paths = {
-				"/usr/local/llvm80",
-				"/usr/local/bin",
-				"/lib",
-				"/usr/lib",
-				"/usr/local/lib",
+				{
+					path = "/usr/local/llvm80",
+					type = "dir",
+				},
+				{
+					path = "/usr/local/bin",
+					type = "dir"
+				},
+				{
+					path = "/lib",
+					type = "dir"
+				},
+				{
+					path = "/usr/lib",
+					type = "dir"
+				},
+				{
+					path = "/usr/local/lib",
+					type = "dir"
+				},
 			}
 
 			libpaths = factory.map(make_lib_path, config["libs"])
@@ -131,13 +192,10 @@ definitions = {
 				stdlibs
 			)
 
-			inputs = {
-				rw = {prog_path},
-				ro = factory.flat_list(
-					read_paths,
-					libpaths
-				)
-			}
+			inputs = factory.flat_list(
+				read_paths,
+				libpaths
+			)
 
 			factory.define_command(prog_path, inputs, arglist)
 		end

@@ -32,8 +32,12 @@
 #include "PermissionList.h"
 #include "ProductManager.h"
 
+#include <filesystem>
+
 #include <err.h>
 #include <sys/stat.h>
+
+namespace fs = std::filesystem;
 
 CommandFactory::CommandFactory(ProductManager &p)
   : productManager(p)
@@ -55,42 +59,62 @@ CommandFactory::IsDirectory(const std::string & path)
 	return sb.st_mode & S_IFDIR;
 }
 
+Product*
+CommandFactory::ParsePermissionConf(PermissionList & permList, const PermissionConf & permConf) const
+{
+	Permission perm;
+
+	if (strcmp(permConf.access, "r") == 0) {
+		perm = Permission::READ;
+	} else if (strcmp(permConf.access, "rw") == 0) {
+		perm = Permission::READ | Permission::WRITE;
+	} else if (strcmp(permConf.access, "x") == 0) {
+		perm = Permission::READ | Permission::EXEC;
+	} else {
+		errx(1, "Unrecognized permission type '%s'", permConf.access);
+	}
+
+	Product::Type type;
+	if (strcmp(permConf.type, "dir") == 0) {
+		type = Product::Type::DIR;
+	} else if (strcmp(permConf.type, "file") == 0) {
+		type = Product::Type::FILE;
+	} else {
+		errx(1, "Unrecognized product type '%s'", permConf.access);
+	}
+
+	Path path(permConf.path);
+	if (type == Product::Type::DIR) {
+		permList.AddDirPermission(path, perm);
+	} else {
+		permList.AddFilePermission(path, perm);
+	}
+
+	return productManager.GetProduct(path, type);
+}
+
 void
-CommandFactory::AddCommand(const std::vector<std::string> & productList,
-    const std::unordered_map<std::string, std::vector<std::string>> & permMap,
+CommandFactory::AddCommand(const std::vector<PermissionConf> & productList,
+    const std::vector<PermissionConf> & permMap,
     std::vector<std::string> && argList)
 {
 	PermissionList permList;
 	std::vector<Product*> inputs, products;
 
-	for (auto & [permType, paths] : permMap) {
-		Permission perm;
-		if (permType == "ro") {
-			perm = Permission::READ;
-		} else {
-			errx(1, "Unrecognized permission type '%s'", permType.c_str());
-		}
+	Product * exe = productManager.GetProduct(argList.front(), Product::Type::FILE);
+	inputs.push_back(exe);
 
-		for (std::string p : paths) {
-			if (IsDirectory(p)) {
-				permList.AddDirPermission(p, perm);
-			} else {
-				permList.AddFilePermission(p, perm);
-			}
+	permList.AddFilePermission(exe->GetPath(), Permission::READ | Permission::EXEC);
 
-			inputs.push_back(productManager.GetProduct(p));
-		}
+	for (auto & permConf : permMap) {
+		inputs.push_back(ParsePermissionConf(permList, permConf));
 	}
 
-	for (const std::string & path : productList) {
-		Product * product = productManager.GetProduct(path);
+	for (auto & permConf : productList) {
+		Product * product = ParsePermissionConf(permList, permConf);
 		products.push_back(product);
 		productManager.SetInputs(product, inputs);
-
-		permList.AddFilePermission(path, Permission::READ | Permission::WRITE);
 	}
-
-	permList.Finalize();
 
 	commandList.emplace_back(std::make_unique<Command>(std::move(products), std::move(argList), std::move(permList)));
 }

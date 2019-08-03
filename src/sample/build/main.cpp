@@ -247,9 +247,6 @@ void FindRules(const ConfigNode & node, ProductManager & productMgr, PermissionL
 
 int main(int argc, char **argv)
 {
-	PermissionList perms;
-	std::vector<Product*> objects;
-
 	EventLoop loop;
 	TempFileManager tmpMgr;
 	auto msgSock = tmpMgr.GetUnixSocket("msg_sock");
@@ -264,8 +261,6 @@ int main(int argc, char **argv)
 
 	IngestManager ingestMgr;
 	Interpreter interp(ingestMgr, commandFactory);
-
-	perms.AddDirPermission("/", Permission::READ | Permission::WRITE | Permission::EXEC);
 
 	ConfigParser parser("/home/rstone/repos/factory/src/sample/build/build.ucl");
 

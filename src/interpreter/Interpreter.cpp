@@ -78,7 +78,12 @@ Interpreter::~Interpreter()
 void
 Interpreter::RegisterModules()
 {
+	lua_State *lua = luaState.get();
+
+	lua_newtable(lua);
+	lua_pushstring(lua, "internal");
 	luaL_newlib(luaState.get(), factoryModule);
+	lua_settable(lua, -3);
 	lua_setglobal(luaState.get(), "factory");
 }
 
@@ -297,20 +302,40 @@ Interpreter::GetStringList(int relative)
 	return list;
 }
 
-std::unordered_map<std::string, std::vector<std::string>>
-Interpreter::GetInputs(int stackIndex)
+const char *
+Interpreter::GetTableString(int stackIndex, const char * name)
 {
 	lua_State * lua = luaState.get();
-	std::unordered_map<std::string, std::vector<std::string>> inputList;
+	lua_pushstring(lua, name);
+	lua_gettable(lua, stackIndex);
+	luaL_checktype(lua, -1, LUA_TSTRING);
 
+	const char * value = lua_tostring(lua, -1);
+	lua_pop(lua, 1);
+
+	return value;
+}
+
+std::vector<PermissionConf>
+Interpreter::GetProductList(int stackIndex)
+{
+	lua_State * lua = luaState.get();
+	std::vector<PermissionConf> inputList;
+
+	int i = 0;
 	lua_pushnil(lua);
 	while (lua_next(lua, stackIndex) != 0) {
-		luaL_checktype(lua, -2, LUA_TSTRING);
-		std::string permType = lua_tostring(lua, -2);
-		std::vector<std::string> paths = GetStringList(-1);
+		int entryIndex = LuaAbsoluteIndex(lua, -1);
+		luaL_checktype(lua, entryIndex, LUA_TTABLE);
+
+		const char * path = GetTableString(entryIndex, "path");
+		const char * access = GetTableString(entryIndex, "access");
+		const char * type = GetTableString(entryIndex, "type");
+
 		lua_pop(lua, 1);
 
-		inputList.emplace(std::move(permType), std::move(paths));
+		inputList.emplace_back(path, access, type);
+		i++;
 	}
 
 	return inputList;
@@ -320,8 +345,8 @@ Interpreter::GetInputs(int stackIndex)
 int
 Interpreter::DefineCommand()
 {
-	std::vector<std::string> products = GetStringList(1);
-	auto perms = GetInputs(2);
+	auto products = GetProductList(1);
+	auto perms = GetProductList(2);
 	std::vector<std::string> argList = GetStringList(3);
 
 	commandFactory.AddCommand(products, perms, std::move(argList));

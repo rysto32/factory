@@ -37,67 +37,91 @@
 #include <err.h>
 #include <errno.h>
 
+namespace fs = std::filesystem;
+
 ProductManager::ProductManager(JobQueue & jq)
   : jobQueue(jq)
 {
 }
 
 Product *
-ProductManager::GetProduct(const Path & path)
+ProductManager::GetProduct(const Path & path, Product::Type type)
 {
 	auto it = products.find(path);
 	if (it != products.end())
 		return it->second.get();
 
-	auto product = std::make_unique<Product>(path, *this);
+	auto product = std::make_unique<Product>(path, type, *this);
 	Product * ptr = product.get();
 	products.insert(std::make_pair(path, std::move(product)));
 	fullyBuilt.insert(ptr);
+
+	Path parent(path.parent_path());
+	std::error_code error;
+	bool exists = fs::exists(parent, error);
+	if (!exists || error) {
+		Product * parentDir = GetProduct(parent, Product::Type::DIR);
+		AddDependency(ptr, parentDir);
+	}
 	return ptr;
 }
 
 void
-ProductManager::AddDependency(Product * dependant, Product * dependee)
+ProductManager::AddDependency(Product * product, Product * input)
 {
-	struct stat statDependee, statDependant;
-	int error;
+	std::error_code error;
 
-	dependant->AddDependency(dependee);
+	product->AddDependency(input);
+	fprintf(stderr, "%s depends on %s\n", product->GetPath().c_str(), input->GetPath().c_str());
 
-	if (NeedsBuild(dependee)) {
-		SetNeedsBuild(dependant);
+	if (NeedsBuild(input)) {
+		fprintf(stderr, "'%s' needs build because '%s' needs build\n", product->GetPath().c_str(), input->GetPath().c_str());
+		SetNeedsBuild(product);
 		return;
 	}
 
-	error = stat(dependee->GetPath().c_str(), &statDependee);
-	if (error != 0) {
-		SetNeedsBuild(dependant);
-		return;
-	}
+	try {
+		if (!ProductExists(product)) {
+			SetNeedsBuild(product);
+			fprintf(stderr, "'%s' needs build because it doesn't exist\n", product->GetPath().c_str());
+			return;
+		}
 
-	error = stat(dependant->GetPath().c_str(), &statDependant);
-	if (error != 0) {
-		SetNeedsBuild(dependant);
-		return;
-	}
+		if (!ProductExists(input)) {
+			SetNeedsBuild(product);
+			fprintf(stderr, "'%s' needs build because '%s' doesn't exist\n", product->GetPath().c_str(), input->GetPath().c_str());
+			return;
+		}
 
-	/*printf("Dependant: mtime %ld.%09ld %s\n", statDependant.st_mtim.tv_sec, statDependant.st_mtim.tv_nsec, dependant->GetPath().c_str());
-	printf("Dependee:  mtime %ld.%09ld %s\n", statDependee.st_mtim.tv_sec, statDependee.st_mtim.tv_nsec, dependee->GetPath().c_str());*/
-	if (statDependant.st_mtim.tv_sec < statDependee.st_mtim.tv_sec ||
-	    (statDependant.st_mtim.tv_sec == statDependee.st_mtim.tv_sec &&
-	    statDependant.st_mtim.tv_nsec < statDependee.st_mtim.tv_nsec)) {
-		SetNeedsBuild(dependant);
+		if (input->IsDir()) {
+			/*
+			 * Directories are updated when any file in them is
+			 * written to; do not rebuild if object is older than
+			 * a directory it depends on as that's likely a false
+			 * dependency.
+			 */
+			return;
+		}
+
+		auto inputLast = fs::last_write_time(input->GetPath());
+		auto productLast = fs::last_write_time(product->GetPath());
+
+		if (productLast < inputLast) {
+			SetNeedsBuild(product);
+			fprintf(stderr, "'%s' needs build because it is older than '%s'\n", product->GetPath().c_str(), input->GetPath().c_str());
+		}
+	} catch (fs::filesystem_error &e) {
+		SetNeedsBuild(product);
+		fprintf(stderr, "'%s' needs build because we got an error accessing it: %s\n", product->GetPath().c_str(), e.what());
 	}
 }
 
 bool
-ProductManager::FileExists(const std::string & path) const
+ProductManager::ProductExists(const Product * product) const
 {
-	struct stat sb;
-	int error;
+	std::error_code error;
 
-	error = stat(path.c_str(), &sb);
-	return error == 0;
+	return fs::exists(product->GetPath(), error) && !error;
 }
 
 void
@@ -113,8 +137,9 @@ ProductManager::SetInputs(Product * product, const std::vector<Product*> & input
 	}
 
 	if (count == 0) {
-		if (!FileExists(product->GetPath())) {
+		if (!ProductExists(product)) {
 			SetNeedsBuild(product);
+			fprintf(stderr, "'%s' needs build because it doesn't exist\n", product->GetPath().c_str());
 			readyProducts.push_back(product);
 		}
 		return;
@@ -162,6 +187,7 @@ ProductManager::SubmitLeafJobs()
 void
 ProductManager::ProductReady(Product *p)
 {
+	fprintf(stderr, "%s is ready to build\n", p->GetPath().c_str());
 	if (NeedsBuild(p))
 		jobQueue.Submit(p->GetPendingJob());
 }

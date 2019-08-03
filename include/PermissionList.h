@@ -52,11 +52,6 @@ private:
 		{
 		}
 
-		bool operator<(const DirectoryPerm & other) const
-		{
-			return path < other.path;
-		}
-
 		bool Matches(const Path &) const;
 	};
 
@@ -78,8 +73,8 @@ public:
 	PermissionList &operator=(const PermissionList&) = delete;
 	PermissionList &operator=(PermissionList &&) = delete;
 
-	void AddFilePermission(const std::string &, Permission);
-	void AddDirPermission(const std::string &, Permission);
+	void AddFilePermission(const Path &, Permission);
+	void AddDirPermission(const Path &, Permission);
 
 	int IsPermitted(const Path &, int) const;
 };

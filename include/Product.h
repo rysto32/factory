@@ -40,7 +40,12 @@ class ProductManager;
 
 class Product
 {
+public:
+	enum Type { FILE, DIR };
+
+private:
 	Path path;
+	Type type;
 	Command *command;
 	ProductManager & productManager;
 
@@ -49,7 +54,7 @@ class Product
 
 
 public:
-	Product(const Path & p, ProductManager & mgr);
+	Product(const Path & p, Type t, ProductManager & mgr);
 
 	Product(const Product &) = delete;
 	Product(Product &&) = delete;
@@ -77,6 +82,11 @@ public:
 	const std::vector<Product*> & GetDependees() const
 	{
 		return dependees;
+	}
+
+	bool IsDir() const
+	{
+		return type == DIR;
 	}
 };
 

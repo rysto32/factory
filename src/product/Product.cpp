@@ -33,8 +33,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-Product::Product(const Path & p, ProductManager & mgr)
-  : path(p), productManager(mgr)
+Product::Product(const Path & p, Type t, ProductManager & mgr)
+  : path(p), type(t), command(nullptr), productManager(mgr)
 {
 
 }

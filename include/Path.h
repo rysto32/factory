@@ -30,8 +30,76 @@
 #define PATH_H
 
 #include <filesystem>
+#include <string_view>
 
-typedef std::filesystem::path Path;
+class Path
+{
+private:
+	std::filesystem::path path;
+
+	static std::string_view StripTrailingSlashes(std::string_view p)
+	{
+		auto lastChar = p.find_last_not_of("/");
+		if (lastChar == std::string::npos) {
+			return p;
+		} else {
+			return p.substr(0, lastChar + 1);
+		}
+	}
+
+	Path(std::filesystem::path && p)
+	  : path(std::move(p))
+	{
+	}
+
+public:
+	Path() = default;
+
+	Path(std::string_view p)
+	  : path(StripTrailingSlashes(p))
+	{
+	}
+
+	Path(const char *p)
+	  : path(StripTrailingSlashes(p))
+	{
+	}
+
+	Path(const std::string & p)
+	  : path(StripTrailingSlashes(p))
+	{
+	}
+
+	operator const std::filesystem::path &() const
+	{
+		return path;
+	}
+
+	Path parent_path() const
+	{
+		return path.parent_path();
+	}
+
+	Path root_path() const
+	{
+		return path.root_path();
+	}
+
+	bool operator ==(const Path & rhs) const
+	{
+		return path == rhs.path;
+	}
+
+	bool operator !=(const Path & rhs) const
+	{
+		return !(*this == rhs);
+	}
+
+	const char * c_str() const
+	{
+		return path.c_str();
+	}
+};
 
 namespace std
 {

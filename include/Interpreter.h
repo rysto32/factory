@@ -37,6 +37,7 @@
 #include <unordered_map>
 #include <vector>
 
+struct PermissionConf;
 class CommandFactory;
 class IngestManager;
 class PermissionList;
@@ -92,9 +93,10 @@ class Interpreter
 	void ParseDefinition();
 
 	void AddStringValuePair(const char * name, const char * value);
+	const char * GetTableString(int stackIndex, const char * name);
 
 	std::vector<std::string> GetStringList(int stackIndex);
-	std::unordered_map<std::string, std::vector<std::string>> GetInputs(int stackIndex);
+	std::vector<PermissionConf> GetProductList(int stackIndex);
 
 	static int LuaAbsoluteIndex(lua_State *lua, int index);
 

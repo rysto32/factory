@@ -30,13 +30,13 @@
 #define PRODUCT_MANAGER_H
 
 #include "Path.h"
+#include "Product.h"
 
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
-class Product;
 class JobQueue;
 
 class ProductManager
@@ -47,7 +47,7 @@ class ProductManager
 	std::vector<Product*> readyProducts;
 
 	bool NeedsBuild(const Product*) const;
-	bool FileExists(const std::string &) const;
+	bool ProductExists(const Product * product) const;
 	void AddDependency(Product * product, Product * input);
 	void SetNeedsBuild(const Product*);
 
@@ -59,7 +59,7 @@ public:
 	ProductManager &operator=(const ProductManager &) = delete;
 	ProductManager &operator=(ProductManager &&) = delete;
 
-	Product * GetProduct(const Path &);
+	Product * GetProduct(const Path &, Product::Type type);
 	void SetInputs(Product * product, const std::vector<Product*> & inputs);
 
 	void SubmitLeafJobs();

@@ -32,21 +32,15 @@
 #include <fcntl.h>
 
 void
-PermissionList::AddFilePermission(const std::string &path, Permission p)
+PermissionList::AddFilePermission(const Path &path, Permission p)
 {
 	filePerm.emplace(path, p);
 }
 
 void
-PermissionList::AddDirPermission(const std::string & path, Permission p)
+PermissionList::AddDirPermission(const Path & path, Permission p)
 {
-	auto lastChar = path.find_last_not_of("/");
-	if (lastChar == std::string::npos) {
-		dirPerm.emplace(path, p);
-	} else {
-		Path pathObj(path.substr(0, lastChar + 1));
-		dirPerm.emplace(std::move(pathObj), p);
-	}
+	dirPerm.emplace(path, p);
 }
 
 Permission
