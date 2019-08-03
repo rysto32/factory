@@ -10,6 +10,7 @@ PROG_LIBS := \
 	build_sample \
 	ingest \
 	interpreter \
+	lua \
 	job \
 	perm \
 	product \

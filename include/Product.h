@@ -32,6 +32,7 @@
 #include "Path.h"
 #include "Command.h"
 
+#include <cassert>
 #include <unordered_set>
 #include <vector>
 

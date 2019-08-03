@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018 Ryan Stone
+ * Copyright (c) 2019 Ryan Stone
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,51 +25,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "MsgSocketServer.h"
 
-#include "EventLoop.h"
-#include "JobManager.h"
-#include "MsgSocket.h"
-#include "TempFile.h"
+#include "lua/View.h"
 
-#include <cassert>
+#include "lua/Table.h"
 
-MsgSocketServer::MsgSocketServer(std::unique_ptr<TempFile> fd, EventLoop & loop,
-    JobManager &jobMgr)
-  : listenSock(std::move(fd)),
-    eventLoop(loop),
-    jobMgr(jobMgr)
+namespace Lua
 {
-	loop.RegisterListenSocket(this, listenSock->GetFD());
+
+Table
+View::GetTable(int stackIndex)
+{
+	return Table(*this, stackIndex);
 }
 
-MsgSocketServer::~MsgSocketServer()
-{
-}
-
-void
-MsgSocketServer::Dispatch(int fd, short flags)
-{
-	assert (fd == listenSock->GetFD());
-
-	while (1) {
-		int sock = accept4(fd, NULL, NULL, SOCK_CLOEXEC);
-		if (sock < 0)
-			break;
-
-		incompleteSockets.insert(std::make_pair(sock,
-		    std::make_unique<MsgSocket>(sock, this, eventLoop)));
-	}
-}
-
-Job *
-MsgSocketServer::CompleteSocket(MsgSocket *s, uint64_t jobId)
-{
-	auto it = incompleteSockets.find(s->GetFD());
-	assert (it != incompleteSockets.end());
-
-	auto ptr = std::move(it->second);
-	incompleteSockets.erase(s->GetFD());
-
-	return jobMgr.RegisterSocket(jobId, std::move(ptr));
 }

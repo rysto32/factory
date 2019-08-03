@@ -37,6 +37,7 @@
 
 #include <err.h>
 #include <fcntl.h>
+#include <string.h>
 #include <unistd.h>
 
 template<typename T, typename U>

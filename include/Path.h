@@ -99,6 +99,11 @@ public:
 	{
 		return path.c_str();
 	}
+
+	std::string string() const
+	{
+		return path.string();
+	}
 };
 
 namespace std

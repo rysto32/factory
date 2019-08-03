@@ -1,10 +1,11 @@
 
-function factory.add_definitions(...)
-	factory.internal.add_definitions(...)
+function factory.add_definitions(defs)
+	factory.internal.add_definitions(defs)
 end
 
 function factory.define_command(products, inputs, arglist)
-	factory.internal.define_command(products, inputs, arglist)
+	factory.internal.define_command(factory.listify(products),
+	    factory.listify(inputs), factory.listify(arglist))
 end
 
 function factory.replace_ext(file, old, new)
@@ -29,6 +30,14 @@ function factory.flat_list(...)
 	end
 
 	return list
+end
+
+function factory.listify(arg)
+	if type(arg) == 'table' then
+		return arg
+	else
+		return {arg}
+	end
 end
 
 function factory.map(func, list)

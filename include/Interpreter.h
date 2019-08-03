@@ -42,6 +42,12 @@ class CommandFactory;
 class IngestManager;
 class PermissionList;
 
+namespace Lua
+{
+	class Table;
+	class View;
+}
+
 class Interpreter
 {
 	class LuaStateFree
@@ -90,15 +96,11 @@ class Interpreter
 
 	void PushConfig(const ConfigNode & node);
 
-	void ParseDefinition();
+	void ParseDefinition(Lua::Table & def);
 
 	void AddStringValuePair(const char * name, const char * value);
-	const char * GetTableString(int stackIndex, const char * name);
 
-	std::vector<std::string> GetStringList(int stackIndex);
-	std::vector<PermissionConf> GetProductList(int stackIndex);
-
-	static int LuaAbsoluteIndex(lua_State *lua, int index);
+	std::vector<std::string> GetStringList(Lua::View &, int stackIndex);
 
 public:
 	Interpreter(IngestManager &, CommandFactory &);

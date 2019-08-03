@@ -33,6 +33,9 @@
 #include "IngestManager.h"
 #include "PermissionList.h"
 
+#include "lua/Table.h"
+#include "lua/View.h"
+
 #include <cassert>
 #include <memory>
 #include <string>
@@ -223,23 +226,19 @@ Interpreter::DefineCommandWrapper(lua_State *lua)
 	return GetInterpreter(lua)->DefineCommand();
 }
 
+
 void
-Interpreter::ParseDefinition()
+Interpreter::ParseDefinition(Lua::Table & def)
 {
-	lua_State * lua = luaState.get();
+	Lua::View & lua = def.GetView();
 
-	luaL_checktype(lua, -1, LUA_TTABLE);
+	std::string name(def.GetString("name"));
 
-	lua_pushliteral(lua, "name");
-	lua_gettable(lua, -2);
-	luaL_checktype(lua, -1, LUA_TSTRING);
-	std::string name = lua_tostring(lua, -1);
-	lua_pop(lua, 1);
+	def.FetchValue("process");
+	if (!lua.isfunction(-1))
+		errx(1, "Field 'process' is expected to be a function");
 
-	lua_pushliteral(lua, "process");
-	lua_gettable(lua, -2);
-	luaL_checktype(lua, -1, LUA_TFUNCTION);
-	int ref = luaL_ref(lua, LUA_REGISTRYINDEX);
+	int ref = lua.SaveToRegistry();
 
 	ingestMgr.AddIngest(std::move(name), ref);
 
@@ -249,80 +248,39 @@ Interpreter::ParseDefinition()
 int
 Interpreter::AddDefinitions()
 {
-	int i;
-	int numElements;
-	lua_State * lua = luaState.get();
+	Lua::View lua(luaState);
 
 	/* Ensure that our first argument is a table. */
-	luaL_checktype(lua, 1, LUA_TTABLE);
-
-	numElements = luaL_len(lua, 1);
-	for (i = 1; i <= numElements; ++i) {
-		lua_geti(lua, 1, i);
-		ParseDefinition();
-		lua_pop(lua, 1);
-	}
+	auto table = lua.GetTable(1);
+	table.IterateList([this] (int index, Lua::Table & def)
+	{
+		ParseDefinition(def);
+	});
 
 	return 0;
 }
 
-/*
- * Conver an index to an equivalant absolute index that references the same object
- * even as the stack is pushed or popped.
- */
-int
-Interpreter::LuaAbsoluteIndex(lua_State *lua, int relative)
-{
-	return (relative > 0 || relative <= LUA_REGISTRYINDEX) ? relative
-	    : lua_gettop(lua) + relative + 1;
-}
-
 std::vector<std::string>
-Interpreter::GetStringList(int relative)
+Interpreter::GetStringList(Lua::View & lua, int relative)
 {
-	lua_State * lua = luaState.get();
-	int stackIndex = LuaAbsoluteIndex(lua, relative);
-
-	if (lua_isstring(lua, stackIndex)) {
-		std::string str = lua_tostring(lua, stackIndex);
-		return {str};
-	}
-
-	luaL_checktype(lua, stackIndex, LUA_TTABLE);
-
 	std::vector<std::string> list;
-
-	/* Start with the first entry in table */
-	lua_pushnil(lua);
-	while (lua_next(lua, stackIndex) != 0) {
-		luaL_checktype(lua, -1, LUA_TSTRING);
-		list.push_back(lua_tostring(lua, -1));
-		lua_pop(lua, 1);
-	}
+	auto configList = lua.GetTable(relative);
+	configList.IterateList([&list](int index, std::string str)
+	{
+		list.push_back(std::move(str));
+	});
 	return list;
-}
-
-const char *
-Interpreter::GetTableString(int stackIndex, const char * name)
-{
-	lua_State * lua = luaState.get();
-	lua_pushstring(lua, name);
-	lua_gettable(lua, stackIndex);
-	luaL_checktype(lua, -1, LUA_TSTRING);
-
-	const char * value = lua_tostring(lua, -1);
-	lua_pop(lua, 1);
-
-	return value;
 }
 
 // factory.define_command(products, inputs, arglist)
 int
 Interpreter::DefineCommand()
 {
-	auto products = GetStringList(1);
-	auto inputs = GetStringList(2);
-	auto argList = GetStringList(3);
+	Lua::View lua(luaState);
+
+	auto products = GetStringList(lua, 1);
+	auto inputs = GetStringList(lua, 2);
+	auto argList = GetStringList(lua, 3);
 
 	commandFactory.AddCommand(products, inputs, std::move(argList));
 

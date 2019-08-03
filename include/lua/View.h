@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018 Ryan Stone
+ * Copyright (c) 2019 Ryan Stone
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,51 +25,86 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "MsgSocketServer.h"
 
-#include "EventLoop.h"
-#include "JobManager.h"
-#include "MsgSocket.h"
-#include "TempFile.h"
+#ifndef LUA_VIEW_H
+#define LUA_VIEW_H
+
+#include <lua.hpp>
 
 #include <cassert>
+#include <memory>
 
-MsgSocketServer::MsgSocketServer(std::unique_ptr<TempFile> fd, EventLoop & loop,
-    JobManager &jobMgr)
-  : listenSock(std::move(fd)),
-    eventLoop(loop),
-    jobMgr(jobMgr)
+#include <err.h>
+
+namespace Lua
 {
-	loop.RegisterListenSocket(this, listenSock->GetFD());
-}
 
-MsgSocketServer::~MsgSocketServer()
+class Table;
+
+class View
 {
-}
+private:
+	lua_State *lua;
+ 	int startStackTop;
 
-void
-MsgSocketServer::Dispatch(int fd, short flags)
-{
-	assert (fd == listenSock->GetFD());
+public:
+	template <typename Free>
+	View(const std::unique_ptr<lua_State, Free> & l)
+	  : lua(l.get()),
+	    startStackTop(lua_gettop(lua))
+	{
 
-	while (1) {
-		int sock = accept4(fd, NULL, NULL, SOCK_CLOEXEC);
-		if (sock < 0)
-			break;
-
-		incompleteSockets.insert(std::make_pair(sock,
-		    std::make_unique<MsgSocket>(sock, this, eventLoop)));
 	}
+
+	~View()
+	{
+		assert (lua_gettop(lua) == startStackTop);
+	}
+
+	View(View &&) = default;
+	View(const View*) = delete;
+
+	View & operator=(View &&) = delete;
+	View & operator=(const View &) = delete;
+
+	operator lua_State*()
+	{
+		return lua;
+	}
+
+	Table GetTable(int stackIndex);
+
+	bool isstring(int stackIndex)
+	{
+		return lua_isstring(lua, stackIndex);
+	}
+
+	bool isfunction(int index)
+	{
+		return lua_isfunction(lua, index);
+	}
+
+	const char * tostring(int stackIndex)
+	{
+		return lua_tostring(lua, stackIndex);
+	}
+
+	/*
+	 * Conver an index to an equivalant absolute index that references the
+	 * same object even as the stack is pushed or popped.
+	 */
+	int absolute(int relative)
+	{
+		return (relative > 0 || relative <= LUA_REGISTRYINDEX) ? relative
+		    : lua_gettop(lua) + relative + 1;
+	}
+
+	int SaveToRegistry()
+	{
+		return luaL_ref(lua, LUA_REGISTRYINDEX);
+	}
+};
 }
 
-Job *
-MsgSocketServer::CompleteSocket(MsgSocket *s, uint64_t jobId)
-{
-	auto it = incompleteSockets.find(s->GetFD());
-	assert (it != incompleteSockets.end());
+#endif
 
-	auto ptr = std::move(it->second);
-	incompleteSockets.erase(s->GetFD());
-
-	return jobMgr.RegisterSocket(jobId, std::move(ptr));
-}
