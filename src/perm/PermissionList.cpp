@@ -32,15 +32,9 @@
 #include <fcntl.h>
 
 void
-PermissionList::AddFilePermission(const Path &path, Permission p)
+PermissionList::AddPermission(const Path &path, Permission p)
 {
 	filePerm.emplace(path, p);
-}
-
-void
-PermissionList::AddDirPermission(const Path & path, Permission p)
-{
-	dirPerm.emplace(path, p);
 }
 
 Permission
@@ -67,25 +61,6 @@ PermissionList::ModeToPermission(int mode)
 }
 
 int
-PermissionList::CheckDirPerms(Path path, int mode) const
-{
-
-	while (true) {
-		auto it = dirPerm.find(path);
-		if (it != dirPerm.end()) {
-			return (CheckPerm(it->second, mode));
-		}
-
-		if (path == path.root_path()) {
-			return (EPERM);
-		}
-
-		path = path.parent_path();
-	}
-
-}
-
-int
 PermissionList::CheckPerm(Permission allowed, int mode) const
 {
 	Permission requested = ModeToPermission(mode);
@@ -96,23 +71,19 @@ PermissionList::CheckPerm(Permission allowed, int mode) const
 }
 
 int
-PermissionList::IsPermitted(const Path & path, int mode) const
+PermissionList::IsPermitted(const Path & origPath, int mode) const
 {
-	auto it = filePerm.find(path);
-	if (it == filePerm.end())
-		return (CheckDirPerms(path, mode));
+	Path path(origPath);
+	while (true) {
+		auto it = filePerm.find(path);
+		if (it != filePerm.end()) {
+			return (CheckPerm(it->second, mode));
+		}
 
-	return (CheckPerm(it->second, mode));
-}
+		if (path == path.root_path()) {
+			return (EPERM);
+		}
 
-bool PermissionList::DirectoryPerm::Matches(const Path & candidate) const
-{
-	if (path == candidate)
-		return true;
-
-	do {
-		Path parent = candidate.parent_path();
-	} while (candidate != candidate.root_path());
-
-	return false;
+		path = path.parent_path();
+	}
 }

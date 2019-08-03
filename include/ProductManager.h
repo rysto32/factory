@@ -44,11 +44,18 @@ class ProductManager
 	std::unordered_map<Path, std::unique_ptr<Product>> products;
 	JobQueue & jobQueue;
 
-	bool ProductExists(const Product * product) const;
+	static bool ProductExists(const Product * product);
+	static bool FileExists(const Path & path);
+
 	void AddDependency(Product * product, Product * input);
 
 	bool CheckNeedsBuild(Product * product, const Product * input);
 	bool CheckNeedsBuild(Product * product);
+
+	Product * FindProduct(const Path &);
+	Product * MakeProduct(const Path &);
+
+	static Product::Type GetType(const Path &);
 
 public:
 	ProductManager(JobQueue &);
@@ -58,7 +65,7 @@ public:
 	ProductManager &operator=(const ProductManager &) = delete;
 	ProductManager &operator=(ProductManager &&) = delete;
 
-	Product * GetProduct(const Path &, Product::Type type);
+	Product * GetProduct(const Path &);
 	void SetInputs(Product * product, const std::vector<Product*> & inputs);
 
 	void SubmitLeafJobs();

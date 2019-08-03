@@ -43,7 +43,7 @@ TEST_F(PermissionListTestSuite, TestDirPerm)
 {
 	PermissionList list;
 
-	list.AddDirPermission("/home", Permission::READ);
+	list.AddPermission("/home", Permission::READ);
 
 	EXPECT_EQ(list.IsPermitted("/home/rstone", O_RDONLY), 0);
 	EXPECT_EQ(list.IsPermitted("/home/rstone", O_WRONLY), EPERM);
@@ -62,8 +62,8 @@ TEST_F(PermissionListTestSuite, TestMultiDirPerm)
 {
 	PermissionList list;
 
-	list.AddDirPermission("/home", Permission::READ);
-	list.AddDirPermission("/tmp", Permission::READ);
+	list.AddPermission("/home", Permission::READ);
+	list.AddPermission("/tmp", Permission::READ);
 
 	EXPECT_EQ(list.IsPermitted("/home/rstone", O_RDONLY), 0);
 	EXPECT_EQ(list.IsPermitted("/home/rstone", O_WRONLY), EPERM);
@@ -83,7 +83,7 @@ TEST_F(PermissionListTestSuite, TestSubDirPerm)
 {
 	PermissionList list;
 
-	list.AddDirPermission("/home", Permission::READ);
+	list.AddPermission("/home", Permission::READ);
 
 	EXPECT_EQ(list.IsPermitted("/home/rstone/tmp", O_RDONLY), 0);
 	EXPECT_EQ(list.IsPermitted("/home/rstone/tmp", O_RDONLY | O_EXEC), EPERM);
@@ -94,8 +94,8 @@ TEST_F(PermissionListTestSuite, TestTrailingSlash)
 {
 	PermissionList list;
 
-	list.AddDirPermission("/home/", Permission::READ);
-	list.AddDirPermission("/tmp//////", Permission::WRITE);
+	list.AddPermission("/home/", Permission::READ);
+	list.AddPermission("/tmp//////", Permission::WRITE);
 
 	EXPECT_EQ(list.IsPermitted("/home", O_RDONLY), 0);
 	EXPECT_EQ(list.IsPermitted("/home/", O_RDONLY), 0);
@@ -113,7 +113,7 @@ TEST_F(PermissionListTestSuite, TestRootDirPerm)
 {
 	PermissionList list;
 
-	list.AddDirPermission("/", Permission::READ);
+	list.AddPermission("/", Permission::READ);
 
 	EXPECT_EQ(list.IsPermitted("/etc", O_RDONLY), 0);
 	EXPECT_EQ(list.IsPermitted("/tmp", O_RDONLY), 0);

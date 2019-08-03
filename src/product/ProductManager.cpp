@@ -44,25 +44,61 @@ ProductManager::ProductManager(JobQueue & jq)
 {
 }
 
-Product *
-ProductManager::GetProduct(const Path & path, Product::Type type)
+Product::Type
+ProductManager::GetType(const Path & path)
 {
-	auto it = products.find(path);
-	if (it != products.end())
-		return it->second.get();
+	try {
+		auto status = fs::status(path);
+		if (fs::exists(status) && fs::is_directory(status)) {
+			return Product::Type::DIR;
+		}
+	} catch (fs::filesystem_error & e) {
 
-	auto product = std::make_unique<Product>(path, type, *this);
+	}
+
+	/*
+	 * If the product does not exist or we get some kind or error, assume
+	 * a file type.  If we're getting a failure here then the product does
+	 * not exist and anything that depends on it must be rebuilt.  The only
+	 * reason why we care about FILE or DIR is to change the algorithm on
+	 * whether to rebuild dependees, but FILE or DIR doesn't matter if the
+	 * input does not exist.
+	 */
+	return Product::Type::FILE;
+}
+
+Product *
+ProductManager::MakeProduct(const Path & path)
+{
+	auto product = std::make_unique<Product>(path, GetType(path), *this);
 	Product * ptr = product.get();
 	products.insert(std::make_pair(path, std::move(product)));
 
-	Path parent(path.parent_path());
-	std::error_code error;
-	bool exists = fs::exists(parent, error);
-	if (!exists || error) {
-		Product * parentDir = GetProduct(parent, Product::Type::DIR);
-		AddDependency(ptr, parentDir);
-	}
 	return ptr;
+}
+
+Product *
+ProductManager::GetProduct(const Path & path)
+{
+	Product * product = FindProduct(path);
+	if (product != nullptr) {
+		return product;
+	}
+
+	product = MakeProduct(path);
+
+	return product;
+}
+
+Product *
+ProductManager::FindProduct(const Path &path)
+{
+	auto it = products.find(path);
+	if (it != products.end()) {
+		return it->second.get();
+	}
+
+	return nullptr;
 }
 
 void
@@ -72,7 +108,7 @@ ProductManager::AddDependency(Product * product, Product * input)
 		return;
 
 	product->AddDependency(input);
-// 	fprintf(stderr, "%s depends on %s\n", product->GetPath().c_str(), input->GetPath().c_str());
+	fprintf(stderr, "%s depends on %s\n", product->GetPath().c_str(), input->GetPath().c_str());
 }
 
 bool
@@ -125,11 +161,17 @@ ProductManager::CheckNeedsBuild(Product * product, const Product * input)
 }
 
 bool
-ProductManager::ProductExists(const Product * product) const
+ProductManager::FileExists(const Path & path)
 {
 	std::error_code error;
 
-	return fs::exists(product->GetPath(), error) && !error;
+	return fs::exists(path, error) && !error;
+}
+
+bool
+ProductManager::ProductExists(const Product * product)
+{
+	return FileExists(product->GetPath());
 }
 
 void
@@ -159,9 +201,20 @@ ProductManager::SubmitLeafJobs()
 {
 	std::vector<Product*> outstanding;
 
-	for (auto & [path, product] : products) {
-		if(CheckNeedsBuild(product.get())) {
-			outstanding.push_back(product.get());
+	for (auto & [path, productPtr] : products) {
+		Product * product = productPtr.get();
+
+		Path parentPath(product->GetPath().parent_path());
+		Product * parent = FindProduct(parentPath);
+
+		if (parent) {
+			AddDependency(product, parent);
+		} else if (!FileExists(parentPath)) {
+			errx(1, "No command to make product '%s'", parentPath.c_str());
+		}
+
+		if(CheckNeedsBuild(product)) {
+			outstanding.push_back(product);
 		}
 	}
 

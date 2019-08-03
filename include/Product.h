@@ -95,10 +95,7 @@ public:
 		return type == DIR;
 	}
 
-	void SetNeedsBuild()
-	{
-		needsBuild = true;
-	}
+	void SetNeedsBuild();
 
 	bool NeedsBuild() const
 	{

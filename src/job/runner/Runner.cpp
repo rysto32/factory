@@ -114,18 +114,14 @@ int main(int argc, char **argv)
 	ArgList list;
 	int ch;
 
-	while ((ch = getopt(argc, argv, "a:d:")) != -1) {
+	while ((ch = getopt(argc, argv, "a:")) != -1) {
 		std::string permPath;
 		Permission p;
 
 		switch (ch) {
 		case 'a':
 			p = ParsePermission(optarg, permPath);
-			perms.AddFilePermission(permPath, p);
-			break;
-		case 'd':
-			p = ParsePermission(optarg, permPath);
-			perms.AddDirPermission(permPath, p);
+			perms.AddPermission(permPath, p);
 			break;
 		}
 	}

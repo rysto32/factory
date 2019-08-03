@@ -42,27 +42,12 @@
 class PermissionList
 {
 private:
-	struct DirectoryPerm
-	{
-		Path path;
-		Permission perm;
-
-		DirectoryPerm(const Path & path, Permission perm)
-		  : path(path), perm(perm)
-		{
-		}
-
-		bool Matches(const Path &) const;
-	};
-
 	typedef std::unordered_map<Path, Permission> PermMap;
 
 	PermMap filePerm;
-	PermMap dirPerm;
 
 	static Permission ModeToPermission(int);
 
-	int CheckDirPerms(Path path, int mode) const;
 	int CheckPerm(Permission allowed, int mode) const;
 
 public:
@@ -73,8 +58,7 @@ public:
 	PermissionList &operator=(const PermissionList&) = delete;
 	PermissionList &operator=(PermissionList &&) = delete;
 
-	void AddFilePermission(const Path &, Permission);
-	void AddDirPermission(const Path &, Permission);
+	void AddPermission(const Path &, Permission);
 
 	int IsPermitted(const Path &, int) const;
 };

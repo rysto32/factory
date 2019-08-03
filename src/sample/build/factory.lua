@@ -3,38 +3,7 @@ function factory.add_definitions(...)
 	factory.internal.add_definitions(...)
 end
 
-function factory.internal.qualify_product_list(inList, defaultAccess)
-	outList = {}
-
-	if (type(inList) == 'string') then
-		inList = {inList}
-	end
-
-	for _,i in ipairs(inList) do
-		-- Defaults; may be overridden below
-		entry = {
-			access = defaultAccess,
-			type = 'file'
-		}
-
-		if (type(i) == 'string') then
-			entry['path'] = i
-		elseif (type(i) == 'table') then
-			for k, v in pairs(i) do
-				entry[k] = v
-			end
-		end
-
-		table.insert(outList, entry)
-	end
-
-	return outList
-end
-
-function factory.define_command(productsOrig, inputsOrig, arglist)
-	inputs = factory.internal.qualify_product_list(inputsOrig, "r")
-	products = factory.internal.qualify_product_list(productsOrig, "rw")
-
+function factory.define_command(products, inputs, arglist)
 	factory.internal.define_command(products, inputs, arglist)
 end
 
@@ -101,13 +70,7 @@ definitions = {
 			libpath = make_lib_path(defs["name"])
 			objdir = "/home/rstone/obj/tcplat/"
 
-			objdirProduct = {
-				{
-					path = objdir,
-					type = "dir"
-				}
-			}
-			factory.define_command(objdirProduct, {}, {"/bin/mkdir", "-p", objdir})
+			factory.define_command(objdir, {}, {"/bin/mkdir", "-p", objdir})
 
 			objs = {}
 			for i, src in ipairs(defs["srcs"]) do
@@ -125,22 +88,10 @@ definitions = {
 					srcpath)
 
 				inputs = {
-					{
-						path = "/usr/local/llvm80",
-						type = "dir",
-					},
-					{
-						path = "/usr/local/bin",
-						type = "dir"
-					},
-					{
-						path = "/usr/include/",
-						type = "dir"
-					},
-					{
-						path = srcdir,
-						type = "dir"
-					},
+					"/usr/local/llvm80",
+					"/usr/local/bin",
+					"/usr/include/",
+					srcdir,
 					srcpath
 				}
 
@@ -159,26 +110,11 @@ definitions = {
 		name = "program",
 		process = function(parent_config, config)
 			read_paths = {
-				{
-					path = "/usr/local/llvm80",
-					type = "dir",
-				},
-				{
-					path = "/usr/local/bin",
-					type = "dir"
-				},
-				{
-					path = "/lib",
-					type = "dir"
-				},
-				{
-					path = "/usr/lib",
-					type = "dir"
-				},
-				{
-					path = "/usr/local/lib",
-					type = "dir"
-				},
+				"/usr/local/llvm80",
+				"/usr/local/bin",
+				"/lib",
+				"/usr/lib",
+				"/usr/local/lib",
 			}
 
 			libpaths = factory.map(make_lib_path, config["libs"])

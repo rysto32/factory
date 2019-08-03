@@ -34,7 +34,11 @@
 #include <sys/wait.h>
 
 Product::Product(const Path & p, Type t, ProductManager & mgr)
-  : path(p), type(t), command(nullptr), productManager(mgr), needsBuild(false)
+  : path(p),
+    type(t),
+    command(nullptr),
+    productManager(mgr),
+    needsBuild(false)
 {
 
 }
@@ -90,6 +94,15 @@ Product::BuildComplete(int status)
 		fprintf(stderr, "%s: job terminated on unknown code %d\n",
 		     path.c_str(), status);
 		exit(1);
+	}
+}
+
+void
+Product::SetNeedsBuild()
+{
+	needsBuild = true;
+	for (Product * p : dependees) {
+		p->SetNeedsBuild();
 	}
 }
 

@@ -59,59 +59,28 @@ CommandFactory::IsDirectory(const std::string & path)
 	return sb.st_mode & S_IFDIR;
 }
 
-Product*
-CommandFactory::ParsePermissionConf(PermissionList & permList, const PermissionConf & permConf) const
-{
-	Permission perm;
-
-	if (strcmp(permConf.access, "r") == 0) {
-		perm = Permission::READ;
-	} else if (strcmp(permConf.access, "rw") == 0) {
-		perm = Permission::READ | Permission::WRITE;
-	} else if (strcmp(permConf.access, "x") == 0) {
-		perm = Permission::READ | Permission::EXEC;
-	} else {
-		errx(1, "Unrecognized permission type '%s'", permConf.access);
-	}
-
-	Product::Type type;
-	if (strcmp(permConf.type, "dir") == 0) {
-		type = Product::Type::DIR;
-	} else if (strcmp(permConf.type, "file") == 0) {
-		type = Product::Type::FILE;
-	} else {
-		errx(1, "Unrecognized product type '%s'", permConf.access);
-	}
-
-	Path path(permConf.path);
-	if (type == Product::Type::DIR) {
-		permList.AddDirPermission(path, perm);
-	} else {
-		permList.AddFilePermission(path, perm);
-	}
-
-	return productManager.GetProduct(path, type);
-}
-
 void
-CommandFactory::AddCommand(const std::vector<PermissionConf> & productList,
-    const std::vector<PermissionConf> & permMap,
+CommandFactory::AddCommand(const std::vector<std::string> & productList,
+    const std::vector<std::string> & inputPaths,
     std::vector<std::string> && argList)
 {
 	PermissionList permList;
 	std::vector<Product*> inputs, products;
 
-	Product * exe = productManager.GetProduct(argList.front(), Product::Type::FILE);
+	Product * exe = productManager.GetProduct(argList.front());
 	inputs.push_back(exe);
 
-	permList.AddFilePermission(exe->GetPath(), Permission::READ | Permission::EXEC);
+	permList.AddPermission(exe->GetPath(), Permission::READ | Permission::EXEC);
 
-	for (auto & permConf : permMap) {
-		inputs.push_back(ParsePermissionConf(permList, permConf));
+	for (auto & path : inputPaths) {
+		Product * input = productManager.GetProduct(path);
+		permList.AddPermission(input->GetPath(), Permission::READ);
+		inputs.push_back(input);
 	}
 
-	for (auto & permConf : productList) {
-		Product * product = ParsePermissionConf(permList, permConf);
+	for (auto & path : productList) {
+		Product * product = productManager.GetProduct(path);
+		permList.AddPermission(product->GetPath(), Permission::READ | Permission::WRITE);
 		products.push_back(product);
 		productManager.SetInputs(product, inputs);
 	}

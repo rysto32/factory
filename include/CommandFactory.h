@@ -39,18 +39,6 @@ class Product;
 class PermissionList;
 class ProductManager;
 
-struct PermissionConf
-{
-	const char * path;
-	const char * access;
-	const char * type;
-
-	PermissionConf(const char *p, const char *a, const char *t)
-	  : path(p), access(a), type(t)
-	{
-	}
-};
-
 class CommandFactory
 {
 	ProductManager &productManager;
@@ -58,12 +46,10 @@ class CommandFactory
 
 	static bool IsDirectory(const std::string & path);
 
-	Product* ParsePermissionConf(PermissionList &, const PermissionConf &) const;
-
 public:
 	CommandFactory(ProductManager &);
-	void AddCommand(const std::vector<PermissionConf> & products,
-	    const std::vector<PermissionConf> & permMap,
+	void AddCommand(const std::vector<std::string> & products,
+	    const std::vector<std::string> & inputs,
 	    std::vector<std::string> && argList);
 };
 

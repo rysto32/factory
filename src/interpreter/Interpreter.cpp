@@ -316,40 +316,15 @@ Interpreter::GetTableString(int stackIndex, const char * name)
 	return value;
 }
 
-std::vector<PermissionConf>
-Interpreter::GetProductList(int stackIndex)
-{
-	lua_State * lua = luaState.get();
-	std::vector<PermissionConf> inputList;
-
-	int i = 0;
-	lua_pushnil(lua);
-	while (lua_next(lua, stackIndex) != 0) {
-		int entryIndex = LuaAbsoluteIndex(lua, -1);
-		luaL_checktype(lua, entryIndex, LUA_TTABLE);
-
-		const char * path = GetTableString(entryIndex, "path");
-		const char * access = GetTableString(entryIndex, "access");
-		const char * type = GetTableString(entryIndex, "type");
-
-		lua_pop(lua, 1);
-
-		inputList.emplace_back(path, access, type);
-		i++;
-	}
-
-	return inputList;
-}
-
 // factory.define_command(products, inputs, arglist)
 int
 Interpreter::DefineCommand()
 {
-	auto products = GetProductList(1);
-	auto perms = GetProductList(2);
-	std::vector<std::string> argList = GetStringList(3);
+	auto products = GetStringList(1);
+	auto inputs = GetStringList(2);
+	auto argList = GetStringList(3);
 
-	commandFactory.AddCommand(products, perms, std::move(argList));
+	commandFactory.AddCommand(products, inputs, std::move(argList));
 
 	return 0;
 }
