@@ -36,7 +36,7 @@ definitions = {
 				srcpath=factory.build_path(parent_config.srcdir, src)
 
 				objname = factory.replace_ext(src, "[a-zA-Z0-9]+", "o")
-				objpath = objdir .. "/" .. objname
+				objpath = factory.build_path(objdir, objname)
 
 				arglist = factory.flat_list(
 					parent_config["CXX"],
@@ -76,7 +76,7 @@ definitions = {
 			libpaths = factory.map(make_lib_path, config["libs"])
 			stdlibs = factory.addprefix("-l", config["stdlibs"])
 
-			prog_path = bindir .. "/" .. config["path"]
+			prog_path = factory.build_path(bindir, config["path"])
 			arglist = factory.flat_list(
 				parent_config["LD"],
 				"-o", prog_path,
