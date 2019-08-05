@@ -26,17 +26,37 @@
  * SUCH DAMAGE.
  */
 
-#include "lua/View.h"
+#ifndef LUA_NAMED_VALUE_H
+#define LUA_NAMED_VALUE_H
 
-#include "lua/Table.h"
+#include <string>
+#include <variant>
+
+#include "lua/Parameter.h"
 
 namespace Lua
 {
-
-Table
-View::GetTable(const NamedValue & value)
+class NamedValue
 {
-	return Table(*this, value);
+private:
+	std::variant<const Parameter *, const NamedValue *> parent;
+	std::string tableIndex;
+	int stackIndex;
+
+	static std::string MakeIndexedString(int key);
+
+public:
+	NamedValue(const Parameter & p);
+	NamedValue(const NamedValue & p, const std::string & key, int);
+	NamedValue(const NamedValue & p, int key, int);
+
+	std::string ToString() const;
+	int GetStackIndex() const
+	{
+		return stackIndex;
+	}
+};
 }
 
-}
+#endif
+

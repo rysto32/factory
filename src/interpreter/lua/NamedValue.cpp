@@ -26,17 +26,57 @@
  * SUCH DAMAGE.
  */
 
-#include "lua/View.h"
+#include "lua/NamedValue.h"
 
-#include "lua/Table.h"
+#include "lua/Parameter.h"
+
+#include <sstream>
 
 namespace Lua
 {
-
-Table
-View::GetTable(const NamedValue & value)
+NamedValue::NamedValue(const Parameter & p)
+	: parent(&p),
+	  tableIndex(""),
+	  stackIndex(p.GetIndex())
 {
-	return Table(*this, value);
 }
 
+NamedValue::NamedValue(const NamedValue & p, const std::string & key, int stackIndex)
+	: parent(&p),
+	  tableIndex("." + key),
+	  stackIndex(stackIndex)
+{
+}
+
+NamedValue::NamedValue(const NamedValue & p, int key, int stackIndex)
+	: parent(&p),
+	  tableIndex(MakeIndexedString(key)),
+	  stackIndex(stackIndex)
+{
+	// Try to detect reversed parameters
+	assert (key > 0);
+}
+
+std::string
+NamedValue::MakeIndexedString(int key)
+{
+	std::ostringstream sout;
+
+	sout << "[" << key << "]";
+	return sout.str();
+}
+
+std::string
+NamedValue::ToString() const
+{
+	const auto * const* param = std::get_if<const Parameter *>(&parent);
+	if (param) {
+		return (*param)->ToString();
+	}
+
+	const auto * const* value = std::get_if<const NamedValue *>(&parent);
+	assert (value);
+
+	return (*value)->ToString() + tableIndex;
+}
 }

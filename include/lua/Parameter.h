@@ -26,17 +26,52 @@
  * SUCH DAMAGE.
  */
 
-#include "lua/View.h"
+#ifndef LUA_PARAMETER_H
+#define LUA_PARAMETER_H
 
-#include "lua/Table.h"
+#include <sstream>
+#include <string>
 
 namespace Lua
 {
-
-Table
-View::GetTable(const NamedValue & value)
+class Parameter
 {
-	return Table(*this, value);
+private:
+	std::string func;
+	std::string name;
+	int index;
+
+public:
+	Parameter(const std::string & f, const std::string & n, int i)
+	  : func(f),
+	    name(n),
+	    index(i)
+	{
+	}
+
+	const std::string & GetFuncName() const
+	{
+		return func;
+	}
+
+	const std::string & GetParamName() const
+	{
+		return name;
+	}
+
+	int GetIndex() const
+	{
+		return index;
+	}
+
+	std::string ToString() const
+	{
+		std::ostringstream sout;
+		sout << "func " << func << " arg #" << index << ": " << name;
+		return sout.str();
+	}
+};
 }
 
-}
+#endif
+

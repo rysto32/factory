@@ -29,6 +29,7 @@
 #ifndef LUA_TABLE_H
 #define LUA_TABLE_H
 
+#include "lua/NamedValue.h"
 #include "lua/View.h"
 
 #include <err.h>
@@ -42,11 +43,13 @@ class Table
 {
 private:
 	Lua::View & lua;
-	const int stackIndex;
+	NamedValue value;
+	int stackIndex;
 
-	Table(Lua::View & l, int relative)
+	Table(Lua::View & l, const NamedValue & v)
 	  : lua(l),
-	    stackIndex(l.absolute(relative))
+	    value(v),
+	    stackIndex(l.absolute(v.GetStackIndex()))
 	{
 
 	}
@@ -54,57 +57,85 @@ private:
 	friend class View;
 
 	template <typename F, typename IndexType>
-	void
-	InvokeIntListFunc(const F & fun, IndexType index, int stackPos)
+	static constexpr bool takes_int_value()
 	{
-		if constexpr (std::is_invocable<F, IndexType, int>::value)
+		return std::is_invocable_v<F, IndexType, int>;
+	}
+
+	template <typename F, typename IndexType>
+	static constexpr bool takes_str_value()
+	{
+		return std::is_invocable_v<F, IndexType, const char *>;
+	}
+
+	template <typename F, typename IndexType>
+	static constexpr bool takes_table_value()
+	{
+		return std::is_invocable_v<F, IndexType, Table&>;
+	}
+
+	template <typename F, typename IndexType>
+	static constexpr bool callback_is_invocable()
+	{
+		return takes_int_value<F, IndexType>() ||
+		   takes_str_value<F, IndexType>() ||
+		    takes_table_value<F, IndexType>();
+	}
+
+	template <typename F, typename IndexType>
+	void
+	InvokeIntListFunc(const F & fun, const NamedValue & subvalue, IndexType index, int stackPos)
+	{
+		if constexpr (takes_int_value<F, IndexType>())
 			func(index, lua_tointeger(lua, stackPos));
 		else
-			errx(1, "Did not expect an int");
+			errx(1, "Did not expect an int in %s", subvalue.ToString().c_str());
 	}
 
 	template <typename F, typename IndexType>
 	void
-	InvokeStrListFunc(const F & func, IndexType index, int stackPos)
+	InvokeStrListFunc(const F & func, const NamedValue & subvalue, IndexType index, int stackPos)
 	{
-		if constexpr (std::is_invocable<F, IndexType, const char*>::value)
+		if constexpr (takes_str_value<F, IndexType>())
 			func(index, lua_tostring(lua, stackPos));
 		else
-			errx(1, "Did not expect a string");
+			errx(1, "Did not expect a string in %s", subvalue.ToString().c_str());
 	}
 
 	template <typename F, typename IndexType>
 	void
-	InvokeTableListFunc(const F & func, IndexType index, int stackPos)
+	InvokeTableListFunc(const F & func, const NamedValue & subvalue, IndexType index, int stackPos)
 	{
-		if constexpr (std::is_invocable_v<F, IndexType, Table>) {
-			Table table(lua, stackPos);
+		if constexpr (takes_table_value<F, IndexType>()) {
+			Table table(lua, subvalue);
 			func(index, table);
 		} else {
-			errx(1, "Did not expect a table");
+			errx(1, "Did not expect a table in %s", subvalue.ToString().c_str());
 		}
 	}
 
 	template <typename F, typename IndexType>
 	void InvokeTableFunc(const F & func, IndexType index, int stackPos)
 	{
+		NamedValue subvalue(value, index, stackPos);
 		if (lua_isinteger(lua, stackPos)) {
-			InvokeIntListFunc(func, index, stackPos);
+			InvokeIntListFunc(func, subvalue, index, stackPos);
 		} else if (lua_isstring(lua, stackPos)) {
-			InvokeStrListFunc(func, index, stackPos);
+			InvokeStrListFunc(func, subvalue, index, stackPos);
 		} else if (lua_istable(lua, stackPos)) {
-			InvokeTableListFunc(func, index, stackPos);
+			InvokeTableListFunc(func, subvalue, index, stackPos);
 		} else {
-			errx(1, "Invalid type");
+			errx(1, "Invalid type in %s", subvalue.ToString().c_str());
 		}
 	}
 
 	template <typename F>
 	void InvokeListFunc(const F & func, int stackPos)
 	{
+		static_assert(callback_is_invocable<F, int>(), "Callback function accepts unexpected args");
 		int keyPos = stackPos -  1;
 		if (!lua_isinteger(lua, keyPos)) {
-			errx(1, "Expected a list");
+			errx(1, "Expected a list in %s", value.ToString().c_str());
 		}
 
 		InvokeTableFunc(func, lua_tointeger(lua, keyPos), stackPos);
@@ -113,9 +144,10 @@ private:
 	template <typename F>
 	void InvokeTableFunc(const F & func, int stackPos)
 	{
+		static_assert(callback_is_invocable<F, const char *>(), "Callback function accepts unexpected args");
 		int keyPos = stackPos -  1;
 		if (!lua_isstring(lua, keyPos)) {
-			errx(1, "Expected a list");
+			errx(1, "Expected a table in %s", value.ToString().c_str());
 		}
 
 		InvokeTableFunc(func, lua_tostring(lua, keyPos), stackPos);
@@ -131,7 +163,7 @@ public:
 	void IterateList(const F & func)
 	{
 		if (!lua_istable(lua, stackIndex))
-			errx(1, "Expected a table");
+			errx(1, "Expected a table in %s", value.ToString().c_str());
 
 		lua_pushnil(lua);
 		while (lua_next(lua, stackIndex) != 0) {
@@ -145,7 +177,7 @@ public:
 		FetchValue(name);
 
 		if (!lua_isstring(lua, -1))
-			errx(1, "Field '%s' is expected to be a string", name);
+			errx(1, "Field '%s' in %s is expected to be a string", name, value.ToString().c_str());
 		const char * val = lua_tostring(lua, -1);
 		lua_pop(lua, 1);
 		return val;

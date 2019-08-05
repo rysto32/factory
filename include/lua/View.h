@@ -39,6 +39,7 @@
 namespace Lua
 {
 
+class NamedValue;
 class Table;
 
 class View
@@ -72,7 +73,7 @@ public:
 		return lua;
 	}
 
-	Table GetTable(int stackIndex);
+	Table GetTable(const NamedValue & index);
 
 	bool isstring(int stackIndex)
 	{

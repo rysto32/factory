@@ -44,6 +44,7 @@ class PermissionList;
 
 namespace Lua
 {
+	class NamedValue;
 	class Table;
 	class View;
 }
@@ -100,7 +101,7 @@ class Interpreter
 
 	void AddStringValuePair(const char * name, const char * value);
 
-	std::vector<std::string> GetStringList(Lua::View &, int stackIndex);
+	std::vector<std::string> GetStringList(Lua::View &, const Lua::NamedValue & value);
 
 public:
 	Interpreter(IngestManager &, CommandFactory &);

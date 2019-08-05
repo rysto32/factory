@@ -33,6 +33,8 @@
 #include "IngestManager.h"
 #include "PermissionList.h"
 
+#include "lua/NamedValue.h"
+#include "lua/Parameter.h"
 #include "lua/Table.h"
 #include "lua/View.h"
 
@@ -249,9 +251,10 @@ int
 Interpreter::AddDefinitions()
 {
 	Lua::View lua(luaState);
+	Lua::Parameter defs("factory.add_definitions", "defs", 1);
 
-	/* Ensure that our first argument is a table. */
-	auto table = lua.GetTable(1);
+
+	auto table = lua.GetTable(defs);
 	table.IterateList([this] (int index, Lua::Table & def)
 	{
 		ParseDefinition(def);
@@ -261,10 +264,10 @@ Interpreter::AddDefinitions()
 }
 
 std::vector<std::string>
-Interpreter::GetStringList(Lua::View & lua, int relative)
+Interpreter::GetStringList(Lua::View & lua, const Lua::NamedValue & value)
 {
 	std::vector<std::string> list;
-	auto configList = lua.GetTable(relative);
+	auto configList = lua.GetTable(value);
 	configList.IterateList([&list](int index, std::string str)
 	{
 		list.push_back(std::move(str));
@@ -278,9 +281,13 @@ Interpreter::DefineCommand()
 {
 	Lua::View lua(luaState);
 
-	auto products = GetStringList(lua, 1);
-	auto inputs = GetStringList(lua, 2);
-	auto argList = GetStringList(lua, 3);
+	Lua::Parameter productsArg("factory.define_command", "products", 1);
+	Lua::Parameter inputsArg("factory.define_command", "inputs", 2);
+	Lua::Parameter argListArg("factory.define_command", "argList", 3);
+
+	auto products = GetStringList(lua, productsArg);
+	auto inputs = GetStringList(lua, inputsArg);
+	auto argList = GetStringList(lua, argListArg);
 
 	commandFactory.AddCommand(products, inputs, std::move(argList));
 
