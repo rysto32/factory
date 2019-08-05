@@ -160,12 +160,14 @@ private:
 	template <typename F>
 	void InvokeAnyFunc(const F & func, int stackPos)
 	{
+		/* Sanity test that F can handle both lists and tables. */
 		static_assert(!(!callback_is_invocable<F, int>() &&
 		    callback_is_invocable<F, const char *>()),
 		    "Callback function must accept int indices");
 		static_assert(!(callback_is_invocable<F, int>() &&
 		    !callback_is_invocable<F, const char *>()),
 		    "Callback function must accept const char * indices");
+
 		static_assert(callback_is_invocable<F, int>() &&
 		    callback_is_invocable<F, const char *>(),
 		    "Callback function does not accept correct args");
