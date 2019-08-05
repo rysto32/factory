@@ -100,7 +100,7 @@ int main(int argc, char **argv)
 
 	if (!jobManager.ScheduleJob()) {
 		printf("No work to build target\n");
-		exit(0);
+		return 0;
 	}
 
 	loop.Run();
