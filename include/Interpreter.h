@@ -125,7 +125,7 @@ class Interpreter
 
 	std::vector<std::string> GetStringList(Lua::View &, const Lua::NamedValue & value);
 
-	static std::unique_ptr<ConfigNode> SerializeConfig(Lua::View & lua, Lua::Table & config);
+	static std::unique_ptr<ConfigNode> SerializeConfig(Lua::Table & config);
 
 public:
 	Interpreter(IngestManager &, CommandFactory &);

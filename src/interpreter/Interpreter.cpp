@@ -333,7 +333,7 @@ Interpreter::DefineCommand()
 }
 
 std::unique_ptr<ConfigNode>
-Interpreter::SerializeConfig(Lua::View & lua, Lua::Table & config)
+Interpreter::SerializeConfig(Lua::Table & config)
 {
 	ConfigNodeList list;
 	ConfigPairMap map;
@@ -347,9 +347,9 @@ Interpreter::SerializeConfig(Lua::View & lua, Lua::Table & config)
 		{
 			list.emplace_back(std::make_unique<ConfigNode>(value));
 		},
-		[&list,&lua](int key, Lua::Table & value)
+		[&list](int key, Lua::Table & value)
 		{
-			list.emplace_back(SerializeConfig(lua, value));
+			list.emplace_back(SerializeConfig(value));
 		},
 		[&map](const char * key, int value)
 		{
@@ -359,9 +359,9 @@ Interpreter::SerializeConfig(Lua::View & lua, Lua::Table & config)
 		{
 			map.emplace(key, std::make_unique<ConfigNode>(value));
 		},
-		[&map,&lua](const char * key, Lua::Table & value)
+		[&map](const char * key, Lua::Table & value)
 		{
-			map.emplace(key, SerializeConfig(lua, value));
+			map.emplace(key, SerializeConfig(value));
 		}
 	));
 
@@ -389,7 +389,7 @@ Interpreter::Include(const char * funcName, IncludeFile::Type t)
 	Lua::Table fileList = lua.GetTable(files);
 	Lua::Table configTable = lua.GetTable(configArg);
 
-	auto configUniq = SerializeConfig(lua, configTable);
+	auto configUniq = SerializeConfig(configTable);
 	std::shared_ptr<ConfigNode> config(configUniq.release());
 
 	fileList.IterateList([this, t, &config](int i, const char * path)
