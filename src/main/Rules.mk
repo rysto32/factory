@@ -1,16 +1,15 @@
 
-LIB := build_sample
-
+LIB := main
 SRCS := \
 	main.cpp \
 
-PROG := bin/build
+PROG := bin/factory
 
 PROG_LIBS := \
-	build_sample \
-	ingest \
+	main \
 	interpreter \
 	lua \
+	ingest \
 	job \
 	perm \
 	product \
@@ -24,5 +23,3 @@ PROG_STDLIBS := \
 	nv \
 	ucl \
 	lua-5.3 \
-
-

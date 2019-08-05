@@ -8,6 +8,14 @@ function factory.define_command(products, inputs, arglist)
 	    factory.listify(inputs), factory.listify(arglist))
 end
 
+function factory.include_config(paths)
+	factory.internal.include_config(factory.listify(paths))
+end
+
+function factory.include_script(paths)
+	factory.internal.include_script(factory.listify(paths))
+end
+
 function factory.replace_ext(file, old, new)
 	return string.gsub(file, "%." .. old .. "$", "." .. new)
 end

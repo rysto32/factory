@@ -68,18 +68,33 @@ int main(int argc, char **argv)
 	IngestManager ingestMgr;
 	Interpreter interp(ingestMgr, commandFactory);
 
-	ConfigParser parser("/home/rstone/git/factory/src/sample/build/build.ucl");
-
-	std::string errors;
-	if (!parser.Parse(errors)) {
-		errx(1, "Could not parse build definition: %s", errors.c_str());
-	}
-
 	interp.RunFile("/home/rstone/git/factory/src/lua_lib/basic.lua");
-	interp.RunFile("/home/rstone/git/factory/src/sample/build/factory.lua");
+	interp.RunFile("factory.lua");
 
-	const ConfigNode & config = parser.GetConfig();
-	interp.ProcessConfig(config);
+	while (true) {
+		std::optional<IncludeFile> file = interp.GetNextInclude();
+		if (!file.has_value())
+			break;
+
+		switch (file->type) {
+			case IncludeFile::Type::SCRIPT: {
+				interp.RunFile(file->path);
+				break;
+			}
+			case IncludeFile::Type::CONFIG: {
+				ConfigParser parser(file->path);
+
+				std::string errors;
+				if (!parser.Parse(errors)) {
+					errx(1, "Could not parse build definition: %s", errors.c_str());
+				}
+
+				const ConfigNode & config = parser.GetConfig();
+				interp.ProcessConfig(config);
+				break;
+			}
+		}
+	}
 
 	productMgr.SubmitLeafJobs();
 
