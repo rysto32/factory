@@ -32,8 +32,10 @@
 
 #include "ConfigNode.h"
 
+#include <deque>
 #include <lua.hpp>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -48,6 +50,19 @@ namespace Lua
 	class Table;
 	class View;
 }
+
+struct IncludeFile
+{
+	enum Type { CONFIG, SCRIPT };
+
+	const std::string path;
+	const Type type;
+
+	IncludeFile(const std::string & p, Type t)
+	  : path(p), type(t)
+	{
+	}
+};
 
 class Interpreter
 {
@@ -80,6 +95,7 @@ class Interpreter
 	LuaStatePtr luaState;
 	IngestManager & ingestMgr;
 	CommandFactory & commandFactory;
+	std::deque<IncludeFile> includeQueue;
 
 	void RegisterModules();
 
@@ -89,11 +105,14 @@ class Interpreter
 	static Interpreter * GetInterpreter(lua_State *);
 	static int AddDefinitionsWrapper(lua_State *);
 	static int DefineCommandWrapper(lua_State *);
+	static int IncludeConfigWrapper(lua_State *);
+	static int IncludeScriptWrapper(lua_State *);
 
 	static int ErrorHandler(lua_State *);
 
 	int AddDefinitions();
 	int DefineCommand();
+	int Include(const char * funcName, IncludeFile::Type);
 
 	void PushConfig(const ConfigNode & node);
 
@@ -114,6 +133,8 @@ public:
 
 	void RunFile(const std::string & path);
 	void ProcessConfig(const ConfigNode &);
+
+	std::optional<IncludeFile> GetNextInclude();
 };
 
 #endif

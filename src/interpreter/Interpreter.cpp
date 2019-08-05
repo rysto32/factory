@@ -50,6 +50,8 @@ const char Interpreter::INTERPRETER_REGISTRY_ENTRY = 0;
 const struct luaL_Reg Interpreter::factoryModule [] = {
 	{"add_definitions", AddDefinitionsWrapper},
 	{"define_command", DefineCommandWrapper},
+	{"include_script", IncludeScriptWrapper},
+	{"include_config", IncludeConfigWrapper},
 	{nullptr, nullptr}
 };
 
@@ -104,6 +106,17 @@ Interpreter::RunFile(const std::string & path)
 	if (lua_pcall(lua, 0, 0, 0) != 0) {
 		errx(1, "Failed to run script: %s", lua_tostring(lua, -1));
 	}
+}
+
+std::optional<IncludeFile>
+Interpreter::GetNextInclude()
+{
+	if (includeQueue.empty())
+		return std::nullopt;
+
+	IncludeFile include = std::move(includeQueue.front());
+	includeQueue.pop_front();
+	return include;
 }
 
 
@@ -229,6 +242,18 @@ Interpreter::DefineCommandWrapper(lua_State *lua)
 }
 
 
+int
+Interpreter::IncludeConfigWrapper(lua_State *lua)
+{
+	return GetInterpreter(lua)->Include("factory.include_config", IncludeFile::CONFIG);
+}
+
+int
+Interpreter::IncludeScriptWrapper(lua_State *lua)
+{
+	return GetInterpreter(lua)->Include("factory.include_script", IncludeFile::SCRIPT);
+}
+
 void
 Interpreter::ParseDefinition(Lua::Table & def)
 {
@@ -290,6 +315,23 @@ Interpreter::DefineCommand()
 	auto argList = GetStringList(lua, argListArg);
 
 	commandFactory.AddCommand(products, inputs, std::move(argList));
+
+	return 0;
+}
+
+int
+Interpreter::Include(const char * funcName, IncludeFile::Type t)
+{
+	Lua::View lua(luaState);
+
+	Lua::Parameter files(funcName, "files", 1);
+
+	auto table = lua.GetTable(files);
+
+	table.IterateList([this, t](int i, const char * path)
+	{
+		includeQueue.emplace_back(path, t);
+	});
 
 	return 0;
 }
