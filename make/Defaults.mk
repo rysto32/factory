@@ -2,7 +2,7 @@
 CC:=cc
 CXX:=c++
 LD:=$(CXX)
-LD_C:=/usr/local/bin/ld
+LD_C:=ld
 AR:=ar
 
 #CWARNFLAGS.gcc += -Wno-expansion-to-defined -Wno-extra -Wno-unused-but-set-variable
@@ -17,4 +17,5 @@ CXX_WARNFLAGS:=-Wno-user-defined-literals
 CFLAGS:=-I/usr/local/include -I/usr/local/include/lua53 -I$(TOPDIR)/include $(C_OPTIM) -g $(C_WARNFLAGS)
 CXXFLAGS:=$(CXX_STD) $(CXX_WARNFLAGS)
 
-LDFLAGS := -L/usr/local/lib
+# I don't know why ld needs this -L/usr/lib...
+LDFLAGS := -L/usr/lib -L/usr/local/lib
