@@ -75,7 +75,8 @@ int main(int argc, char **argv)
 		errx(1, "Could not parse build definition: %s", errors.c_str());
 	}
 
-	interp.RunFile("/home/rstone/repos/factory/src/sample/build/factory.lua");
+	interp.RunFile("/home/rstone/repos/factory/lua_lib/basic.lua");
+	interp.RunFile("/home/rstone/git/factory/src/sample/build/factory.lua");
 
 	const ConfigNode & config = parser.GetConfig();
 	interp.ProcessConfig(config);
