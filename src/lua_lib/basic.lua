@@ -3,9 +3,10 @@ function factory.add_definitions(defs)
 	factory.internal.add_definitions(defs)
 end
 
-function factory.define_command(products, inputs, arglist)
+function factory.define_command(products, inputs, arglist, tmpdirs)
 	factory.internal.define_command(factory.listify(products),
-	    factory.listify(inputs), factory.listify(arglist))
+	    factory.listify(inputs), factory.listify(arglist),
+	    factory.listify(tmpdirs))
 end
 
 function factory.include_config(paths)

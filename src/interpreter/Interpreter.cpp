@@ -309,12 +309,14 @@ Interpreter::DefineCommand()
 	Lua::Parameter productsArg("factory.define_command", "products", 1);
 	Lua::Parameter inputsArg("factory.define_command", "inputs", 2);
 	Lua::Parameter argListArg("factory.define_command", "argList", 3);
+	Lua::Parameter tmpdirsArg("factory.define_command", "tmpdirs", 4);
 
 	auto products = GetStringList(lua, productsArg);
 	auto inputs = GetStringList(lua, inputsArg);
 	auto argList = GetStringList(lua, argListArg);
+	auto tmpdirs = GetStringList(lua, tmpdirsArg);
 
-	commandFactory.AddCommand(products, inputs, std::move(argList));
+	commandFactory.AddCommand(products, inputs, std::move(argList), tmpdirs);
 
 	return 0;
 }

@@ -48,7 +48,8 @@ public:
 	CommandFactory(ProductManager &);
 	void AddCommand(const std::vector<std::string> & products,
 	    const std::vector<std::string> & inputs,
-	    std::vector<std::string> && argList);
+	    std::vector<std::string> && argList,
+	    const std::vector<std::string> & tmpdirs);
 };
 
 #endif

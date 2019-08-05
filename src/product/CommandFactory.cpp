@@ -46,7 +46,8 @@ CommandFactory::CommandFactory(ProductManager &p)
 void
 CommandFactory::AddCommand(const std::vector<std::string> & productList,
     const std::vector<std::string> & inputPaths,
-    std::vector<std::string> && argList)
+    std::vector<std::string> && argList,
+    const std::vector<std::string> & tmpdirs)
 {
 	PermissionList permList;
 	std::vector<Product*> inputs, products;
@@ -60,6 +61,10 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 		Product * input = productManager.GetProduct(path);
 		permList.AddPermission(input->GetPath(), Permission::READ);
 		inputs.push_back(input);
+	}
+
+	for (auto & path : tmpdirs) {
+		permList.AddPermission(path, Permission::READ | Permission::WRITE);
 	}
 
 	for (auto & path : productList) {

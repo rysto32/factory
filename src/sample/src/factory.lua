@@ -43,7 +43,7 @@ definitions = {
 					srcpath
 				}
 
-				factory.define_command({objpath}, inputs, arglist)
+				factory.define_command({objpath}, inputs, arglist, objdir)
 
 				table.insert(objs, objpath)
 			end
@@ -80,11 +80,10 @@ definitions = {
 				"/usr/share",
 				"/etc",
 				"/usr/bin",
-				bindir,
 				libpaths
 			)
 
-			factory.define_command(prog_path, inputs, arglist)
+			factory.define_command(prog_path, inputs, arglist, bindir)
 		end
 	},
 	{
