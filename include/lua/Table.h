@@ -134,7 +134,8 @@ private:
 	template <typename F>
 	void InvokeListFunc(const F & func, int stackPos)
 	{
-		static_assert(callback_is_invocable<F, int>(), "Callback function accepts unexpected args");
+		static_assert(callback_is_invocable<F, int>(),
+		    "Callback function does not accept correct args");
 		int keyPos = stackPos -  1;
 		if (!lua_isinteger(lua, keyPos)) {
 			errx(1, "Expected a list in %s", value.ToString().c_str());
@@ -146,7 +147,8 @@ private:
 	template <typename F>
 	void InvokeTableFunc(const F & func, int stackPos)
 	{
-		static_assert(callback_is_invocable<F, const char *>(), "Callback function accepts unexpected args");
+		static_assert(callback_is_invocable<F, const char *>(),
+		    "Callback function does not accept correct args");
 		int keyPos = stackPos -  1;
 		if (!lua_isstring(lua, keyPos)) {
 			errx(1, "Expected a table in %s", value.ToString().c_str());
@@ -166,7 +168,7 @@ private:
 		    "Callback function must accept const char * indices");
 		static_assert(callback_is_invocable<F, int>() &&
 		    callback_is_invocable<F, const char *>(),
-		    "Callback function accepts unexpected args");
+		    "Callback function does not accept correct args");
 
 		int keyPos = stackPos -  1;
 		if (lua_isinteger(lua, keyPos)) {
