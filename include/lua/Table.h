@@ -108,7 +108,8 @@ private:
 	InvokeTableListFunc(const F & func, const NamedValue & subvalue, IndexType index, int stackPos)
 	{
 		if constexpr (takes_table_value<F, IndexType>()) {
-			Table table(lua, subvalue);
+			View view(lua.GetLua());
+			Table table(view, subvalue);
 			func(index, table);
 		} else {
 			errx(1, "Did not expect a table in %s", subvalue.ToString().c_str());

@@ -46,7 +46,16 @@ class View
 {
 private:
 	lua_State *lua;
- 	int startStackTop;
+	int startStackTop;
+
+	friend class Lua::Table;
+
+	View(lua_State *l)
+	  : lua(l),
+	    startStackTop(lua_gettop(lua))
+	{
+
+	}
 
 public:
 	template <typename Free>
@@ -69,6 +78,11 @@ public:
 	View & operator=(const View &) = delete;
 
 	operator lua_State*()
+	{
+		return lua;
+	}
+
+	lua_State* GetLua() const
 	{
 		return lua;
 	}
