@@ -85,7 +85,7 @@ ConfigParser::Parse(std::string & errors)
 	}
 
 	if (!ucl_parser_add_file(parser.get(), filename.c_str())) {
-		errors = "Could not open file for reading";
+		errors = "Could not open file '" + filename + "' for reading";
 		return false;
 	}
 
