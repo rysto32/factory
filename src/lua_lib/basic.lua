@@ -9,12 +9,12 @@ function factory.define_command(products, inputs, arglist, tmpdirs)
 	    factory.listify(tmpdirs))
 end
 
-function factory.include_config(paths)
-	factory.internal.include_config(factory.listify(paths))
+function factory.include_config(paths, config)
+	factory.internal.include_config(factory.listify(paths), config)
 end
 
-function factory.include_script(paths)
-	factory.internal.include_script(factory.listify(paths))
+function factory.include_script(paths, config)
+	factory.internal.include_script(factory.listify(paths), config)
 end
 
 function factory.replace_ext(file, old, new)
@@ -25,6 +25,21 @@ function factory.array_concat(t1, t2)
 	for _,v in ipairs(t2) do
 		table.insert(t1, v)
 	end
+end
+
+function factory.build_path(...)
+	path = ""
+	for _, v in ipairs{...} do
+		if (v ~= '') then
+			if (path == '') then
+				path = v
+			else
+				path = path .. "/" .. v
+			end
+		end
+	end
+
+	return path
 end
 
 function factory.flat_list(...)

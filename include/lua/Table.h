@@ -32,6 +32,7 @@
 #include "lua/NamedValue.h"
 #include "lua/View.h"
 
+#include <cassert>
 #include <err.h>
 #include <functional>
 #include <string>
@@ -84,7 +85,7 @@ private:
 
 	template <typename F, typename IndexType>
 	void
-	InvokeIntListFunc(const F & fun, const NamedValue & subvalue, IndexType index, int stackPos)
+	InvokeIntListFunc(const F & func, const NamedValue & subvalue, IndexType index, int stackPos)
 	{
 		if constexpr (takes_int_value<F, IndexType>())
 			func(index, lua_tointeger(lua, stackPos));
@@ -115,7 +116,7 @@ private:
 	}
 
 	template <typename F, typename IndexType>
-	void InvokeTableFunc(const F & func, IndexType index, int stackPos)
+	void InvokeFunc(const F & func, IndexType index, int stackPos)
 	{
 		NamedValue subvalue(value, index, stackPos);
 		if (lua_isinteger(lua, stackPos)) {
@@ -138,7 +139,7 @@ private:
 			errx(1, "Expected a list in %s", value.ToString().c_str());
 		}
 
-		InvokeTableFunc(func, lua_tointeger(lua, keyPos), stackPos);
+		InvokeFunc(func, lua_tointeger(lua, keyPos), stackPos);
 	}
 
 	template <typename F>
@@ -150,7 +151,29 @@ private:
 			errx(1, "Expected a table in %s", value.ToString().c_str());
 		}
 
-		InvokeTableFunc(func, lua_tostring(lua, keyPos), stackPos);
+		InvokeFunc(func, lua_tostring(lua, keyPos), stackPos);
+	}
+
+	template <typename F>
+	void InvokeAnyFunc(const F & func, int stackPos)
+	{
+		static_assert(!(!callback_is_invocable<F, int>() &&
+		    callback_is_invocable<F, const char *>()),
+		    "Callback function must accept int indices");
+		static_assert(!(callback_is_invocable<F, int>() &&
+		    !callback_is_invocable<F, const char *>()),
+		    "Callback function must accept const char * indices");
+		static_assert(callback_is_invocable<F, int>() &&
+		    callback_is_invocable<F, const char *>(),
+		    "Callback function accepts unexpected args");
+
+		int keyPos = stackPos -  1;
+		if (lua_isinteger(lua, keyPos)) {
+			InvokeFunc(func, lua_tointeger(lua, keyPos), stackPos);
+		} else {
+			assert (lua_isstring(lua, keyPos));
+			InvokeFunc(func, lua_tostring(lua, keyPos), stackPos);
+		}
 	}
 
 public:
@@ -172,6 +195,32 @@ public:
 		}
 	}
 
+	template <typename F>
+	void IterateTable(const F & func)
+	{
+		if (!lua_istable(lua, stackIndex))
+			errx(1, "Expected a table in %s", value.ToString().c_str());
+
+		lua_pushnil(lua);
+		while (lua_next(lua, stackIndex) != 0) {
+			InvokeTableFunc(func, -1);
+			lua_pop(lua, 1);
+		}
+	}
+
+	template <typename F>
+	void Iterate(const F & func)
+	{
+		if (!lua_istable(lua, stackIndex))
+			errx(1, "Expected a table in %s, got %s", value.ToString().c_str(), lua_typename(lua, stackIndex));
+
+		lua_pushnil(lua);
+		while (lua_next(lua, stackIndex) != 0) {
+			InvokeAnyFunc(func, -1);
+			lua_pop(lua, 1);
+		}
+	}
+
 	const char * GetString(const char * name)
 	{
 		FetchValue(name);
@@ -188,6 +237,11 @@ public:
 		lua_pushstring(lua, name);
 		lua_gettable(lua, stackIndex);
 
+	}
+
+	const NamedValue & GetNamedValue() const
+	{
+		return value;
 	}
 };
 }

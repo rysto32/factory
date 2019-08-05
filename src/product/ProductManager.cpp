@@ -141,6 +141,14 @@ ProductManager::CheckNeedsBuild(Product * product, const Product * input)
 bool
 ProductManager::FileExists(const Path & path)
 {
+	/*
+	 * XXX The parent path of "foo" is "", which doesn't test as existing.
+	 * Pretend that is does and hope for the best.
+	 */
+	if (path.empty()) {
+		return true;
+	}
+
 	std::error_code error;
 
 	return fs::exists(path, error) && !error;
@@ -188,7 +196,8 @@ ProductManager::SubmitLeafJobs()
 		if (parent) {
 			AddDependency(product, parent);
 		} else if (!FileExists(parentPath)) {
-			errx(1, "No command to make product '%s'", parentPath.c_str());
+			errx(1, "No command to make product '%s', needed by '%s'",
+			     parentPath.c_str(), product->GetPath().c_str());
 		}
 
 		CheckNeedsBuild(product);

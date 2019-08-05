@@ -95,6 +95,11 @@ public:
 		return !(*this == rhs);
 	}
 
+	bool empty() const
+	{
+		return path.empty();
+	}
+
 	const char * c_str() const
 	{
 		return path.c_str();

@@ -45,6 +45,22 @@
 
 #include <err.h>
 
+template<typename ...Ts>
+struct Visitor : Ts...
+{
+    Visitor(const Ts&... args) : Ts(args)...
+    {
+    }
+
+    using Ts::operator()...;
+};
+
+template<typename... Ts>
+auto make_visitor(Ts... lambdas)
+{
+    return Visitor<Ts...>(lambdas...);
+}
+
 const char Interpreter::INTERPRETER_REGISTRY_ENTRY = 0;
 
 const struct luaL_Reg Interpreter::factoryModule [] = {
@@ -95,7 +111,7 @@ Interpreter::RegisterModules()
 }
 
 void
-Interpreter::RunFile(const std::string & path)
+Interpreter::RunFile(const std::string & path, const ConfigNode & config)
 {
 	lua_State *lua = luaState.get();
 
@@ -103,6 +119,7 @@ Interpreter::RunFile(const std::string & path)
 		errx(1, "Failed to parse script: %s", lua_tostring(lua, -1));
 	}
 
+	// XXX what does it mean for a script to be passed config?  We do nothing right now
 	if (lua_pcall(lua, 0, 0, 0) != 0) {
 		errx(1, "Failed to run script: %s", lua_tostring(lua, -1));
 	}
@@ -181,7 +198,7 @@ Interpreter::AddStringValuePair(const char * name, const char * value)
 }
 
 void
-Interpreter::ProcessConfig(const ConfigNode & node)
+Interpreter::ProcessConfig(const ConfigNode & parentConfig, const ConfigNode & node)
 {
 	lua_State *lua = luaState.get();
 	const auto & config = node.GetValue();
@@ -197,12 +214,7 @@ Interpreter::ProcessConfig(const ConfigNode & node)
 
 		lua_pushcfunction(lua, ErrorHandler);
 		lua_rawgeti(lua, LUA_REGISTRYINDEX, ref);
-		lua_newtable(lua);
-		//XXX hardcoded defaults
-		AddStringValuePair("AR", "/usr/bin/ar");
-		AddStringValuePair("CXX", "/usr/local/bin/clang++80");
-		AddStringValuePair("LD", "/usr/local/bin/clang++80");
-
+		PushConfig(parentConfig);
 		PushConfig(*value);
 		int result = lua_pcall(lua, 2, 0, -4);
 		if (result != LUA_OK) {
@@ -240,7 +252,6 @@ Interpreter::DefineCommandWrapper(lua_State *lua)
 {
 	return GetInterpreter(lua)->DefineCommand();
 }
-
 
 int
 Interpreter::IncludeConfigWrapper(lua_State *lua)
@@ -321,18 +332,69 @@ Interpreter::DefineCommand()
 	return 0;
 }
 
+std::unique_ptr<ConfigNode>
+Interpreter::SerializeConfig(Lua::View & lua, Lua::Table & config)
+{
+	ConfigNodeList list;
+	ConfigPairMap map;
+
+	config.Iterate(make_visitor(
+		[&list](int key, int value)
+		{
+			list.emplace_back(std::make_unique<ConfigNode>(value));
+		},
+		[&list](int key, const char * value)
+		{
+			list.emplace_back(std::make_unique<ConfigNode>(value));
+		},
+		[&list,&lua](int key, Lua::Table & value)
+		{
+			list.emplace_back(SerializeConfig(lua, value));
+		},
+		[&map](const char * key, int value)
+		{
+			map.emplace(key, std::make_unique<ConfigNode>(value));
+		},
+		[&map](const char * key, const char * value)
+		{
+			map.emplace(key, std::make_unique<ConfigNode>(value));
+		},
+		[&map,&lua](const char * key, Lua::Table & value)
+		{
+			map.emplace(key, SerializeConfig(lua, value));
+		}
+	));
+
+	if (!list.empty() && !map.empty()) {
+		errx(1, "Unsupported mixture of table and list in %s",
+		    config.GetNamedValue().ToString().c_str());
+	}
+
+	if (!map.empty()) {
+		return std::make_unique<ConfigNode>(std::move(map));
+	} else {
+		// If both are empty we get an empty list
+		return std::make_unique<ConfigNode>(std::move(list));
+	}
+}
+
 int
 Interpreter::Include(const char * funcName, IncludeFile::Type t)
 {
 	Lua::View lua(luaState);
 
 	Lua::Parameter files(funcName, "files", 1);
+	Lua::Parameter configArg(funcName, "config", 2);
 
-	auto table = lua.GetTable(files);
+	Lua::Table fileList = lua.GetTable(files);
+	Lua::Table configTable = lua.GetTable(configArg);
 
-	table.IterateList([this, t](int i, const char * path)
+	auto configUniq = SerializeConfig(lua, configTable);
+	std::shared_ptr<ConfigNode> config(configUniq.release());
+
+	fileList.IterateList([this, t, &config](int i, const char * path)
 	{
-		includeQueue.emplace_back(path, t);
+		includeQueue.emplace_back(path, t, config);
 	});
 
 	return 0;

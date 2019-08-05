@@ -93,5 +93,10 @@ Job::HandleMessage(MsgSocket * sock, MsgType type, nvlist_t *msg)
 		return;
 	}
 
-	SendResponse(sock, resp, perm.IsPermitted(path.get(), mode));
+	int permitted = perm.IsPermitted(path.get(), mode);
+	if (permitted != 0) {
+// 		fprintf(stderr, "Denied access to '%s'\n", path.get());
+	}
+
+	SendResponse(sock, resp, permitted);
 }

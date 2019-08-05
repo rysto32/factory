@@ -57,9 +57,12 @@ struct IncludeFile
 
 	const std::string path;
 	const Type type;
+	const std::shared_ptr<ConfigNode> config;
 
-	IncludeFile(const std::string & p, Type t)
-	  : path(p), type(t)
+	IncludeFile(const std::string & p, Type t, std::shared_ptr<ConfigNode> c)
+	  : path(p),
+	    type(t),
+	    config(std::move(c))
 	{
 	}
 };
@@ -122,6 +125,8 @@ class Interpreter
 
 	std::vector<std::string> GetStringList(Lua::View &, const Lua::NamedValue & value);
 
+	static std::unique_ptr<ConfigNode> SerializeConfig(Lua::View & lua, Lua::Table & config);
+
 public:
 	Interpreter(IngestManager &, CommandFactory &);
 	~Interpreter();
@@ -131,8 +136,8 @@ public:
 	Interpreter &operator=(const Interpreter&) = delete;
 	Interpreter &operator=(Interpreter &&) = delete;
 
-	void RunFile(const std::string & path);
-	void ProcessConfig(const ConfigNode &);
+	void RunFile(const std::string & path, const ConfigNode & config);
+	void ProcessConfig(const ConfigNode & parent, const ConfigNode & config);
 
 	std::optional<IncludeFile> GetNextInclude();
 };

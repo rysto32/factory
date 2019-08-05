@@ -1,12 +1,21 @@
-function make_lib_path(lib)
-	return "/home/rstone/obj/tcplat/lib" .. lib .. ".a"
-end
 
-objdir = "/home/rstone/obj/tcplat"
+objdirprefix = "/home/rstone/obj/tcplat"
+libdir = objdirprefix .. "/lib"
+bindir = objdirprefix .. "/bin"
+
+function make_lib_path(lib)
+	return factory.build_path(libdir, "lib" .. lib .. ".a")
+end
 
 function define_obj_create(dir)
 	factory.define_command(dir, {}, {"/bin/mkdir", "-p", dir})
 end
+
+define_obj_create(objdirprefix)
+define_obj_create(libdir)
+define_obj_create(bindir)
+
+include_path = "include"
 
 definitions = {
 	{
@@ -14,12 +23,17 @@ definitions = {
 		process = function (parent_config, defs)
 			libpath = make_lib_path(defs["name"])
 
+			objdir = factory.build_path(objdirprefix, "objects", parent_config.srcdir)
 			define_obj_create(objdir)
 
 			objs = {}
 			for i, src in ipairs(defs["srcs"]) do
-				srcdir="/home/rstone/src/tcplat/"
-				srcpath=srcdir .. src
+				if (parent_config.srcdir == '') then
+					srcdir = "."
+				else
+					srcdir = parent_config.srcdir
+				end
+				srcpath=factory.build_path(parent_config.srcdir, src)
 
 				objname = factory.replace_ext(src, "[a-zA-Z0-9]+", "o")
 				objpath = objdir .. "/" .. objname
@@ -31,6 +45,7 @@ definitions = {
 					"-Wall",
 					"-g",
 					"-o", objpath,
+					"-I", include_path,
 					srcpath)
 
 				inputs = {
@@ -40,7 +55,8 @@ definitions = {
 					"/usr/share",
 					"/etc",
 					srcdir,
-					srcpath
+					srcpath,
+					include_path
 				}
 
 				factory.define_command({objpath}, inputs, arglist, objdir)
@@ -57,9 +73,6 @@ definitions = {
 	{
 		name = "program",
 		process = function(parent_config, config)
-			bindir = objdir .. "/bin"
-			define_obj_create(bindir)
-
 			libpaths = factory.map(make_lib_path, config["libs"])
 			stdlibs = factory.addprefix("-l", config["stdlibs"])
 
@@ -89,12 +102,24 @@ definitions = {
 	{
 		name = "subdirs",
 		process = function(parent_config, config)
-			pathlist = factory.map(function (dir) return dir .. "/build.ucl" end, config)
-			factory.include_config(pathlist)
+			orig_srcdir = parent_config.srcdir
+			for _, dir in ipairs(config) do
+				parent_config.srcdir = factory.build_path(orig_srcdir, dir)
+				path = factory.build_path(parent_config.srcdir, "build.ucl")
+
+				factory.include_config(path, parent_config)
+			end
 		end
 	},
 }
 
+top_config = {
+	AR = "/usr/bin/ar",
+	CXX = "/usr/local/bin/clang++80",
+	LD = "/usr/local/bin/clang++80",
+	srcdir = "",
+}
+
 factory.add_definitions(definitions)
-factory.include_config("build.ucl")
+factory.include_config("build.ucl", top_config)
 

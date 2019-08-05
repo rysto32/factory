@@ -68,8 +68,8 @@ int main(int argc, char **argv)
 	IngestManager ingestMgr;
 	Interpreter interp(ingestMgr, commandFactory);
 
-	interp.RunFile("/home/rstone/git/factory/src/lua_lib/basic.lua");
-	interp.RunFile("factory.lua");
+	interp.RunFile("/home/rstone/git/factory/src/lua_lib/basic.lua", ConfigNode(ConfigNodeList{}));
+	interp.RunFile("factory.lua", ConfigNode(ConfigNodeList{}));
 
 	while (true) {
 		std::optional<IncludeFile> file = interp.GetNextInclude();
@@ -78,7 +78,7 @@ int main(int argc, char **argv)
 
 		switch (file->type) {
 			case IncludeFile::Type::SCRIPT: {
-				interp.RunFile(file->path);
+				interp.RunFile(file->path, *file->config);
 				break;
 			}
 			case IncludeFile::Type::CONFIG: {
@@ -90,7 +90,7 @@ int main(int argc, char **argv)
 				}
 
 				const ConfigNode & config = parser.GetConfig();
-				interp.ProcessConfig(config);
+				interp.ProcessConfig(*file->config, config);
 				break;
 			}
 		}
