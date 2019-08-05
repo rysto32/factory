@@ -68,14 +68,14 @@ int main(int argc, char **argv)
 	IngestManager ingestMgr;
 	Interpreter interp(ingestMgr, commandFactory);
 
-	ConfigParser parser("/home/rstone/repos/factory/src/sample/build/build.ucl");
+	ConfigParser parser("/home/rstone/git/factory/src/sample/build/build.ucl");
 
 	std::string errors;
 	if (!parser.Parse(errors)) {
 		errx(1, "Could not parse build definition: %s", errors.c_str());
 	}
 
-	interp.RunFile("/home/rstone/repos/factory/lua_lib/basic.lua");
+	interp.RunFile("/home/rstone/git/factory/src/lua_lib/basic.lua");
 	interp.RunFile("/home/rstone/git/factory/src/sample/build/factory.lua");
 
 	const ConfigNode & config = parser.GetConfig();
