@@ -51,8 +51,39 @@
 #include <string>
 #include <vector>
 
+class Main
+{
+private:
+	EventLoop loop;
+	TempFileManager tmpMgr;
+	std::unique_ptr<TempFile> msgSock;
+	JobQueue jq;
+	JobManager jobManager;
+	MsgSocketServer server;
+	ProductManager productMgr;
+	CommandFactory commandFactory;
+	IngestManager ingestMgr;
+	Interpreter interp;
+
+	void IncludeScript(Interpreter & interp, const IncludeFile & file);
+	void IncludeConfig(Interpreter & interp, const IncludeFile & file);
+
+public:
+	Main()
+	  : msgSock(tmpMgr.GetUnixSocket("msg_sock")),
+	    jobManager(loop, msgSock.get(), jq),
+	    server(std::move(msgSock), loop, jobManager),
+	    productMgr(jq),
+	    commandFactory(productMgr),
+	    interp(ingestMgr, commandFactory)
+	{
+	}
+
+	int Run();
+};
+
 void
-IncludeScript(Interpreter & interp, const IncludeFile & file)
+Main::IncludeScript(Interpreter & interp, const IncludeFile & file)
 {
 	if (file.paths.size() != 1) {
 		errx(1, "Cannot include multiple scripts at once.");
@@ -62,7 +93,7 @@ IncludeScript(Interpreter & interp, const IncludeFile & file)
 }
 
 void
-IncludeConfig(Interpreter & interp, const IncludeFile & file)
+Main::IncludeConfig(Interpreter & interp, const IncludeFile & file)
 {
 	std::vector<ConfigNodePtr> configList;
 
@@ -80,23 +111,9 @@ IncludeConfig(Interpreter & interp, const IncludeFile & file)
 	interp.ProcessConfig(*file.config, configList);
 }
 
-int main(int argc, char **argv)
+int
+Main::Run()
 {
-	EventLoop loop;
-	TempFileManager tmpMgr;
-	auto msgSock = tmpMgr.GetUnixSocket("msg_sock");
-	if (!msgSock)
-		err(1, "Failed to get msgsock");
-
-	JobQueue jq;
-	JobManager jobManager(loop, msgSock.get(), jq);
-	MsgSocketServer server(std::move(msgSock), loop, jobManager);
-	ProductManager productMgr(jq);
-	CommandFactory commandFactory(productMgr);
-
-	IngestManager ingestMgr;
-	Interpreter interp(ingestMgr, commandFactory);
-
 	interp.RunFile("/home/rstone/git/factory/src/lua_lib/basic.lua", ConfigNode(ConfigNodeList{}));
 	interp.RunFile("factory.lua", ConfigNode(ConfigNodeList{}));
 
@@ -125,4 +142,17 @@ int main(int argc, char **argv)
 	loop.Run();
 
 	return (0);
+}
+
+/*
+ * Because this is a global object, its destructor should be called for any
+ * call to exit, ensuring that we clean up all resources (e.g. delete temp
+ * files) on exit.
+ */
+std::unique_ptr<Main> mainObj;
+
+int main(int argc, char **argv)
+{
+	mainObj = std::make_unique<Main>();
+	return mainObj->Run();
 }
