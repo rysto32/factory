@@ -29,6 +29,7 @@
 #ifndef LUA_TABLE_H
 #define LUA_TABLE_H
 
+#include "lua/Function.h"
 #include "lua/NamedValue.h"
 #include "lua/View.h"
 
@@ -72,15 +73,22 @@ private:
 	template <typename F, typename IndexType>
 	static constexpr bool takes_table_value()
 	{
-		return std::is_invocable_v<F, IndexType, Table&>;
+		return std::is_invocable_v<F, IndexType, Table&&>;
+	}
+
+	template <typename F, typename IndexType>
+	static constexpr bool takes_func_value()
+	{
+		return std::is_invocable_v<F, IndexType, Function&&>;
 	}
 
 	template <typename F, typename IndexType>
 	static constexpr bool callback_is_invocable()
 	{
 		return takes_int_value<F, IndexType>() ||
-		   takes_str_value<F, IndexType>() ||
-		    takes_table_value<F, IndexType>();
+		    takes_str_value<F, IndexType>() ||
+		    takes_table_value<F, IndexType>() ||
+		    takes_func_value<F, IndexType>();
 	}
 
 	template <typename F, typename IndexType>
@@ -110,7 +118,17 @@ private:
 		if constexpr (takes_table_value<F, IndexType>()) {
 			View view(lua.GetLua());
 			Table table(view, subvalue);
-			func(index, table);
+			func(index, std::move(table));
+		} else {
+			errx(1, "Did not expect a table in %s", subvalue.ToString().c_str());
+		}
+	}
+	template <typename F, typename IndexType>
+	void
+	InvokeFunctionListFunc(const F & func, const NamedValue & subvalue, IndexType index, int stackPos)
+	{
+		if constexpr (takes_func_value<F, IndexType>()) {
+			func(index, Function(lua, stackPos));
 		} else {
 			errx(1, "Did not expect a table in %s", subvalue.ToString().c_str());
 		}
@@ -126,8 +144,11 @@ private:
 			InvokeStrListFunc(func, subvalue, index, stackPos);
 		} else if (lua_istable(lua, stackPos)) {
 			InvokeTableListFunc(func, subvalue, index, stackPos);
+		} else if (lua_isfunction(lua, stackPos)) {
+			InvokeFunctionListFunc(func, subvalue, index, stackPos);
 		} else {
-			errx(1, "Invalid type in %s", subvalue.ToString().c_str());
+			errx(1, "Invalid type '%s' in %s",
+			     lua_typename(lua, stackIndex), subvalue.ToString().c_str());
 		}
 	}
 
@@ -201,7 +222,7 @@ public:
 	}
 
 	template <typename F>
-	void IterateTable(const F & func)
+	void IterateMap(const F & func)
 	{
 		if (!lua_istable(lua, stackIndex))
 			errx(1, "Expected a table in %s", value.ToString().c_str());

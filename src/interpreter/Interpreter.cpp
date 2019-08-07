@@ -32,7 +32,9 @@
 #include "ConfigNode.h"
 #include "IngestManager.h"
 #include "PermissionList.h"
+#include "VectorUtil.h"
 
+#include "lua/Function.h"
 #include "lua/NamedValue.h"
 #include "lua/Parameter.h"
 #include "lua/Table.h"
@@ -44,22 +46,6 @@
 #include <vector>
 
 #include <err.h>
-
-template<typename ...Ts>
-struct Visitor : Ts...
-{
-    Visitor(const Ts&... args) : Ts(args)...
-    {
-    }
-
-    using Ts::operator()...;
-};
-
-template<typename... Ts>
-auto make_visitor(Ts... lambdas)
-{
-    return Visitor<Ts...>(lambdas...);
-}
 
 const char Interpreter::INTERPRETER_REGISTRY_ENTRY = 0;
 
@@ -136,57 +122,6 @@ Interpreter::GetNextInclude()
 	return include;
 }
 
-
-void
-Interpreter::ConfigVisitor::operator()(int value) const
-{
-	lua_pushinteger(interp.luaState.get(), value);
-}
-
-void
-Interpreter::ConfigVisitor::operator()(const std::string & value) const
-{
-	lua_pushstring(interp.luaState.get(), value.c_str());
-}
-
-void
-Interpreter::ConfigVisitor::operator()(const ConfigNodeList & list) const
-{
-	lua_State *lua = interp.luaState.get();
-
-	lua_createtable(lua, list.size(), 0);
-	for (size_t i = 0; i < list.size(); ++i) {
-		const auto & node = list.at(i);
-		const ConfigNode::ValueType & config = node->GetValue();
-		std::visit(*this, config);
-		// +1 because lua arrays are 1-based
-		lua_seti(lua, -2, i + 1);
-	}
-}
-
-void
-Interpreter::ConfigVisitor::operator()(const ConfigPairMap & map) const
-{
-	lua_State *lua = interp.luaState.get();
-
-	lua_createtable(lua, 0, map.size());
-	for (auto & [name, node] : map) {
-		const ConfigNode::ValueType & config = node->GetValue();
-
-		lua_pushstring(lua, name.c_str());
-		std::visit(*this, config);
-		lua_settable(lua, -3);
-	}
-}
-
-void
-Interpreter::PushConfig(const ConfigNode & node)
-{
-	const auto & config = node.GetValue();
-
-	std::visit(ConfigVisitor(*this), config);
-}
-
 void
 Interpreter::AddStringValuePair(const char * name, const char * value)
 {
@@ -198,31 +133,57 @@ Interpreter::AddStringValuePair(const char * name, const char * value)
 }
 
 void
-Interpreter::ProcessConfig(const ConfigNode & parentConfig, const ConfigNode & node)
+Interpreter::ProcessConfig(const ConfigNode & parentConfig, const std::vector<ConfigNodePtr> & configList)
 {
-	lua_State *lua = luaState.get();
+	if (configList.size() == 1) {
+		ProcessSingleConfig(parentConfig, *configList.front());
+	} else {
+		ProcessMultiConfig(parentConfig, configList);
+	}
+}
+
+void
+Interpreter::ProcessMultiConfig(const ConfigNode & parentConfig, const std::vector<ConfigNodePtr> & configList)
+{
+	std::vector<std::string> argTypes;
+	std::vector<const ConfigNode*> args;
+	args.push_back(&parentConfig);
+
+	for (const ConfigNodePtr & node : configList) {
+		const ConfigNode::ValueType & config = node->GetValue();
+		const auto & pairs = std::get<ConfigPairMap>(config);
+
+		if (pairs.size() != 1) {
+			errx(1, "Only one config key allowed in a multiinclude");
+		}
+
+		argTypes.push_back(pairs.begin()->first);
+		args.push_back(pairs.begin()->second.get());
+	}
+
+	Lua::Function * func = ingestMgr.GetIngest(argTypes);
+	if (!func) {
+		warnx("No ingest for config '%s'", VectorToString(argTypes).c_str());
+	}
+
+	func->VarargsCall(args);
+}
+
+void
+Interpreter::ProcessSingleConfig(const ConfigNode & parentConfig, const ConfigNode & node)
+{
 	const auto & config = node.GetValue();
 
 	const auto & pairs = std::get<ConfigPairMap>(config);
 
 	for (const auto & [name, value] : pairs) {
-		int ref = ingestMgr.GetIngest(name);
-		if (ref == LUA_NOREF) {
+		Lua::Function * func = ingestMgr.GetIngest({name});
+		if (!func) {
 			warnx("No ingest for config '%s'", name.c_str());
 			continue;
 		}
 
-		lua_pushcfunction(lua, ErrorHandler);
-		lua_rawgeti(lua, LUA_REGISTRYINDEX, ref);
-		PushConfig(parentConfig);
-		PushConfig(*value);
-		int result = lua_pcall(lua, 2, 0, -4);
-		if (result != LUA_OK) {
-
-			errx(1, "Error running lua callback: %s", lua_tostring(lua, -1));
-		}
-		/* Pop ErrorHandler off the stack. */
-		lua_pop(lua, 1);
+		func->Call(parentConfig, *value);
 	}
 }
 
@@ -268,18 +229,43 @@ Interpreter::IncludeScriptWrapper(lua_State *lua)
 void
 Interpreter::ParseDefinition(Lua::Table & def)
 {
-	Lua::View & lua = def.GetView();
+	std::vector<std::string> ingestedConfigs;
+	Lua::Function callback;
 
-	std::string name(def.GetString("name"));
+	def.IterateMap(make_visitor(
+		[&ingestedConfigs,&def](const std::string & name, Lua::Table && value)
+		{
+			if (name == "name") {
+				ingestedConfigs = GetStringList(value);
+			} else if (name == "process") {
+				errx(1, "process field in definition must be a function");
+			} else {
+				errx(1, "Unexpected field '%s' in %s\n", name.c_str(), def.GetNamedValue().ToString().c_str());
+			}
+		},
+		[&ingestedConfigs,&def](const std::string & name, const std::string & value)
+		{
+			if (name == "name") {
+				ingestedConfigs.push_back(value);
+			} else if (name == "process") {
+				errx(1, "process field in definition must be a function");
+			} else {
+				errx(1, "Unexpected field '%s' in %s\n", name.c_str(), def.GetNamedValue().ToString().c_str());
+			}
+		},
+		[&callback,&def](const std::string & name, Lua::Function && func)
+		{
+			if (name == "process") {
+				callback = std::move(func);
+			} else if (name == "name") {
+				errx(1, "name field is definition must be a list of strings");
+			} else {
+				errx(1, "Unexpected field '%s' in %s\n", name.c_str(), def.GetNamedValue().ToString().c_str());
+			}
+		}
+	));
 
-	def.FetchValue("process");
-	if (!lua.isfunction(-1))
-		errx(1, "Field 'process' is expected to be a function");
-
-	int ref = lua.SaveToRegistry();
-
-	ingestMgr.AddIngest(std::move(name), ref);
-
+	ingestMgr.AddIngest(std::move(ingestedConfigs), std::move(callback));
 }
 
 /* Implements function factory.add_definitions(defs) */
@@ -291,7 +277,7 @@ Interpreter::AddDefinitions()
 
 
 	auto table = lua.GetTable(defs);
-	table.IterateList([this] (int index, Lua::Table & def)
+	table.IterateList([this] (int index, Lua::Table && def)
 	{
 		ParseDefinition(def);
 	});
@@ -302,9 +288,17 @@ Interpreter::AddDefinitions()
 std::vector<std::string>
 Interpreter::GetStringList(Lua::View & lua, const Lua::NamedValue & value)
 {
+	Lua::Table table(lua.GetTable(value));
+	return GetStringList(table);
+}
+
+
+std::vector<std::string>
+Interpreter::GetStringList(Lua::Table & configList)
+{
 	std::vector<std::string> list;
-	auto configList = lua.GetTable(value);
-	configList.IterateList([&list](int index, std::string str)
+
+	configList.IterateList([&list](int index, std::string && str)
 	{
 		list.push_back(std::move(str));
 	});
@@ -347,7 +341,7 @@ Interpreter::SerializeConfig(Lua::Table & config)
 		{
 			list.emplace_back(std::make_unique<ConfigNode>(value));
 		},
-		[&list](int key, Lua::Table & value)
+		[&list](int key, Lua::Table && value)
 		{
 			list.emplace_back(SerializeConfig(value));
 		},
@@ -359,7 +353,7 @@ Interpreter::SerializeConfig(Lua::Table & config)
 		{
 			map.emplace(key, std::make_unique<ConfigNode>(value));
 		},
-		[&map](const char * key, Lua::Table & value)
+		[&map](const char * key, Lua::Table && value)
 		{
 			map.emplace(key, SerializeConfig(value));
 		}
@@ -386,24 +380,12 @@ Interpreter::Include(const char * funcName, IncludeFile::Type t)
 	Lua::Parameter files(funcName, "files", 1);
 	Lua::Parameter configArg(funcName, "config", 2);
 
-	Lua::Table fileList = lua.GetTable(files);
+	auto fileList = GetStringList(lua, files);
+
 	Lua::Table configTable = lua.GetTable(configArg);
+	auto config = SerializeConfig(configTable);
 
-	auto configUniq = SerializeConfig(configTable);
-	std::shared_ptr<ConfigNode> config(configUniq.release());
-
-	fileList.IterateList([this, t, &config](int i, const char * path)
-	{
-		includeQueue.emplace_back(path, t, config);
-	});
+	includeQueue.emplace_back(std::move(fileList), t, std::move(config));
 
 	return 0;
-}
-
-int
-Interpreter::ErrorHandler(lua_State *lua)
-{
-	const char * error = lua_tostring(lua, -1);
-	luaL_traceback(lua, lua, error, 1);
-	errx(1, "error in lua script: %s", lua_tostring(lua, -1));
 }

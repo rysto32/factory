@@ -51,6 +51,35 @@
 #include <string>
 #include <vector>
 
+void
+IncludeScript(Interpreter & interp, const IncludeFile & file)
+{
+	if (file.paths.size() != 1) {
+		errx(1, "Cannot include multiple scripts at once.");
+	}
+
+	interp.RunFile(file.paths.front(), *file.config);
+}
+
+void
+IncludeConfig(Interpreter & interp, const IncludeFile & file)
+{
+	std::vector<ConfigNodePtr> configList;
+
+	for (const std::string & path : file.paths) {
+		ConfigParser parser(path);
+
+		std::string errors;
+		if (!parser.Parse(errors)) {
+			errx(1, "Could not parse build definition %s: %s",
+			    path.c_str(), errors.c_str());
+		}
+
+		configList.push_back(parser.TakeConfig());
+	}
+	interp.ProcessConfig(*file.config, configList);
+}
+
 int main(int argc, char **argv)
 {
 	EventLoop loop;
@@ -77,22 +106,12 @@ int main(int argc, char **argv)
 			break;
 
 		switch (file->type) {
-			case IncludeFile::Type::SCRIPT: {
-				interp.RunFile(file->path, *file->config);
+			case IncludeFile::Type::SCRIPT:
+				IncludeScript(interp, *file);
 				break;
-			}
-			case IncludeFile::Type::CONFIG: {
-				ConfigParser parser(file->path);
-
-				std::string errors;
-				if (!parser.Parse(errors)) {
-					errx(1, "Could not parse build definition: %s", errors.c_str());
-				}
-
-				const ConfigNode & config = parser.GetConfig();
-				interp.ProcessConfig(*file->config, config);
+			case IncludeFile::Type::CONFIG:
+				IncludeConfig(interp, *file);
 				break;
-			}
 		}
 	}
 

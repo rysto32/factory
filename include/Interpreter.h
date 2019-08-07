@@ -55,16 +55,18 @@ struct IncludeFile
 {
 	enum Type { CONFIG, SCRIPT };
 
-	const std::string path;
+	std::vector<std::string> paths;
 	const Type type;
-	const std::shared_ptr<ConfigNode> config;
+	std::unique_ptr<ConfigNode> config;
 
-	IncludeFile(const std::string & p, Type t, std::shared_ptr<ConfigNode> c)
-	  : path(p),
+	IncludeFile(const std::vector<std::string> && p, Type t, std::unique_ptr<ConfigNode> && c)
+	  : paths(p),
 	    type(t),
 	    config(std::move(c))
 	{
 	}
+
+	IncludeFile(IncludeFile &&) = default;
 };
 
 class Interpreter
@@ -123,9 +125,13 @@ class Interpreter
 
 	void AddStringValuePair(const char * name, const char * value);
 
-	std::vector<std::string> GetStringList(Lua::View &, const Lua::NamedValue & value);
+	static std::vector<std::string> GetStringList(Lua::View &, const Lua::NamedValue & value);
+	static std::vector<std::string> GetStringList(Lua::Table & configList);
 
 	static std::unique_ptr<ConfigNode> SerializeConfig(Lua::Table & config);
+
+	void ProcessSingleConfig(const ConfigNode & parentConfig, const ConfigNode & node);
+	void ProcessMultiConfig(const ConfigNode & parent, const std::vector<ConfigNodePtr> & config);
 
 public:
 	Interpreter(IngestManager &, CommandFactory &);
@@ -137,7 +143,7 @@ public:
 	Interpreter &operator=(Interpreter &&) = delete;
 
 	void RunFile(const std::string & path, const ConfigNode & config);
-	void ProcessConfig(const ConfigNode & parent, const ConfigNode & config);
+	void ProcessConfig(const ConfigNode & parent, const std::vector<ConfigNodePtr> & config);
 
 	std::optional<IncludeFile> GetNextInclude();
 };

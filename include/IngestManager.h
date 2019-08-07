@@ -29,15 +29,23 @@
 #ifndef INGEST_MANAGER_H
 #define INGEST_MANAGER_H
 
+#include "lua/Function.h"
+
+#include "ConfigNode.h"
+#include "HashUtil.h"
+
+#include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 class IngestManager
 {
-	std::unordered_map<std::string, int> callbacks;
+	std::unordered_map<std::vector<std::string>, Lua::Function, VectorHasher<std::string>> callbacks;
+
 public:
-	void AddIngest(std::string && name, int callbackRef);
-	int GetIngest(const std::string & name) const;
+	void AddIngest(std::vector<std::string> && types, Lua::Function && func);
+	Lua::Function * GetIngest(const std::vector<std::string> & types);
 };
 
 #endif

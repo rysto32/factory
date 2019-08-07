@@ -26,103 +26,25 @@
  * SUCH DAMAGE.
  */
 
-#ifndef LUA_VIEW_H
-#define LUA_VIEW_H
+#include "VectorUtil.h"
 
-#include "lua/Util.h"
+#include <sstream>
 
-#include <lua.hpp>
-
-#include <cassert>
-#include <memory>
-
-#include <err.h>
-
-namespace Lua
+std::string
+VectorToString(const std::vector<std::string> &list)
 {
+	std::ostringstream sout;
 
-class Function;
-class NamedValue;
-class Table;
+	if (list.size() == 1)
+		return list.front();
 
-class View
-{
-private:
-	lua_State *lua;
-	int startStackTop;
-
-	friend class Lua::Function;
-	friend class Lua::Table;
-
-	View(lua_State *l)
-	  : lua(l),
-	    startStackTop(lua_gettop(lua))
-	{
-
+	const char * comma = "";
+	sout << "[";
+	for (const std::string & str : list) {
+		sout << comma << str;
+		comma = ", ";
 	}
+	sout << "]";
 
-public:
-	template <typename Free>
-	View(const std::unique_ptr<lua_State, Free> & l)
-	  : lua(l.get()),
-	    startStackTop(lua_gettop(lua))
-	{
-
-	}
-
-	~View()
-	{
-		assert (lua_gettop(lua) == startStackTop);
-	}
-
-	View(View &&) = default;
-	View(const View*) = delete;
-
-	View & operator=(View &&) = delete;
-	View & operator=(const View &) = delete;
-
-	operator lua_State*()
-	{
-		return lua;
-	}
-
-	lua_State* GetLua() const
-	{
-		return lua;
-	}
-
-	Table GetTable(const NamedValue & index);
-
-	bool isstring(int stackIndex)
-	{
-		return lua_isstring(lua, stackIndex);
-	}
-
-	bool isfunction(int index)
-	{
-		return lua_isfunction(lua, index);
-	}
-
-	const char * tostring(int stackIndex)
-	{
-		return lua_tostring(lua, stackIndex);
-	}
-
-	/*
-	 * Conver an index to an equivalant absolute index that references the
-	 * same object even as the stack is pushed or popped.
-	 */
-	int absolute(int relative)
-	{
-		return AbsoluteIndex(lua, relative);
-	}
-
-	int SaveToRegistry()
-	{
-		return luaL_ref(lua, LUA_REGISTRYINDEX);
-	}
-};
+	return sout.str();
 }
-
-#endif
-

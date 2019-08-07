@@ -17,6 +17,7 @@ PROG_LIBS := \
 	eventloop \
 	config \
 	temp_files \
+	util \
 
 PROG_STDLIBS := \
 	event_core \

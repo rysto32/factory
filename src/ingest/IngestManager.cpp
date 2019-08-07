@@ -28,26 +28,29 @@
 
 #include "IngestManager.h"
 
+#include "VectorUtil.h"
+
 #include <err.h>
 #include <lua.hpp>
+#include <sstream>
 
 void
-IngestManager::AddIngest(std::string && name, int callbackRef)
+IngestManager::AddIngest(std::vector<std::string> && types, Lua::Function && callback)
 {
 // 	fprintf(stderr, "Add ingest for '%s'\n", name.c_str());
-	auto [it, inserted] = callbacks.emplace(std::move(name), callbackRef);
+	auto [it, inserted] = callbacks.emplace(std::move(types), std::move(callback));
 	if (!inserted) {
-		errx(1, "Multiple definitions for ingesting '%s'", it->first.c_str());
+		errx(1, "Multiple definitions for ingesting '%s'",
+		     VectorToString(it->first).c_str());
 	}
 }
 
-int
-IngestManager::GetIngest(const std::string & name) const
+Lua::Function *
+IngestManager::GetIngest(const std::vector<std::string> &types)
 {
-	auto it = callbacks.find(name);
+	auto it = callbacks.find(types);
 	if (it == callbacks.end())
-		return LUA_NOREF;
+		return nullptr;
 
-	return it->second;
+	return &it->second;
 }
-

@@ -26,102 +26,23 @@
  * SUCH DAMAGE.
  */
 
-#ifndef LUA_VIEW_H
-#define LUA_VIEW_H
+#ifndef VISITOR_H
+#define VISITOR_H
 
-#include "lua/Util.h"
-
-#include <lua.hpp>
-
-#include <cassert>
-#include <memory>
-
-#include <err.h>
-
-namespace Lua
+template<typename ...Ts>
+struct Visitor : Ts...
 {
+    Visitor(const Ts&... args) : Ts(args)...
+    {
+    }
 
-class Function;
-class NamedValue;
-class Table;
-
-class View
-{
-private:
-	lua_State *lua;
-	int startStackTop;
-
-	friend class Lua::Function;
-	friend class Lua::Table;
-
-	View(lua_State *l)
-	  : lua(l),
-	    startStackTop(lua_gettop(lua))
-	{
-
-	}
-
-public:
-	template <typename Free>
-	View(const std::unique_ptr<lua_State, Free> & l)
-	  : lua(l.get()),
-	    startStackTop(lua_gettop(lua))
-	{
-
-	}
-
-	~View()
-	{
-		assert (lua_gettop(lua) == startStackTop);
-	}
-
-	View(View &&) = default;
-	View(const View*) = delete;
-
-	View & operator=(View &&) = delete;
-	View & operator=(const View &) = delete;
-
-	operator lua_State*()
-	{
-		return lua;
-	}
-
-	lua_State* GetLua() const
-	{
-		return lua;
-	}
-
-	Table GetTable(const NamedValue & index);
-
-	bool isstring(int stackIndex)
-	{
-		return lua_isstring(lua, stackIndex);
-	}
-
-	bool isfunction(int index)
-	{
-		return lua_isfunction(lua, index);
-	}
-
-	const char * tostring(int stackIndex)
-	{
-		return lua_tostring(lua, stackIndex);
-	}
-
-	/*
-	 * Conver an index to an equivalant absolute index that references the
-	 * same object even as the stack is pushed or popped.
-	 */
-	int absolute(int relative)
-	{
-		return AbsoluteIndex(lua, relative);
-	}
-
-	int SaveToRegistry()
-	{
-		return luaL_ref(lua, LUA_REGISTRYINDEX);
-	}
+    using Ts::operator()...;
 };
+
+template<typename... Ts>
+auto make_visitor(Ts... lambdas)
+{
+    return Visitor<Ts...>(lambdas...);
 }
 
 #endif

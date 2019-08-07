@@ -11,3 +11,5 @@ SUBDIRS := \
 	product \
 	sandbox \
 	temp_files \
+	util \
+

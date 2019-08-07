@@ -60,6 +60,11 @@ public:
 	{
 		return *top;
 	}
+
+	ConfigNodePtr&& TakeConfig()
+	{
+		return std::move(top);
+	}
 };
 
 #endif
