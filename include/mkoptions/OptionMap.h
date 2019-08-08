@@ -26,45 +26,36 @@
  * SUCH DAMAGE.
  */
 
-#ifndef CONFIG_PARSER_H
-#define CONFIG_PARSER_H
-
-#include "ConfigNode.h"
+#ifndef OPTION_MAP_H
+#define OPTION_MAP_H
 
 #include <string>
+#include <unordered_map>
+#include <vector>
 
-#include "ucl.h"
-
-class ConfigParser
+class OptionMap
 {
-	std::string filename;
-	ConfigNodePtr top;
-
-	template <typename Container, typename AddNodeFunc>
-	static bool WalkConfig(const ucl_object_t *obj, Container & node, std::string & errors, const AddNodeFunc & AddNode);
+	std::unordered_map<std::string, std::string> optionHeaderMap;
+	std::vector<std::string> headerList;
 
 public:
-	explicit ConfigParser(const std::string & file)
-	  : filename(file)
+	bool AddHeader(std::string option, std::string && header)
 	{
+		headerList.push_back(header);
+		auto [it, success] = optionHeaderMap.emplace(std::move(option), std::move(header));
+		return success;
 	}
 
-	ConfigParser(const ConfigParser &) = delete;
-	ConfigParser(ConfigParser &&) = delete;
-	ConfigParser &operator=(const ConfigParser &) = delete;
-	ConfigParser &operator=(ConfigParser &&) = delete;
-
-	bool Parse(std::string & errors);
-
-	const ConfigNode & GetConfig() const
+	const std::vector<std::string> & GetHeaderList() const
 	{
-		return *top;
+		return headerList;
 	}
 
-	ConfigNodePtr&& TakeConfig()
+	const std::unordered_map<std::string, std::string> GetOptionMap() const
 	{
-		return std::move(top);
+		return optionHeaderMap;
 	}
 };
 
 #endif
+

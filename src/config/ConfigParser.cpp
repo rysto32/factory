@@ -84,7 +84,8 @@ ConfigParser::Parse(std::string & errors)
 		return false;
 	}
 
-	if (!ucl_parser_add_file(parser.get(), filename.c_str())) {
+	if (!ucl_parser_add_file_full(parser.get(), filename.c_str(), 0,
+	    UCL_DUPLICATE_MERGE, UCL_PARSE_UCL)) {
 		errors = "Could not open file '" + filename + "' for reading";
 		return false;
 	}

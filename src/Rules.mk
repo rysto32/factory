@@ -1,5 +1,6 @@
 
 SUBDIRS := \
+	buildkernel \
 	config \
 	eventloop \
 	ingest \
