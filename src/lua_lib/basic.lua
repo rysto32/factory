@@ -74,6 +74,17 @@ function factory.map(func, list)
 	return result
 end
 
+function factory.split(inputstr, sep)
+        if sep == nil then
+                sep = "%s"
+        end
+        local t={}
+        for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
+                table.insert(t, str)
+        end
+        return t
+end
+
 function factory.addprefix(prefix, list)
 	return factory.map(function (lib) return prefix .. lib end, list)
 end
