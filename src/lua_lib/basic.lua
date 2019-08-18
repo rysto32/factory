@@ -42,6 +42,56 @@ function factory.build_path(...)
 	return path
 end
 
+function factory.internal.expand_var(name, vars)
+
+	if not vars[name] then
+		print("Undefined variable '" .. name .. "'")
+		os.exit(1)
+	end
+
+	--print("Var " .. name .. " -> " .. vars[name])
+	return vars[name]
+end
+
+function factory.evaluate_vars(str, vars)
+	if str == nil then
+		return ''
+	end
+
+	local out = ''
+	local i = 1
+	while i <= #str do
+		local c = str:sub(i,i)
+		if c ~= '$' then
+			out = out .. c
+			i = i + 1
+			goto continue
+		end
+
+		local next = str:sub(i+1,i+1)
+		if next == '{' then
+			local j = i + 1
+			while j <= #str do
+				next = str:sub(j, j)
+				if next == '}' then
+					varname = str:sub(i+2, j - 1)
+					out = out .. factory.internal.expand_var(varname, vars)
+					break
+				end
+				j = j + 1
+			end
+
+			i = j + 1
+		else
+			out = out .. factory.internal.expand_var(next, vars)
+			i = i + 2
+		end
+		::continue::
+	end
+
+	return out
+end
+
 function factory.flat_list(...)
 	list = {}
 
