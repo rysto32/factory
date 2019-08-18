@@ -30,6 +30,7 @@
 #define CONFIG_PARSER_H
 
 #include "ConfigNode.h"
+#include "Path.h"
 
 #include <string>
 
@@ -37,14 +38,14 @@
 
 class ConfigParser
 {
-	std::string filename;
+	Path filename;
 	ConfigNodePtr top;
 
 	template <typename Container, typename AddNodeFunc>
 	static bool WalkConfig(const ucl_object_t *obj, Container & node, std::string & errors, const AddNodeFunc & AddNode);
 
 public:
-	explicit ConfigParser(const std::string & file)
+	explicit ConfigParser(const Path & file)
 	  : filename(file)
 	{
 	}

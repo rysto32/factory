@@ -46,6 +46,8 @@ struct UclObjectDeleter
 	}
 };
 
+typedef std::unique_ptr<ucl_object_t, UclObjectDeleter> UclObjPtr;
+
 static auto
 AddKeyValue()
 {
@@ -84,6 +86,23 @@ ConfigParser::Parse(std::string & errors)
 		return false;
 	}
 
+	Path parent = filename.parent_path();
+	
+	UclObjPtr incPaths(ucl_object_typed_new(UCL_ARRAY));
+	ucl_array_append(incPaths.get(), ucl_object_fromstring(parent.c_str()));
+	
+	if (!ucl_set_include_path(parser.get(), incPaths.get())) {
+		const char * errmsg = ucl_parser_get_error(parser.get());
+		if (errmsg != nullptr) {
+			errors = errmsg;
+			return false;
+		}
+		
+		errors = "Could not set " + parent.string() + " as parser include path";
+		return false;
+	}
+	
+
 	if (!ucl_parser_add_file_full(parser.get(), filename.c_str(), 0,
 	    UCL_DUPLICATE_MERGE, UCL_PARSE_UCL)) {
 		const char * errmsg = ucl_parser_get_error(parser.get());
@@ -92,12 +111,12 @@ ConfigParser::Parse(std::string & errors)
 			return false;
 		}
 
-		errors = "Could not open file '" + filename + "' for reading";
+		errors = "Could not open file '" + filename.string() + "' for reading";
 		return false;
 	}
 
 	ConfigPairMap pairs;
-	auto obj = std::unique_ptr<ucl_object_t, UclObjectDeleter>(ucl_parser_get_object(parser.get()));
+	UclObjPtr obj(ucl_parser_get_object(parser.get()));
 	if (ucl_object_type(obj.get()) != UCL_OBJECT) {
 		errors = "Illegal top-level node (must be OBJECT)";
 		return false;
