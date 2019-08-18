@@ -320,6 +320,10 @@ Interpreter::DefineCommand()
 	auto inputs = GetStringList(lua, inputsArg);
 	auto argList = GetStringList(lua, argListArg);
 	auto tmpdirs = GetStringList(lua, tmpdirsArg);
+	
+	if (argList.empty()) {
+		errx(1, "In %s: cannot be empty", argListArg.ToString().c_str());
+	}
 
 	commandFactory.AddCommand(products, inputs, std::move(argList), tmpdirs);
 
