@@ -149,8 +149,13 @@ ConfigParser::WalkConfig(const ucl_object_t *parentObj, Container & parent, std:
 					return false;
 				}
 				break;
+			case UCL_BOOLEAN:
+				if (!AddNode(parent, obj, ucl_object_toboolean(obj), errors)) {
+					return false;
+				}
+				break;
 			case UCL_STRING:
-				if (!AddNode(parent, obj, ucl_object_tostring(obj), errors)) {
+				if (!AddNode(parent, obj, std::string(ucl_object_tostring(obj)), errors)) {
 					return false;
 				}
 				break;

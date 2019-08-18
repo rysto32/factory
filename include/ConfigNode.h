@@ -45,7 +45,7 @@ typedef std::unordered_map<std::string, ConfigNodePtr> ConfigPairMap;
 class ConfigNode
 {
 public:
-	typedef std::variant<int, std::string, ConfigNodeList, ConfigPairMap> ValueType;
+	typedef std::variant<int64_t, bool, std::string, ConfigNodeList, ConfigPairMap> ValueType;
 
 private:
 
@@ -56,6 +56,11 @@ public:
 	  : value(std::move(v))
 	{
 
+	}
+
+	ConfigNode(const char * s)
+	  : value(std::string(s))
+	{
 	}
 
 	ConfigNode(const ConfigNode &) = delete;

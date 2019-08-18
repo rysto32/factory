@@ -333,7 +333,7 @@ Interpreter::SerializeConfig(Lua::Table & config)
 	ConfigPairMap map;
 
 	config.Iterate(make_visitor(
-		[&list](int key, int value)
+		[&list](int key, int64_t value)
 		{
 			list.emplace_back(std::make_unique<ConfigNode>(value));
 		},
@@ -345,7 +345,7 @@ Interpreter::SerializeConfig(Lua::Table & config)
 		{
 			list.emplace_back(SerializeConfig(value));
 		},
-		[&map](const char * key, int value)
+		[&map](const char * key, int64_t value)
 		{
 			map.emplace(key, std::make_unique<ConfigNode>(value));
 		},

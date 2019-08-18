@@ -90,13 +90,17 @@ private:
 		//Lua::View view(lua);
 		const ConfigNode::ValueType & config = node.GetValue();
 		std::visit(make_visitor(
-			[this](int value)
+			[this](int64_t value)
 			{
 				lua_pushinteger(lua, value);
 			},
 			[this](const std::string & value)
 			{
 				lua_pushstring(lua, value.c_str());
+			},
+			[this](bool value)
+			{
+				lua_pushboolean(lua, value);
 			},
 			[this](const ConfigNodeList & list)
 			{

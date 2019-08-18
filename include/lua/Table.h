@@ -61,7 +61,7 @@ private:
 	template <typename F, typename IndexType>
 	static constexpr bool takes_int_value()
 	{
-		return std::is_invocable_v<F, IndexType, int>;
+		return std::is_invocable_v<F, IndexType, int64_t>;
 	}
 
 	template <typename F, typename IndexType>
