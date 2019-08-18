@@ -180,7 +180,7 @@ ConfigParser::WalkConfig(const ucl_object_t *parentObj, Container & parent, std:
 				break;
 			default:
 				// XXX
-				errx(1, "Unhandled type %d", ucl_object_type(obj));
+				errx(1, "Unhandled type %s", ucl_object_type_to_string(ucl_object_type(obj)));
 		}
 	}
 
