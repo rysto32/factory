@@ -109,6 +109,8 @@ end
 function factory.listify(arg)
 	if type(arg) == 'table' then
 		return arg
+	elseif arg == nil then
+		return {}
 	else
 		return {arg}
 	end
