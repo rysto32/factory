@@ -86,13 +86,13 @@ ConfigParser::Parse(std::string & errors)
 
 	if (!ucl_parser_add_file_full(parser.get(), filename.c_str(), 0,
 	    UCL_DUPLICATE_MERGE, UCL_PARSE_UCL)) {
-		errors = "Could not open file '" + filename + "' for reading";
-		return false;
-	}
+		const char * errmsg = ucl_parser_get_error(parser.get());
+		if (errmsg != nullptr) {
+			errors = errmsg;
+			return false;
+		}
 
-	const char * errmsg = ucl_parser_get_error(parser.get());
-	if (errmsg != nullptr) {
-		errors = errmsg;
+		errors = "Could not open file '" + filename + "' for reading";
 		return false;
 	}
 
