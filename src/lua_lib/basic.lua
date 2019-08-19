@@ -126,6 +126,48 @@ function factory.map(func, list)
 	return result
 end
 
+function factory.shell_split(str)
+	local out = {}
+	local cur = ''
+	local explicit_empty = false
+	local quote = nil
+	local i = 1
+	while i <= #str do
+		local c = str:sub(i,i)
+		if not quote and c:find('%s') then
+			if cur ~= '' or explicit_empty then
+				table.insert(out, cur)
+				cur = ''
+				explicit_empty = false
+			end
+			goto continue
+		end
+
+		if c == quote then
+			quote = nil
+			goto continue
+		end
+
+		if not quote and (c == '"' or c == "'") then
+			quote = c
+			explicit_empty = true
+			goto continue
+		end
+
+		cur = cur .. c
+		explicit_empty = false
+
+		::continue::
+		i = i + 1
+	end
+
+	if cur ~= '' or explicit_empty then
+		table.insert(out, cur)
+	end
+
+	return out
+end
+
 function factory.split(inputstr, sep)
         if sep == nil then
                 sep = "%s"
