@@ -18,4 +18,4 @@ CFLAGS:=-I/usr/local/include -I/usr/local/include/lua53 -I$(TOPDIR)/include $(C_
 CXXFLAGS:=$(CXX_STD) $(CXX_WARNFLAGS)
 
 # I don't know why ld needs this -L/usr/lib...
-LDFLAGS := -L/usr/lib -L/usr/local/lib
+LDFLAGS := -L/usr/lib -L/usr/local/lib -lc++experimental

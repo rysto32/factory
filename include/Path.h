@@ -29,7 +29,17 @@
 #ifndef PATH_H
 #define PATH_H
 
+#if defined(__clang__) && __clang_major__ == 6
+
+#include <experimental/filesystem>
+namespace std
+{
+	using namespace std::experimental;
+}
+#else
 #include <filesystem>
+#endif
+
 #include <string_view>
 
 class Path
