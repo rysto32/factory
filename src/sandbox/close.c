@@ -26,32 +26,20 @@
  * SUCH DAMAGE.
  */
 
-#ifndef INTERPOSE_H
-#define INTERPOSE_H
+#include "interpose.h"
+#include "SharedMem.h"
 
-#include <sys/types.h>
+#include <unistd.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-struct SandboxMsg;
-
-typedef int fexecve_t(int fd, char * const argv[], char * const orig_envp[]);
-typedef int open_t(const char * path, int flags, ...);
-typedef void closefrom_t(int fd);
-
-extern fexecve_t * real_fexecve;
-extern open_t * real_open;
-extern closefrom_t * real_closefrom;
-
-extern struct FactoryShm *shm;
-extern int msg_sock_fd;
-
-int send_sandbox_msg(struct SandboxMsg * msg);
-
-#ifdef __cplusplus
+void
+closefrom(int lowfd)
+{
+	if (lowfd <= SHARED_MEM_API_NUM) {
+		for (int fd = lowfd; fd < SHARED_MEM_API_NUM; ++fd) {
+			close(fd);
+		}
+		
+		lowfd = SHARED_MEM_API_NUM + 1;
+	}
+	real_closefrom(lowfd);
 }
-#endif
-
-#endif

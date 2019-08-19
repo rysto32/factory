@@ -6,6 +6,7 @@ SHLIB_STDLIBS := \
 	nv \
 
 SRCS := \
+	close.c \
 	exec.c \
 	interpose.c \
 	open.c \

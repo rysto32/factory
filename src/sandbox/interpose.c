@@ -38,6 +38,7 @@
 
 static void initialize(void) __attribute__((constructor));
 
+closefrom_t * real_closefrom;
 fexecve_t * real_fexecve;
 open_t *real_open;
 
@@ -94,6 +95,7 @@ initialize(void)
 
 	real_fexecve = (fexecve_t *)dlsym(RTLD_NEXT, "fexecve");
 	real_open = (open_t *)dlsym(RTLD_NEXT, "open");
+	real_closefrom = (closefrom_t*)dlsym(RTLD_NEXT, "closefrom");
 
 	msg_sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (msg_sock_fd < 0)
