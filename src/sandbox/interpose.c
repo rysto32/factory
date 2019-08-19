@@ -34,7 +34,6 @@
 #include <dlfcn.h>
 #include <err.h>
 #include <sys/mman.h>
-#include <sys/nv.h>
 #include <unistd.h>
 
 static void initialize(void) __attribute__((constructor));
@@ -42,13 +41,36 @@ static void initialize(void) __attribute__((constructor));
 fexecve_t * real_fexecve;
 open_t *real_open;
 
-int msg_sock_fd;
+int msg_sock_fd = -1;
 
 struct FactoryShm *shm;
+
+int
+send_sandbox_msg(struct SandboxMsg * msg)
+{
+	/*struct iovec iov = {
+		.iov_base = msg,
+		.iov_len = sizeof(*msg),
+	};
+
+	struct msghdr hdr = {
+		.msg_iov = &iov,
+		.msg_iovlen = 1,
+		.msg_flags = MSG_EOR,
+	};
+
+	return sendmsg(msg_sock_fd, &hdr, 0);*/
+	ssize_t bytes = send(msg_sock_fd, msg, sizeof(*msg), 0);
+	if (bytes == sizeof(*msg))
+		return 0;
+	else
+		return -1;
+}
 
 static void
 initialize(void)
 {
+	struct SandboxMsg msg;
 	long page_size = sysconf(_SC_PAGE_SIZE);
 
 	void *mem = mmap(NULL, page_size, PROT_READ, MAP_SHARED, SHARED_MEM_FD, 0);
@@ -82,14 +104,10 @@ initialize(void)
 	if (error != 0)
 		err(1, "Could not connect msg socket");
 
-	nvlist_t *msg = nvlist_create(NV_FLAG_IGNORE_CASE);
-	if (msg == NULL)
-		err(1, "Could not alloc nvlist msg");
+	msg.type = MSG_TYPE_INIT;
+	msg.init.jid = shm->jobId;
 
-	nvlist_add_number(msg, "type", MSG_TYPE_INIT);
-	nvlist_add_number(msg, "jid", shm->jobId);
-
-	error = nvlist_send(msg_sock_fd, msg);
+	error = send_sandbox_msg(&msg);
 	if (error != 0)
 		err(1, "Could not send init msg");
 

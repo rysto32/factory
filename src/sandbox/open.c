@@ -33,50 +33,34 @@
 #include <errno.h>
 #include <err.h>
 #include <fcntl.h>
-#include <sys/nv.h>
+#include <stdarg.h>
+#include <string.h>
+#include <unistd.h>
 
 int
 open(const char * path, int flags, ...)
 {
-	nvlist_t *msg;
+	struct SandboxMsg msg;
+	struct SandboxResp resp;
 	mode_t mode;
 	int error;
 
-	msg = nvlist_create(NV_FLAG_IGNORE_CASE);
-	if (msg == NULL) {
-		errno = ENOMEM;
-		return (-1);
-	}
+	msg.type = MSG_TYPE_OPEN_REQUEST;
+	msg.open.flags = flags;
+	strlcpy(msg.open.path, path, sizeof(msg.open.path));
 
-	nvlist_add_number(msg, "type", MSG_TYPE_OPEN_REQUEST);
-	nvlist_add_string(msg, "path", path);
-	nvlist_add_number(msg, "flags", flags);
-
-	error = nvlist_error(msg);
-	if (error != 0) {
-		errno = error;
-		return (-1);
-	}
-
-	error = nvlist_send(msg_sock_fd, msg);
+	error = send_sandbox_msg(&msg);
 	if (error != 0) {
 		err(1, "Failed to send to factory");
 	}
 
-	nvlist_destroy(msg);
+	ssize_t bytes = recv(msg_sock_fd, &resp, sizeof(resp), 0);
+	if (bytes != sizeof(resp)) {
+		err(1, "Failed to receive from factory");
+	}
 
-	msg = nvlist_recv(msg_sock_fd, NV_FLAG_IGNORE_CASE);
-	if (msg == NULL)
-		err(1, "Failed to receive response from factory");
-
-	if (nvlist_error(msg) != 0)
-		err(1, "Response from factory had an error");
-
-	error = nvlist_get_number(msg, "error");
-	nvlist_destroy(msg);
-
-	if (error != 0) {
-		errno = error;
+	if (resp.error != 0) {
+		errno = resp.error;
 		return (-1);
 	}
 

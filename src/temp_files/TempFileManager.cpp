@@ -64,7 +64,7 @@ TempFileManager::GetUnixSocket(const std::string & name)
 		return std::unique_ptr<TempFile>();
 	}
 
-	error  = listen(fd, 0);
+	error = listen(fd, 0);
 	if (error != 0) {
 		close(fd);
 		return std::unique_ptr<TempFile>();

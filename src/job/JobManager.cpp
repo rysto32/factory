@@ -39,10 +39,12 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 
 #include <err.h>
 #include <fcntl.h>
+#include <paths.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -57,11 +59,131 @@
 // Not defined by any header(!)
 extern char ** environ;
 
+static const char path_prefix[] = "PATH=";
+
+/* Stolen from FreeBSD's libc/gen/exec.c */
 static int
-StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, int shm_fd) __attribute__((noreturn));
+execvPe(const char *name, const char *path, char * const *argv,
+    char * const *envp)
+{
+	const char **memp;
+	size_t cnt, lp, ln;
+	int eacces, save_errno;
+	char *cur, buf[MAXPATHLEN];
+	const char *p, *bp;
+	struct stat sb;
+
+	eacces = 0;
+
+	/* If it's an absolute or relative path name, it's easy. */
+	if (strchr(name, '/')) {
+		bp = name;
+		cur = NULL;
+		goto retry;
+	}
+	bp = buf;
+
+	/* If it's an empty path name, fail in the usual POSIX way. */
+	if (*name == '\0') {
+		errno = ENOENT;
+		return (-1);
+	}
+
+	cur = (char*)alloca(strlen(path) + 1);
+	if (cur == NULL) {
+		errno = ENOMEM;
+		return (-1);
+	}
+	strcpy(cur, path);
+	while ((p = strsep(&cur, ":")) != NULL) {
+		/*
+		 * It's a SHELL path -- double, leading and trailing colons
+		 * mean the current directory.
+		 */
+		if (*p == '\0') {
+			p = ".";
+			lp = 1;
+		} else
+			lp = strlen(p);
+		ln = strlen(name);
+
+		/*
+		 * If the path is too long complain.  This is a possible
+		 * security issue; given a way to make the path too long
+		 * the user may execute the wrong program.
+		 */
+		if (lp + ln + 2 > sizeof(buf)) {
+			fprintf(stderr, "execvP: %s path too long\n", p);
+			continue;
+		}
+		bcopy(p, buf, lp);
+		buf[lp] = '/';
+		bcopy(name, buf + lp + 1, ln);
+		buf[lp + ln + 1] = '\0';
+
+retry:		(void)execve(bp, argv, envp);
+		switch (errno) {
+		case E2BIG:
+			goto done;
+		case ELOOP:
+		case ENAMETOOLONG:
+		case ENOENT:
+			break;
+		case ENOEXEC:
+			for (cnt = 0; argv[cnt]; ++cnt)
+				;
+			memp = (const char**)alloca((cnt + 2) * sizeof(char *));
+			if (memp == NULL) {
+				/* errno = ENOMEM; XXX override ENOEXEC? */
+				goto done;
+			}
+			memp[0] = "sh";
+			memp[1] = bp;
+			bcopy(argv + 1, memp + 2, cnt * sizeof(char *));
+			(void)execve(_PATH_BSHELL,
+			    __DECONST(char **, memp), envp);
+			goto done;
+		case ENOMEM:
+			goto done;
+		case ENOTDIR:
+			break;
+		case ETXTBSY:
+			/*
+			 * We used to retry here, but sh(1) doesn't.
+			 */
+			goto done;
+		default:
+			/*
+			 * EACCES may be for an inaccessible directory or
+			 * a non-executable file.  Call stat() to decide
+			 * which.  This also handles ambiguities for EFAULT
+			 * and EIO, and undocumented errors like ESTALE.
+			 * We hope that the race for a stat() is unimportant.
+			 */
+			save_errno = errno;
+			if (stat(bp, &sb) != 0)
+				break;
+			if (save_errno == EACCES) {
+				eacces = 1;
+				continue;
+			}
+			errno = save_errno;
+			goto done;
+		}
+	}
+	if (eacces)
+		errno = EACCES;
+	else
+		errno = ENOENT;
+done:
+	return (-1);
+}
 
 static int
-StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, int shm_fd)
+StartChild(const std::vector<char *> & argp, const std::vector<char *> & envpm, const char *path, int shm_fd) __attribute__((noreturn));
+
+static int
+StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, const char *path, int shm_fd)
 {
 	int fd = dup2(shm_fd, SHARED_MEM_FD);
 	if (fd < 0) {
@@ -76,7 +198,7 @@ StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, i
 	}
 
 	closefrom(SHARED_MEM_FD + 1);
-	execve(argp.at(0), &argp[0], &envp[0]);
+	execvPe(argp.at(0), path, &argp[0], &envp[0]);
 	err(1, "execve %s failed", argp.at(0));
 	_exit(1);
 }
@@ -108,6 +230,7 @@ JobManager::StartJob(Command & command, JobCompletion & completer)
 	std::vector<char *>  argp;
 	const ArgList & argList = command.GetArgList();
 	std::ostringstream commandStr;
+	const char * path = _PATH_DEFPATH;
 
 	for (const std::string & arg : argList) {
 		// Blame POSIX for the const_cast :()
@@ -121,6 +244,12 @@ JobManager::StartJob(Command & command, JobCompletion & completer)
 	std::vector<char *> envp;
 	for (int i = 0; environ[i] != NULL; ++i) {
 		envp.push_back(environ[i]);
+
+		// -1 as we don't want to count the null-terminator
+		size_t prefixLen = sizeof(path_prefix) - 1;
+		if (strncmp(environ[i], path_prefix, prefixLen) == 0) {
+			path = environ[i] + prefixLen;
+		}
 	}
 	char ld_preload[] = "LD_PRELOAD=" LIB_LOCATION;
 	envp.push_back(ld_preload);
@@ -134,7 +263,7 @@ JobManager::StartJob(Command & command, JobCompletion & completer)
 		return NULL;
 
 	if (child == 0) {
-		StartChild(argp, envp, shm->GetFD());
+		StartChild(argp, envp, path, shm->GetFD());
 	} else {
 		auto job = std::make_unique<Job>(command.GetPermissions(), completer, jobId, child);
 

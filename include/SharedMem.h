@@ -34,9 +34,9 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#define SHARED_MEM_FD 3
+#define SHARED_MEM_FD 0x10
 
-#define SHARED_MEM_API_NUM 1
+#define SHARED_MEM_API_NUM 2
 
 struct FactoryShmHeader
 {

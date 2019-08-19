@@ -35,6 +35,8 @@
 extern "C" {
 #endif
 
+struct SandboxMsg;
+
 typedef int fexecve_t(int fd, char * const argv[], char * const orig_envp[]);
 typedef int open_t(const char * path, int flags, ...);
 
@@ -43,6 +45,8 @@ extern open_t * real_open;
 
 extern struct FactoryShm *shm;
 extern int msg_sock_fd;
+
+int send_sandbox_msg(struct SandboxMsg * msg);
 
 #ifdef __cplusplus
 }

@@ -29,6 +29,8 @@
 #ifndef MSG_TYPE_H
 #define MSG_TYPE_H
 
+#include <sys/param.h>
+
 enum MsgType
 {
 	MSG_TYPE_INIT,
@@ -36,6 +38,26 @@ enum MsgType
 
 	/* Must be last */
 	MSG_TYPE_MAX
+};
+
+struct SandboxMsg
+{
+	enum MsgType type;
+	union {
+		struct {
+			int flags;
+			char path[MAXPATHLEN];
+		} open;
+		struct {
+			uint64_t jid;
+		} init;
+	};
+};
+
+struct SandboxResp
+{
+	enum MsgType type;
+	int error;
 };
 
 #endif

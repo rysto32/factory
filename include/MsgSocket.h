@@ -32,8 +32,6 @@
 #include "Event.h"
 #include "MsgType.h"
 
-#include <sys/nv.h>
-
 class EventLoop;
 class MsgSocketServer;
 class Job;
@@ -68,7 +66,7 @@ public:
 		return fd;
 	}
 
-	void Send(nvlist_t * msg);
+	void Send(const SandboxResp & msg);
 };
 
 #endif

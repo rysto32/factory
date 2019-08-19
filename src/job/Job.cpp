@@ -35,7 +35,7 @@
 #include <cstdlib>
 #include <errno.h>
 #include <err.h>
-#include <sys/dnv.h>
+#include <fcntl.h>
 
 Job::Job(const PermissionList &perm, JobCompletion &c, int id, pid_t pid)
   : perm(perm),
@@ -62,41 +62,22 @@ Job::RegisterSocket(std::unique_ptr<MsgSocket> sock)
 }
 
 void
-Job::SendResponse(MsgSocket * sock, nvlist_t *resp, int error)
+Job::SendResponse(MsgSocket * sock, int error)
 {
-	nvlist_add_number(resp, "error", error);
+	SandboxResp resp;
+
+	resp.type = MSG_TYPE_OPEN_REQUEST;
+	resp.error = error;
 	sock->Send(resp);
 }
 
 void
-Job::HandleMessage(MsgSocket * sock, MsgType type, nvlist_t *msg)
+Job::HandleMessage(MsgSocket * sock, const SandboxMsg & msg)
 {
-	nvlist_t *resp = nvlist_create(NV_FLAG_IGNORE_CASE);
-	if (msg == NULL)
-		err(1, "Could not allocate nvlist message");
-
-	if (!nvlist_exists_number(msg, "flags")) {
-		SendResponse(sock, resp, EPROTO);
-		return;
-	}
-	mode_t mode = nvlist_take_number(msg, "flags");
-
-	auto path = std::unique_ptr<char[], decltype(&std::free)>(
-		dnvlist_take_string(msg, "path", NULL), &std::free);
-	if (path == NULL) {
-		SendResponse(sock, resp, EPROTO);
-		return;
-	}
-
-	if (!nvlist_empty(msg)) {
-		SendResponse(sock, resp, EPROTO);
-		return;
-	}
-
-	int permitted = perm.IsPermitted(path.get(), mode);
+	int permitted = perm.IsPermitted(msg.open.path, msg.open.flags & O_ACCMODE);
 	if (permitted != 0) {
-// 		fprintf(stderr, "Denied access to '%s'\n", path.get());
+		fprintf(stderr, "Denied access to '%s' for %x\n", msg.open.path, msg.open.flags);
 	}
 
-	SendResponse(sock, resp, permitted);
+	SendResponse(sock, permitted);
 }

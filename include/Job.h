@@ -50,7 +50,7 @@ private:
 	uint64_t jobId;
 	pid_t pid;
 
-	void SendResponse(MsgSocket * sock, nvlist_t *resp, int error);
+	void SendResponse(MsgSocket * sock, int error);
 
 public:
 	Job(const PermissionList &, JobCompletion &, int id, pid_t pid);
@@ -62,7 +62,7 @@ public:
 	Job & operator=(Job &&) = delete;
 
 	void RegisterSocket(std::unique_ptr<MsgSocket> sock);
-	void HandleMessage(MsgSocket * sock, MsgType type, nvlist_t *msg);
+	void HandleMessage(MsgSocket * sock, const SandboxMsg &);
 	void Complete(int status);
 
 	int GetJobId() const
