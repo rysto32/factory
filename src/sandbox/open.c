@@ -45,6 +45,9 @@ open(const char * path, int flags, ...)
 	mode_t mode;
 	int error;
 
+	if (msg_sock_fd < 0)
+		initialize();
+
 	msg.type = MSG_TYPE_OPEN_REQUEST;
 	msg.open.flags = flags;
 	strlcpy(msg.open.path, path, sizeof(msg.open.path));

@@ -36,8 +36,6 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-static void initialize(void) __attribute__((constructor));
-
 closefrom_t * real_closefrom;
 fexecve_t * real_fexecve;
 open_t *real_open;
@@ -68,9 +66,10 @@ send_sandbox_msg(struct SandboxMsg * msg)
 		return -1;
 }
 
-static void
+void
 initialize(void)
 {
+// 	write(2, "initialize start\n", sizeof("initialize start\n"));
 	struct SandboxMsg msg;
 	long page_size = sysconf(_SC_PAGE_SIZE);
 
@@ -113,5 +112,5 @@ initialize(void)
 	if (error != 0)
 		err(1, "Could not send init msg");
 
-// 	write(2, "initialize\n", sizeof("initialize\n"));
+//  	write(2, "initialize\n", sizeof("initialize\n"));
 }

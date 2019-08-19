@@ -48,6 +48,7 @@ extern closefrom_t * real_closefrom;
 extern struct FactoryShm *shm;
 extern int msg_sock_fd;
 
+void initialize(void) __attribute__((constructor));
 int send_sandbox_msg(struct SandboxMsg * msg);
 
 #ifdef __cplusplus
