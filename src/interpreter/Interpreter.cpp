@@ -227,44 +227,42 @@ Interpreter::IncludeScriptWrapper(lua_State *lua)
 	return GetInterpreter(lua)->Include("factory.include_script", IncludeFile::SCRIPT);
 }
 
+auto
+Interpreter::GetFunctionCallback(Lua::Function & func)
+{
+	return [&func](const std::string & name, Lua::Function && f)
+		{
+			func = std::move(f);
+		};
+}
+
+auto
+Interpreter::GetStringListCallback(std::vector<std::string> & list)
+{
+	return make_visitor(
+		[&list](const std::string & name, std::string && value)
+		{
+			list.emplace_back(std::move(value));
+		},
+		[&list](const std::string & name, Lua::Table &table)
+		{
+			list = GetStringList(table);
+		}
+	);
+}
+
 void
 Interpreter::ParseDefinition(Lua::Table & def)
 {
 	std::vector<std::string> ingestedConfigs;
 	Lua::Function callback;
 
-	def.IterateMap(make_visitor(
-		[&ingestedConfigs,&def](const std::string & name, Lua::Table && value)
-		{
-			if (name == "name") {
-				ingestedConfigs = GetStringList(value);
-			} else if (name == "process") {
-				errx(1, "process field in definition must be a function");
-			} else {
-				errx(1, "Unexpected field '%s' in %s\n", name.c_str(), def.GetNamedValue().ToString().c_str());
-			}
-		},
-		[&ingestedConfigs,&def](const std::string & name, const std::string & value)
-		{
-			if (name == "name") {
-				ingestedConfigs.push_back(value);
-			} else if (name == "process") {
-				errx(1, "process field in definition must be a function");
-			} else {
-				errx(1, "Unexpected field '%s' in %s\n", name.c_str(), def.GetNamedValue().ToString().c_str());
-			}
-		},
-		[&callback,&def](const std::string & name, Lua::Function && func)
-		{
-			if (name == "process") {
-				callback = std::move(func);
-			} else if (name == "name") {
-				errx(1, "name field is definition must be a list of strings");
-			} else {
-				errx(1, "Unexpected field '%s' in %s\n", name.c_str(), def.GetNamedValue().ToString().c_str());
-			}
-		}
-	));
+	Lua::ValueParser parser {
+		Lua::FieldSpec("name", GetStringListCallback(ingestedConfigs)),
+		Lua::FieldSpec("process", GetFunctionCallback(callback))
+	};
+
+	def.ParseMap(parser);
 
 	ingestMgr.AddIngest(std::move(ingestedConfigs), std::move(callback));
 }

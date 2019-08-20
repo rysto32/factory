@@ -48,6 +48,7 @@ class PermissionList;
 
 namespace Lua
 {
+	class Function;
 	class NamedValue;
 	class Table;
 	class View;
@@ -137,20 +138,8 @@ class Interpreter
 	
 	CommandOptions GetCommandOptions(Lua::Table &);
 
-
-	auto GetStringListCallback(std::vector<std::string> & list)
-	{
-		return make_visitor(
-			[&list](const std::string & name, std::string && value)
-			{
-				list.emplace_back(std::move(value));
-			},
-			[&list](const std::string & name, Lua::Table &table)
-			{
-				list = GetStringList(table);
-			}
-		);
-	}
+	auto GetFunctionCallback(Lua::Function & func);
+	auto GetStringListCallback(std::vector<std::string> & list);
 
 public:
 	Interpreter(IngestManager &, CommandFactory &);
