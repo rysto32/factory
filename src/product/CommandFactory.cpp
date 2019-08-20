@@ -45,7 +45,7 @@ void
 CommandFactory::AddCommand(const std::vector<std::string> & productList,
     const std::vector<std::string> & inputPaths,
     std::vector<std::string> && argList,
-    const CommandOptions & options)
+    CommandOptions && options)
 {
 	PermissionList permList;
 	std::vector<Product*> inputs, products;
@@ -72,5 +72,6 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 		productManager.SetInputs(product, inputs);
 	}
 
-	commandList.emplace_back(std::make_unique<Command>(std::move(products), std::move(argList), std::move(permList)));
+	commandList.emplace_back(std::make_unique<Command>(std::move(products), std::move(argList),
+	    std::move(permList), std::move(options.workdir)));
 }

@@ -146,7 +146,7 @@ int main(int argc, char **argv)
 	JobManager jobManager(loop, msgSock.get(), jobQueue);
 	MsgSocketServer server(std::move(msgSock), loop, jobManager);
 	SimpleCompletion completer(loop);
-	Command pending({}, std::move(list), std::move(perms));
+	Command pending({}, std::move(list), std::move(perms), {});
 
 	Job * job = jobManager.StartJob(pending, completer);
 	if (job == NULL)

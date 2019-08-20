@@ -31,8 +31,12 @@
 #include "Product.h"
 
 
-Command::Command(ProductList && products, ArgList && a, PermissionList && perm)
-  : products(products), argList(a), permissions(std::move(perm))
+Command::Command(ProductList && products, ArgList && a, PermissionList && perm,
+    std::optional<std::string> && wd)
+  : products(std::move(products)),
+    argList(std::move(a)),
+    permissions(std::move(perm)),
+    workdir(std::move(wd))
 {
 	for (Product * p : products) {
 		p->SetCommand(this);

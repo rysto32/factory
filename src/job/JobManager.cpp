@@ -180,10 +180,12 @@ done:
 }
 
 static int
-StartChild(const std::vector<char *> & argp, const std::vector<char *> & envpm, const char *path, int shm_fd) __attribute__((noreturn));
+StartChild(const std::vector<char *> & argp, const std::vector<char *> & envpm, const char *path, int shm_fd,
+    const std::optional<std::string> & workdir) __attribute__((noreturn));
 
 static int
-StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, const char *path, int shm_fd)
+StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, const char *path, int shm_fd,
+    const std::optional<std::string> & workdir)
 {
 	int fd = dup2(shm_fd, SHARED_MEM_FD);
 	if (fd < 0) {
@@ -195,6 +197,13 @@ StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, c
 	if (error < 0) {
 		perror("Could not disable close-on-exec");
 		exit(1);
+	}
+	
+	if (workdir) {
+		int error = chdir(workdir->c_str());
+		if (error != 0) {
+			err(1, "Could not change cwd to '%s'\n", workdir->c_str());
+		}
 	}
 
 	closefrom(SHARED_MEM_FD + 1);
@@ -263,7 +272,7 @@ JobManager::StartJob(Command & command, JobCompletion & completer)
 		return NULL;
 
 	if (child == 0) {
-		StartChild(argp, envp, path, shm->GetFD());
+		StartChild(argp, envp, path, shm->GetFD(), command.GetWorkDir());
 	} else {
 		auto job = std::make_unique<Job>(command.GetPermissions(), completer, jobId, child);
 

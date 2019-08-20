@@ -138,8 +138,9 @@ class Interpreter
 	
 	CommandOptions GetCommandOptions(Lua::Table &);
 
-	auto GetFunctionCallback(Lua::Function & func);
-	auto GetStringListCallback(std::vector<std::string> & list);
+	auto FunctionField(Lua::Function & func);
+	auto StringField(std::optional<std::string> &);
+	auto StringListField(std::vector<std::string> & list);
 
 public:
 	Interpreter(IngestManager &, CommandFactory &);

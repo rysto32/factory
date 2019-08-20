@@ -29,6 +29,7 @@
 #ifndef PENDING_JOB_H
 #define PENDING_JOB_H
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -47,9 +48,10 @@ class Command : public JobCompletion
 
 	ArgList argList;
 	PermissionList permissions;
+	std::optional<std::string> workdir;
 
 public:
-	Command (ProductList && products, ArgList && a, PermissionList && p);
+	Command (ProductList && products, ArgList && a, PermissionList && p, std::optional<std::string> && wd);
 	virtual ~Command() = default;
 
 	Command (const Command &) = delete;
@@ -68,6 +70,11 @@ public:
 	const PermissionList & GetPermissions() const
 	{
 		return permissions;
+	}
+	
+	const std::optional<std::string> & GetWorkDir()
+	{
+		return workdir;
 	}
 };
 

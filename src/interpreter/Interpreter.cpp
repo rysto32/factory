@@ -228,7 +228,7 @@ Interpreter::IncludeScriptWrapper(lua_State *lua)
 }
 
 auto
-Interpreter::GetFunctionCallback(Lua::Function & func)
+Interpreter::FunctionField(Lua::Function & func)
 {
 	return [&func](const std::string & name, Lua::Function && f)
 		{
@@ -237,14 +237,23 @@ Interpreter::GetFunctionCallback(Lua::Function & func)
 }
 
 auto
-Interpreter::GetStringListCallback(std::vector<std::string> & list)
+Interpreter::StringField(std::optional<std::string> & str)
+{
+	return [&str](const std::string & name, std::string && value)
+		{
+			str = std::move(value);
+		};
+}
+
+auto
+Interpreter::StringListField(std::vector<std::string> & list)
 {
 	return make_visitor(
 		[&list](const std::string & name, std::string && value)
 		{
 			list.emplace_back(std::move(value));
 		},
-		[&list](const std::string & name, Lua::Table &table)
+		[&list](const std::string & name, Lua::Table && table)
 		{
 			list = GetStringList(table);
 		}
@@ -258,8 +267,8 @@ Interpreter::ParseDefinition(Lua::Table & def)
 	Lua::Function callback;
 
 	Lua::ValueParser parser {
-		Lua::FieldSpec("name", GetStringListCallback(ingestedConfigs)),
-		Lua::FieldSpec("process", GetFunctionCallback(callback))
+		Lua::FieldSpec("name", StringListField(ingestedConfigs)),
+		Lua::FieldSpec("process", FunctionField(callback))
 	};
 
 	def.ParseMap(parser);
@@ -310,8 +319,8 @@ Interpreter::GetCommandOptions(Lua::Table &table)
 	CommandOptions opt;
 	
 	Lua::ValueParser parser {
-		Lua::FieldSpec("tmpdirs", GetStringListCallback(opt.tmpdirs))
-		    .Optional(true)
+		Lua::FieldSpec("tmpdirs", StringListField(opt.tmpdirs)).Optional(true),
+		Lua::FieldSpec("workdir", StringField(opt.workdir)).Optional(true)
 	};
 	
 	table.ParseMap(parser);
@@ -333,7 +342,6 @@ Interpreter::DefineCommand()
 	auto products = GetStringList(lua, productsArg);
 	auto inputs = GetStringList(lua, inputsArg);
 	auto argList = GetStringList(lua, argListArg);
-	
 
 	auto optTable = lua.GetTable(optionsArg);
 	CommandOptions options = GetCommandOptions(optTable);
@@ -342,7 +350,7 @@ Interpreter::DefineCommand()
 		errx(1, "In %s: cannot be empty", argListArg.ToString().c_str());
 	}
 
-	commandFactory.AddCommand(products, inputs, std::move(argList), options);
+	commandFactory.AddCommand(products, inputs, std::move(argList), std::move(options));
 
 	return 0;
 }

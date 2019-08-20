@@ -30,6 +30,7 @@
 #define COMMAND_FACTORY_H
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -42,6 +43,7 @@ class ProductManager;
 struct CommandOptions
 {
 	std::vector<std::string> tmpdirs;
+	std::optional<std::string> workdir;
 };
 
 class CommandFactory
@@ -54,7 +56,7 @@ public:
 	void AddCommand(const std::vector<std::string> & products,
 	    const std::vector<std::string> & inputs,
 	    std::vector<std::string> && argList,
-	    const CommandOptions & options);
+	    CommandOptions && options);
 };
 
 #endif
