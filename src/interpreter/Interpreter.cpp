@@ -38,6 +38,7 @@
 #include "lua/NamedValue.h"
 #include "lua/Parameter.h"
 #include "lua/Table.h"
+#include "lua/ValueParser.h"
 #include "lua/View.h"
 
 #include <cassert>

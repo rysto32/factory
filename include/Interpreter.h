@@ -31,6 +31,7 @@
 #define INTERPRETER_H
 
 #include "ConfigNode.h"
+#include "Visitor.h"
 
 #include <deque>
 #include <lua.hpp>
@@ -132,6 +133,20 @@ class Interpreter
 
 	void ProcessSingleConfig(const ConfigNode & parentConfig, const ConfigNode & node);
 	void ProcessMultiConfig(const ConfigNode & parent, const std::vector<ConfigNodePtr> & config);
+
+	auto GetStringListCallback(std::vector<std::string> & list)
+	{
+		return make_visitor(
+			[&list](const std::string & name, std::string && value)
+			{
+				list.emplace_back(std::move(value));
+			},
+			[&list](const std::string & name, Lua::Table &table)
+			{
+				list = GetStringList(table);
+			}
+		);
+	}
 
 public:
 	Interpreter(IngestManager &, CommandFactory &);

@@ -29,6 +29,7 @@
 #ifndef LUA_VIEW_H
 #define LUA_VIEW_H
 
+#include "lua/NamedValue.h"
 #include "lua/Util.h"
 
 #include <lua.hpp>
@@ -44,6 +45,8 @@ namespace Lua
 class Function;
 class NamedValue;
 class Table;
+template <typename... F>
+class ValueParser;
 
 class View
 {
@@ -53,12 +56,114 @@ private:
 
 	friend class Lua::Function;
 	friend class Lua::Table;
+	template <typename...>
+	friend class Lua::ValueParser;
 
 	View(lua_State *l)
 	  : lua(l),
 	    startStackTop(lua_gettop(lua))
 	{
 
+	}
+	
+	Lua::Table MakeTable(const NamedValue & value);
+
+	template <typename F, typename IndexType>
+	static constexpr bool takes_int_value()
+	{
+		return std::is_invocable_v<F, IndexType, int64_t>;
+	}
+
+	template <typename F, typename IndexType>
+	static constexpr bool takes_str_value()
+	{
+		return std::is_invocable_v<F, IndexType, const char *>;
+	}
+
+	template <typename F, typename IndexType>
+	static constexpr bool takes_table_value()
+	{
+		return std::is_invocable_v<F, IndexType, Table&&>;
+	}
+
+	template <typename F, typename IndexType>
+	static constexpr bool takes_func_value()
+	{
+		return std::is_invocable_v<F, IndexType, Function&&>;
+	}
+
+	template <typename F, typename IndexType>
+	static constexpr bool callback_is_invocable()
+	{
+		return takes_int_value<F, IndexType>() ||
+		    takes_str_value<F, IndexType>() ||
+		    takes_table_value<F, IndexType>() ||
+		    takes_func_value<F, IndexType>();
+	}
+
+	template <typename F, typename IndexType>
+	void InvokeIntCallback(const F & func, const NamedValue & subvalue, IndexType index, int stackPos);
+
+	template <typename F, typename IndexType>
+	void InvokeStrCallback(const F & func, const NamedValue & subvalue, IndexType index, int stackPos);
+
+	template <typename F, typename IndexType>
+	void InvokeTableCallback(const F & func, const NamedValue & subvalue, IndexType index, int stackPos);
+
+	template <typename F, typename IndexType>
+	void InvokeFunctionCallback(const F & func, const NamedValue & subvalue, IndexType index, int stackPos);
+
+	template <typename F, typename IndexType>
+	void InvokeCallback(const NamedValue & value, const F & func, IndexType index, int stackPos);
+
+	template <typename F>
+	void InvokeListFunc(const NamedValue & value, const F & func, int stackPos)
+	{
+		static_assert(callback_is_invocable<F, int>(),
+		    "Callback function does not accept correct args");
+		int keyPos = stackPos -  1;
+		if (!lua_isinteger(lua, keyPos)) {
+			errx(1, "Expected a list in %s", value.ToString().c_str());
+		}
+
+		InvokeCallback(value, func, lua_tointeger(lua, keyPos), stackPos);
+	}
+
+	template <typename F>
+	void InvokeMapFunc(const NamedValue & value, const F & func, int stackPos)
+	{
+		static_assert(callback_is_invocable<F, const char *>(),
+		    "Callback function does not accept correct args");
+		int keyPos = stackPos -  1;
+		if (lua_isinteger(lua, keyPos)) {
+			errx(1, "Expected a map in %s", value.ToString().c_str());
+		}
+
+		InvokeCallback(value, func, lua_tostring(lua, keyPos), stackPos);
+	}
+
+	template <typename F>
+	void InvokeAnyFunc(const NamedValue & value, const F & func, int stackPos)
+	{
+		/* Sanity test that F can handle both lists and tables. */
+		static_assert(!(!callback_is_invocable<F, int>() &&
+		    callback_is_invocable<F, const char *>()),
+		    "Callback function must accept int indices");
+		static_assert(!(callback_is_invocable<F, int>() &&
+		    !callback_is_invocable<F, const char *>()),
+		    "Callback function must accept const char * indices");
+
+		static_assert(callback_is_invocable<F, int>() &&
+		    callback_is_invocable<F, const char *>(),
+		    "Callback function does not accept correct args");
+
+		int keyPos = stackPos -  1;
+		if (lua_isinteger(lua, keyPos)) {
+			InvokeCallback(value, func, lua_tointeger(lua, keyPos), stackPos);
+		} else {
+			assert (lua_isstring(lua, keyPos));
+			InvokeCallback(value, func, lua_tostring(lua, keyPos), stackPos);
+		}
 	}
 
 public:

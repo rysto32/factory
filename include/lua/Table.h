@@ -31,6 +31,7 @@
 
 #include "lua/Function.h"
 #include "lua/NamedValue.h"
+#include "lua/ValueParser.h"
 #include "lua/View.h"
 
 #include <cassert>
@@ -58,150 +59,6 @@ private:
 
 	friend class View;
 
-	template <typename F, typename IndexType>
-	static constexpr bool takes_int_value()
-	{
-		return std::is_invocable_v<F, IndexType, int64_t>;
-	}
-
-	template <typename F, typename IndexType>
-	static constexpr bool takes_str_value()
-	{
-		return std::is_invocable_v<F, IndexType, const char *>;
-	}
-
-	template <typename F, typename IndexType>
-	static constexpr bool takes_table_value()
-	{
-		return std::is_invocable_v<F, IndexType, Table&&>;
-	}
-
-	template <typename F, typename IndexType>
-	static constexpr bool takes_func_value()
-	{
-		return std::is_invocable_v<F, IndexType, Function&&>;
-	}
-
-	template <typename F, typename IndexType>
-	static constexpr bool callback_is_invocable()
-	{
-		return takes_int_value<F, IndexType>() ||
-		    takes_str_value<F, IndexType>() ||
-		    takes_table_value<F, IndexType>() ||
-		    takes_func_value<F, IndexType>();
-	}
-
-	template <typename F, typename IndexType>
-	void
-	InvokeIntListFunc(const F & func, const NamedValue & subvalue, IndexType index, int stackPos)
-	{
-		if constexpr (takes_int_value<F, IndexType>())
-			func(index, lua_tointeger(lua, stackPos));
-		else
-			errx(1, "Did not expect an int in %s", subvalue.ToString().c_str());
-	}
-
-	template <typename F, typename IndexType>
-	void
-	InvokeStrListFunc(const F & func, const NamedValue & subvalue, IndexType index, int stackPos)
-	{
-		if constexpr (takes_str_value<F, IndexType>())
-			func(index, lua_tostring(lua, stackPos));
-		else
-			errx(1, "Did not expect a string in %s", subvalue.ToString().c_str());
-	}
-
-	template <typename F, typename IndexType>
-	void
-	InvokeTableListFunc(const F & func, const NamedValue & subvalue, IndexType index, int stackPos)
-	{
-		if constexpr (takes_table_value<F, IndexType>()) {
-			View view(lua.GetLua());
-			Table table(view, subvalue);
-			func(index, std::move(table));
-		} else {
-			errx(1, "Did not expect a table in %s", subvalue.ToString().c_str());
-		}
-	}
-	template <typename F, typename IndexType>
-	void
-	InvokeFunctionListFunc(const F & func, const NamedValue & subvalue, IndexType index, int stackPos)
-	{
-		if constexpr (takes_func_value<F, IndexType>()) {
-			func(index, Function(lua, stackPos));
-		} else {
-			errx(1, "Did not expect a table in %s", subvalue.ToString().c_str());
-		}
-	}
-
-	template <typename F, typename IndexType>
-	void InvokeFunc(const F & func, IndexType index, int stackPos)
-	{
-		NamedValue subvalue(value, index, stackPos);
-		if (lua_isinteger(lua, stackPos)) {
-			InvokeIntListFunc(func, subvalue, index, stackPos);
-		} else if (lua_isstring(lua, stackPos)) {
-			InvokeStrListFunc(func, subvalue, index, stackPos);
-		} else if (lua_istable(lua, stackPos)) {
-			InvokeTableListFunc(func, subvalue, index, stackPos);
-		} else if (lua_isfunction(lua, stackPos)) {
-			InvokeFunctionListFunc(func, subvalue, index, stackPos);
-		} else {
-			errx(1, "Invalid type '%s' in %s",
-			     lua_typename(lua, stackIndex), subvalue.ToString().c_str());
-		}
-	}
-
-	template <typename F>
-	void InvokeListFunc(const F & func, int stackPos)
-	{
-		static_assert(callback_is_invocable<F, int>(),
-		    "Callback function does not accept correct args");
-		int keyPos = stackPos -  1;
-		if (!lua_isinteger(lua, keyPos)) {
-			errx(1, "Expected a list in %s", value.ToString().c_str());
-		}
-
-		InvokeFunc(func, lua_tointeger(lua, keyPos), stackPos);
-	}
-
-	template <typename F>
-	void InvokeTableFunc(const F & func, int stackPos)
-	{
-		static_assert(callback_is_invocable<F, const char *>(),
-		    "Callback function does not accept correct args");
-		int keyPos = stackPos -  1;
-		if (!lua_isstring(lua, keyPos)) {
-			errx(1, "Expected a table in %s", value.ToString().c_str());
-		}
-
-		InvokeFunc(func, lua_tostring(lua, keyPos), stackPos);
-	}
-
-	template <typename F>
-	void InvokeAnyFunc(const F & func, int stackPos)
-	{
-		/* Sanity test that F can handle both lists and tables. */
-		static_assert(!(!callback_is_invocable<F, int>() &&
-		    callback_is_invocable<F, const char *>()),
-		    "Callback function must accept int indices");
-		static_assert(!(callback_is_invocable<F, int>() &&
-		    !callback_is_invocable<F, const char *>()),
-		    "Callback function must accept const char * indices");
-
-		static_assert(callback_is_invocable<F, int>() &&
-		    callback_is_invocable<F, const char *>(),
-		    "Callback function does not accept correct args");
-
-		int keyPos = stackPos -  1;
-		if (lua_isinteger(lua, keyPos)) {
-			InvokeFunc(func, lua_tointeger(lua, keyPos), stackPos);
-		} else {
-			assert (lua_isstring(lua, keyPos));
-			InvokeFunc(func, lua_tostring(lua, keyPos), stackPos);
-		}
-	}
-
 public:
 	View & GetView()
 	{
@@ -216,7 +73,7 @@ public:
 
 		lua_pushnil(lua);
 		while (lua_next(lua, stackIndex) != 0) {
-			InvokeListFunc(func, -1);
+			lua.InvokeListFunc(value, func, -1);
 			lua_pop(lua, 1);
 		}
 	}
@@ -229,7 +86,7 @@ public:
 
 		lua_pushnil(lua);
 		while (lua_next(lua, stackIndex) != 0) {
-			InvokeTableFunc(func, -1);
+			lua.InvokeMapFunc(value, func, -1);
 			lua_pop(lua, 1);
 		}
 	}
@@ -242,7 +99,24 @@ public:
 
 		lua_pushnil(lua);
 		while (lua_next(lua, stackIndex) != 0) {
-			InvokeAnyFunc(func, -1);
+			lua.InvokeAnyFunc(value, func, -1);
+			lua_pop(lua, 1);
+		}
+	}
+	
+	template <typename... C>
+	void ParseMap(const ValueParser<C...> parser)
+	{
+		if (!lua_istable(lua, stackIndex))
+			errx(1, "Expected a table in %s, got %s", value.ToString().c_str(),
+			     lua_typename(lua, stackIndex));
+
+		lua_pushnil(lua);
+		while (lua_next(lua, stackIndex) != 0) {
+			if (lua_isinteger(lua, -2))
+				errx(1, "Expected a map in %s", value.ToString().c_str());
+
+			parser.Parse(lua, value, lua_tostring(lua, -2), -1);
 			lua_pop(lua, 1);
 		}
 	}
@@ -271,6 +145,8 @@ public:
 	}
 };
 }
+
+#include "lua/ViewImpl.h"
 
 #endif
 

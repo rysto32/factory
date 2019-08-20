@@ -51,7 +51,7 @@ private:
 	lua_State *lua;
 	int ref;
 
-	Function(Lua::View &l, int index)
+	Function(lua_State *l, int index)
 	  : lua(l),
 	    ref(LUA_NOREF)
 	{
@@ -62,7 +62,7 @@ private:
 	Function(const Function&) = delete;
 	Function & operator=(const Function &) = delete;
 
-	friend class Table;
+	friend class View;
 
 	template <typename T, typename... Args>
 	void DoCall(int handlerIndex, int argCount, const T & type, const Args &... rest)
