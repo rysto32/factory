@@ -105,11 +105,13 @@ public:
 	}
 	
 	template <typename... C>
-	void ParseMap(const ValueParser<C...> parser)
+	void ParseMap(ValueParser<C...> & parser)
 	{
 		if (!lua_istable(lua, stackIndex))
 			errx(1, "Expected a table in %s, got %s", value.ToString().c_str(),
 			     lua_typename(lua, stackIndex));
+
+		parser.Reset();
 
 		lua_pushnil(lua);
 		while (lua_next(lua, stackIndex) != 0) {
@@ -119,6 +121,8 @@ public:
 			parser.Parse(lua, value, lua_tostring(lua, -2), -1);
 			lua_pop(lua, 1);
 		}
+
+		parser.CheckRequiredFields(value);
 	}
 
 	const char * GetString(const char * name)

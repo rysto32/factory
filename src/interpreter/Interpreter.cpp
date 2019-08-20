@@ -311,6 +311,7 @@ Interpreter::GetCommandOptions(Lua::Table &table)
 	
 	Lua::ValueParser parser {
 		Lua::FieldSpec("tmpdirs", GetStringListCallback(opt.tmpdirs))
+		    .Optional(true)
 	};
 	
 	table.ParseMap(parser);
