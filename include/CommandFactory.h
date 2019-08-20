@@ -39,6 +39,11 @@ class Product;
 class PermissionList;
 class ProductManager;
 
+struct CommandOptions
+{
+	std::vector<std::string> tmpdirs;
+};
+
 class CommandFactory
 {
 	ProductManager &productManager;
@@ -49,7 +54,7 @@ public:
 	void AddCommand(const std::vector<std::string> & products,
 	    const std::vector<std::string> & inputs,
 	    std::vector<std::string> && argList,
-	    const std::vector<std::string> & tmpdirs);
+	    const CommandOptions & options);
 };
 
 #endif

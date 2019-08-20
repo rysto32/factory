@@ -306,6 +306,20 @@ Interpreter::GetStringList(Lua::Table & configList)
 	return list;
 }
 
+CommandOptions 
+Interpreter::GetCommandOptions(Lua::Table &table)
+{
+	CommandOptions opt;
+	
+	Lua::ValueParser parser {
+		Lua::FieldSpec("tmpdirs", GetStringListCallback(opt.tmpdirs))
+	};
+	
+	table.ParseMap(parser);
+	
+	return opt;
+}
+
 // factory.define_command(products, inputs, arglist)
 int
 Interpreter::DefineCommand()
@@ -315,18 +329,21 @@ Interpreter::DefineCommand()
 	Lua::Parameter productsArg("factory.define_command", "products", 1);
 	Lua::Parameter inputsArg("factory.define_command", "inputs", 2);
 	Lua::Parameter argListArg("factory.define_command", "argList", 3);
-	Lua::Parameter tmpdirsArg("factory.define_command", "tmpdirs", 4);
+	Lua::Parameter optionsArg("factory.define_command", "options", 4);
 
 	auto products = GetStringList(lua, productsArg);
 	auto inputs = GetStringList(lua, inputsArg);
 	auto argList = GetStringList(lua, argListArg);
-	auto tmpdirs = GetStringList(lua, tmpdirsArg);
+	
+
+	auto optTable = lua.GetTable(optionsArg);
+	CommandOptions options = GetCommandOptions(optTable);
 	
 	if (argList.empty()) {
 		errx(1, "In %s: cannot be empty", argListArg.ToString().c_str());
 	}
 
-	commandFactory.AddCommand(products, inputs, std::move(argList), tmpdirs);
+	commandFactory.AddCommand(products, inputs, std::move(argList), options);
 
 	return 0;
 }

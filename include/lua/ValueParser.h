@@ -36,12 +36,12 @@
 namespace Lua
 {
 template <typename Callback>
-struct CallbackSpec
+struct FieldSpec
 {
 	std::string_view name;
 	Callback callback;
 	
-	CallbackSpec(std::string_view && n, Callback &&c)
+	FieldSpec(std::string_view && n, Callback &&c)
 	  : name(n), callback(c)
 	{
 	}
@@ -50,11 +50,11 @@ struct CallbackSpec
 template <typename... Callbacks>
 class ValueParser
 {
-	std::tuple<CallbackSpec<Callbacks>...> callbackList;
+	std::tuple<FieldSpec<Callbacks>...> callbackList;
 	
 	template <typename F, typename... Rest>
 	static void TryParser(Lua::View & lua, const NamedValue & value, const char * name,
-	    int valuePos, const CallbackSpec<F> & cb, Rest... rest)
+	    int valuePos, const FieldSpec<F> & cb, Rest... rest)
 	{
 		if (cb.name == name) {
 			lua.InvokeMapFunc(value, cb.callback, valuePos);
@@ -71,14 +71,14 @@ class ValueParser
 	}
 	
 public:
-	explicit ValueParser(CallbackSpec<Callbacks>... cb)
+	explicit ValueParser(FieldSpec<Callbacks>... cb)
 	  : callbackList(std::make_tuple(cb...))
 	{
 	}
 	
 	void Parse(Lua::View & lua, const NamedValue & value, const char * name, int valuePos) const
 	{
-		std::apply([&lua,&value,name,valuePos](CallbackSpec<Callbacks>... cb)
+		std::apply([&lua,&value,name,valuePos](FieldSpec<Callbacks>... cb)
 		{
 			TryParser(lua, value, name, valuePos, cb...);
 		}, callbackList);

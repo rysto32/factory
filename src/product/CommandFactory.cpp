@@ -45,7 +45,7 @@ void
 CommandFactory::AddCommand(const std::vector<std::string> & productList,
     const std::vector<std::string> & inputPaths,
     std::vector<std::string> && argList,
-    const std::vector<std::string> & tmpdirs)
+    const CommandOptions & options)
 {
 	PermissionList permList;
 	std::vector<Product*> inputs, products;
@@ -61,7 +61,7 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 		inputs.push_back(input);
 	}
 
-	for (auto & path : tmpdirs) {
+	for (auto & path : options.tmpdirs) {
 		permList.AddPermission(path, Permission::READ | Permission::WRITE);
 	}
 

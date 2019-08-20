@@ -59,7 +59,10 @@ definitions = {
 					include_path
 				}
 
-				factory.define_command({objpath}, inputs, arglist, objdir)
+				options = {
+					tmpdirs = objdir
+				}
+				factory.define_command({objpath}, inputs, arglist, options)
 
 				table.insert(objs, objpath)
 			end
@@ -96,7 +99,10 @@ definitions = {
 				libpaths
 			)
 
-			factory.define_command(prog_path, inputs, arglist, bindir)
+			options = {
+				tmpdirs = bindir
+			}
+			factory.define_command(prog_path, inputs, arglist, options)
 		end
 	},
 	{

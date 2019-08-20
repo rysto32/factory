@@ -42,6 +42,7 @@
 
 struct PermissionConf;
 class CommandFactory;
+struct CommandOptions;
 class IngestManager;
 class PermissionList;
 
@@ -133,6 +134,9 @@ class Interpreter
 
 	void ProcessSingleConfig(const ConfigNode & parentConfig, const ConfigNode & node);
 	void ProcessMultiConfig(const ConfigNode & parent, const std::vector<ConfigNodePtr> & config);
+	
+	CommandOptions GetCommandOptions(Lua::Table &);
+
 
 	auto GetStringListCallback(std::vector<std::string> & list)
 	{
