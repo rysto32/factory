@@ -31,9 +31,9 @@
 #include "Product.h"
 
 
-Command::Command(ProductList && products, ArgList && a, PermissionList && perm,
+Command::Command(ProductList && productList, ArgList && a, PermissionList && perm,
     std::optional<std::string> && wd)
-  : products(std::move(products)),
+  : products(std::move(productList)),
     argList(std::move(a)),
     permissions(std::move(perm)),
     workdir(std::move(wd))
