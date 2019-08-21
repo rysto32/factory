@@ -44,7 +44,6 @@ class ProductManager
 	std::unordered_map<Path, std::unique_ptr<Product>> products;
 	JobQueue & jobQueue;
 
-	static bool ProductExists(const Product * product);
 	static bool FileExists(const Path & path);
 
 	void AddDependency(Product * product, Product * input);

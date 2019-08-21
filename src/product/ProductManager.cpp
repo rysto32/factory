@@ -93,16 +93,22 @@ ProductManager::CheckNeedsBuild(Product * product, const Product * input)
 {
 
 	if (input->NeedsBuild()) {
-// 		fprintf(stderr, "'%s' needs build because '%s' needs build\n", product->GetPath().c_str(), input->GetPath().c_str());
+		fprintf(stderr, "'%s' needs build because '%s' needs build\n", product->GetPath().c_str(), input->GetPath().c_str());
 		product->SetNeedsBuild();
 		return true;
 	}
 
 	try {
-		if (!ProductExists(product)) {
+		auto productStatus = fs::status(product->GetPath());
+		if (!fs::exists(productStatus)) {
 // 			fprintf(stderr, "'%s' needs build because it doesn't exist\n", product->GetPath().c_str());
 			product->SetNeedsBuild();
 			return true;
+		}
+
+		if (fs::is_directory(productStatus)) {
+			/* A directory can not be rebuilt, so if it already exists, we are done. */
+			return false;
 		}
 
 		auto inputStatus = fs::status(input->GetPath());
@@ -152,12 +158,6 @@ ProductManager::FileExists(const Path & path)
 	std::error_code error;
 
 	return fs::exists(path, error) && !error;
-}
-
-bool
-ProductManager::ProductExists(const Product * product)
-{
-	return FileExists(product->GetPath());
 }
 
 void
