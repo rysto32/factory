@@ -51,6 +51,10 @@ ProductManager::MakeProduct(const Path & path)
 	Product * ptr = product.get();
 	products.insert(std::make_pair(path, std::move(product)));
 
+	if (!FileExists(path)) {
+		ptr->SetNeedsBuild();
+	}
+
 	return ptr;
 }
 
@@ -208,7 +212,7 @@ ProductManager::SubmitLeafJobs()
 
 		if (product->NeedsBuild() && product->IsReady()) {
 // 			fprintf(stderr, "%s is ready\n", product->GetPath().c_str());
-			jobQueue.Submit(product->GetPendingJob());
+			SubmitProductJob(product);
 		}
 	}
 }
@@ -217,5 +221,19 @@ void
 ProductManager::ProductReady(Product *p)
 {
 	if (p->NeedsBuild())
-		jobQueue.Submit(p->GetPendingJob());
+		SubmitProductJob(p);
+}
+
+void
+ProductManager::SubmitProductJob(Product *product)
+{
+	Command * c = product->GetCommand();
+
+	if (!c) {
+		Product * dependee = product->GetDependees().front();
+		errx(1, "No rule to make product '%s', needed by '%s'",
+		    product->GetPath().c_str(), dependee->GetPath().c_str());
+	}
+
+	jobQueue.Submit(c);
 }

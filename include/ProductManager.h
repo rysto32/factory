@@ -54,6 +54,8 @@ class ProductManager
 	Product * FindProduct(const Path &);
 	Product * MakeProduct(const Path &);
 
+	void SubmitProductJob(Product *product);
+
 public:
 	ProductManager(JobQueue &);
 

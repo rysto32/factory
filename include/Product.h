@@ -71,9 +71,8 @@ public:
 		return path;
 	}
 
-	Command * GetPendingJob()
+	Command * GetCommand()
 	{
-		assert (command);
 		return command;
 	}
 
