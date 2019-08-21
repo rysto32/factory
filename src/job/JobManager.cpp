@@ -181,11 +181,11 @@ done:
 
 static int
 StartChild(const std::vector<char *> & argp, const std::vector<char *> & envpm, const char *path, int shm_fd,
-    const std::optional<std::string> & workdir) __attribute__((noreturn));
+    const Path & workdir) __attribute__((noreturn));
 
 static int
 StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, const char *path, int shm_fd,
-    const std::optional<std::string> & workdir)
+    const Path & workdir)
 {
 	int fd = dup2(shm_fd, SHARED_MEM_FD);
 	if (fd < 0) {
@@ -198,12 +198,10 @@ StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, c
 		perror("Could not disable close-on-exec");
 		exit(1);
 	}
-	
-	if (workdir) {
-		int error = chdir(workdir->c_str());
-		if (error != 0) {
-			err(1, "Could not change cwd to '%s'\n", workdir->c_str());
-		}
+
+	error = chdir(workdir.c_str());
+	if (error != 0) {
+		err(1, "Could not change cwd to '%s'\n", workdir.c_str());
 	}
 
 	closefrom(SHARED_MEM_FD + 1);
@@ -274,7 +272,7 @@ JobManager::StartJob(Command & command, JobCompletion & completer)
 	if (child == 0) {
 		StartChild(argp, envp, path, shm->GetFD(), command.GetWorkDir());
 	} else {
-		auto job = std::make_unique<Job>(command.GetPermissions(), completer, jobId, child);
+		auto job = std::make_unique<Job>(command.GetPermissions(), completer, jobId, child, command.GetWorkDir());
 
 		pidMap.insert(std::make_pair(child, job.get()));
 		auto ins = jobMap.insert(std::make_pair(jobId, std::move(job)));

@@ -32,7 +32,7 @@
 
 
 Command::Command(ProductList && productList, ArgList && a, PermissionList && perm,
-    std::optional<std::string> && wd)
+    Path && wd)
   : products(std::move(productList)),
     argList(std::move(a)),
     permissions(std::move(perm)),

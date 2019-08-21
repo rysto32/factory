@@ -45,17 +45,17 @@ TEST_F(PermissionListTestSuite, TestDirPerm)
 
 	list.AddPermission("/home", Permission::READ);
 
-	EXPECT_EQ(list.IsPermitted("/home/rstone", O_RDONLY), 0);
-	EXPECT_EQ(list.IsPermitted("/home/rstone", O_WRONLY), EPERM);
-	EXPECT_EQ(list.IsPermitted("/home/rstone", O_RDWR), EPERM);
-	EXPECT_EQ(list.IsPermitted("/home/rstone", O_RDONLY | O_EXEC), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/home/rstone", O_RDONLY), 0);
+	EXPECT_EQ(list.IsPermitted({}, "/home/rstone", O_WRONLY), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/home/rstone", O_RDWR), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/home/rstone", O_RDONLY | O_EXEC), EPERM);
 
-	EXPECT_EQ(list.IsPermitted("/hom", O_RDONLY), EPERM);
-	EXPECT_EQ(list.IsPermitted("/homer", O_RDONLY), EPERM);
-	EXPECT_EQ(list.IsPermitted("/home/", O_RDONLY), 0);
-	EXPECT_EQ(list.IsPermitted("/tmp/test", O_RDONLY), EPERM);
-	EXPECT_EQ(list.IsPermitted("/etc", O_RDONLY), EPERM);
-	EXPECT_EQ(list.IsPermitted("/usr/home", O_RDONLY), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/hom", O_RDONLY), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/homer", O_RDONLY), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/home/", O_RDONLY), 0);
+	EXPECT_EQ(list.IsPermitted({}, "/tmp/test", O_RDONLY), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/etc", O_RDONLY), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/usr/home", O_RDONLY), EPERM);
 }
 
 TEST_F(PermissionListTestSuite, TestMultiDirPerm)
@@ -65,18 +65,18 @@ TEST_F(PermissionListTestSuite, TestMultiDirPerm)
 	list.AddPermission("/home", Permission::READ);
 	list.AddPermission("/tmp", Permission::READ);
 
-	EXPECT_EQ(list.IsPermitted("/home/rstone", O_RDONLY), 0);
-	EXPECT_EQ(list.IsPermitted("/home/rstone", O_WRONLY), EPERM);
-	EXPECT_EQ(list.IsPermitted("/home/rstone", O_RDWR), EPERM);
-	EXPECT_EQ(list.IsPermitted("/home/rstone", O_RDONLY | O_EXEC), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/home/rstone", O_RDONLY), 0);
+	EXPECT_EQ(list.IsPermitted({}, "/home/rstone", O_WRONLY), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/home/rstone", O_RDWR), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/home/rstone", O_RDONLY | O_EXEC), EPERM);
 
-	EXPECT_EQ(list.IsPermitted("/tmp/test", O_RDONLY), 0);
+	EXPECT_EQ(list.IsPermitted({}, "/tmp/test", O_RDONLY), 0);
 
-	EXPECT_EQ(list.IsPermitted("/hom", O_RDONLY), EPERM);
-	EXPECT_EQ(list.IsPermitted("/homer", O_RDONLY), EPERM);
-	EXPECT_EQ(list.IsPermitted("/home/", O_RDONLY), 0);
-	EXPECT_EQ(list.IsPermitted("/etc", O_RDONLY), EPERM);
-	EXPECT_EQ(list.IsPermitted("/usr/home", O_RDONLY), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/hom", O_RDONLY), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/homer", O_RDONLY), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/home/", O_RDONLY), 0);
+	EXPECT_EQ(list.IsPermitted({}, "/etc", O_RDONLY), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/usr/home", O_RDONLY), EPERM);
 }
 
 TEST_F(PermissionListTestSuite, TestSubDirPerm)
@@ -85,9 +85,9 @@ TEST_F(PermissionListTestSuite, TestSubDirPerm)
 
 	list.AddPermission("/home", Permission::READ);
 
-	EXPECT_EQ(list.IsPermitted("/home/rstone/tmp", O_RDONLY), 0);
-	EXPECT_EQ(list.IsPermitted("/home/rstone/tmp", O_RDONLY | O_EXEC), EPERM);
-	EXPECT_EQ(list.IsPermitted("/home/rstone/git/factory/src", O_RDONLY), 0);
+	EXPECT_EQ(list.IsPermitted({}, "/home/rstone/tmp", O_RDONLY), 0);
+	EXPECT_EQ(list.IsPermitted({}, "/home/rstone/tmp", O_RDONLY | O_EXEC), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/home/rstone/git/factory/src", O_RDONLY), 0);
 }
 
 TEST_F(PermissionListTestSuite, TestTrailingSlash)
@@ -97,16 +97,16 @@ TEST_F(PermissionListTestSuite, TestTrailingSlash)
 	list.AddPermission("/home/", Permission::READ);
 	list.AddPermission("/tmp//////", Permission::WRITE);
 
-	EXPECT_EQ(list.IsPermitted("/home", O_RDONLY), 0);
-	EXPECT_EQ(list.IsPermitted("/home/", O_RDONLY), 0);
-	EXPECT_EQ(list.IsPermitted("/home/rstone/tmp", O_RDONLY), 0);
-	EXPECT_EQ(list.IsPermitted("/home/rstone/tmp", O_RDONLY | O_EXEC), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/home", O_RDONLY), 0);
+	EXPECT_EQ(list.IsPermitted({}, "/home/", O_RDONLY), 0);
+	EXPECT_EQ(list.IsPermitted({}, "/home/rstone/tmp", O_RDONLY), 0);
+	EXPECT_EQ(list.IsPermitted({}, "/home/rstone/tmp", O_RDONLY | O_EXEC), EPERM);
 
-	EXPECT_EQ(list.IsPermitted("/tmp/test", O_WRONLY), 0);
-	EXPECT_EQ(list.IsPermitted("/tmp/", O_WRONLY), 0);
-	EXPECT_EQ(list.IsPermitted("/tmp/test/foo/bar/baz", O_WRONLY), 0);
-	EXPECT_EQ(list.IsPermitted("/tmptest", O_WRONLY), EPERM);
-	EXPECT_EQ(list.IsPermitted("/tmp/test", O_RDONLY), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/tmp/test", O_WRONLY), 0);
+	EXPECT_EQ(list.IsPermitted({}, "/tmp/", O_WRONLY), 0);
+	EXPECT_EQ(list.IsPermitted({}, "/tmp/test/foo/bar/baz", O_WRONLY), 0);
+	EXPECT_EQ(list.IsPermitted({}, "/tmptest", O_WRONLY), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/tmp/test", O_RDONLY), EPERM);
 }
 
 TEST_F(PermissionListTestSuite, TestRootDirPerm)
@@ -115,9 +115,9 @@ TEST_F(PermissionListTestSuite, TestRootDirPerm)
 
 	list.AddPermission("/", Permission::READ);
 
-	EXPECT_EQ(list.IsPermitted("/etc", O_RDONLY), 0);
-	EXPECT_EQ(list.IsPermitted("/tmp", O_RDONLY), 0);
-	EXPECT_EQ(list.IsPermitted("/home/rstone/tmp", O_RDONLY), 0);
-	EXPECT_EQ(list.IsPermitted("/usr/bin/cc", O_RDONLY | O_EXEC), EPERM);
+	EXPECT_EQ(list.IsPermitted({}, "/etc", O_RDONLY), 0);
+	EXPECT_EQ(list.IsPermitted({}, "/tmp", O_RDONLY), 0);
+	EXPECT_EQ(list.IsPermitted({}, "/home/rstone/tmp", O_RDONLY), 0);
+	EXPECT_EQ(list.IsPermitted({}, "/usr/bin/cc", O_RDONLY | O_EXEC), EPERM);
 }
 

@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "MsgType.h"
+#include "Path.h"
 
 class JobCompletion;
 class MsgSocket;
@@ -49,11 +50,12 @@ private:
 	std::vector<std::unique_ptr<MsgSocket>> sockets;
 	uint64_t jobId;
 	pid_t pid;
+	Path workdir;
 
 	void SendResponse(MsgSocket * sock, int error);
 
 public:
-	Job(const PermissionList &, JobCompletion &, int id, pid_t pid);
+	Job(const PermissionList &, JobCompletion &, int id, pid_t pid, Path wd);
 	~Job();
 
 	Job(const Job &) = delete;

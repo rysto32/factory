@@ -60,7 +60,7 @@ public:
 
 	void AddPermission(const Path &, Permission);
 
-	int IsPermitted(const Path &, int) const;
+	int IsPermitted(const Path & cwd, const Path &, int) const;
 };
 
 #endif

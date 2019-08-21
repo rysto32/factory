@@ -37,7 +37,8 @@
 #include <sys/stat.h>
 
 CommandFactory::CommandFactory(ProductManager &p)
-  : productManager(p)
+  : productManager(p),
+    factoryWorkDir(std::filesystem::current_path())
 {
 }
 
@@ -49,13 +50,22 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 {
 	PermissionList permList;
 	std::vector<Product*> inputs, products;
+	Path workdir;
+
+	if (options.workdir)
+		workdir = std::move(*options.workdir);
+	else
+		workdir = factoryWorkDir;
 
 	Product * exe = productManager.GetProduct(argList.front());
 	inputs.push_back(exe);
 
 	permList.AddPermission(exe->GetPath(), Permission::READ | Permission::EXEC);
 
-	for (auto & path : inputPaths) {
+	for (Path path : inputPaths) {
+		if (path.is_relative()) {
+			path = workdir / path;
+		}
 		Product * input = productManager.GetProduct(path);
 		permList.AddPermission(input->GetPath(), Permission::READ);
 		inputs.push_back(input);
@@ -65,7 +75,11 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 		permList.AddPermission(path, Permission::READ | Permission::WRITE);
 	}
 
-	for (auto & path : productList) {
+	for (Path path : productList) {
+		if (path.is_relative()) {
+			path = workdir / path;
+		}
+
 		Product * product = productManager.GetProduct(path);
 		permList.AddPermission(product->GetPath(), Permission::READ | Permission::WRITE);
 		products.push_back(product);
@@ -73,5 +87,5 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 	}
 
 	commandList.emplace_back(std::make_unique<Command>(std::move(products), std::move(argList),
-	    std::move(permList), std::move(options.workdir)));
+	    std::move(permList), std::move(workdir)));
 }

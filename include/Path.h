@@ -57,10 +57,7 @@ private:
 		}
 	}
 
-	Path(std::filesystem::path && p)
-	  : path(std::move(p))
-	{
-	}
+	friend Path operator/(const Path &, const Path &);
 
 public:
 	Path() = default;
@@ -80,6 +77,11 @@ public:
 	{
 	}
 
+	Path(std::filesystem::path && p)
+	  : path(std::move(p))
+	{
+	}
+
 	operator const std::filesystem::path &() const
 	{
 		return path;
@@ -93,6 +95,11 @@ public:
 	Path root_path() const
 	{
 		return path.root_path();
+	}
+
+	bool is_relative() const
+	{
+		return path.is_relative();
 	}
 
 	bool operator ==(const Path & rhs) const
@@ -120,6 +127,11 @@ public:
 		return path.string();
 	}
 };
+
+inline Path operator/(const Path & lhs, const Path & rhs)
+{
+	return lhs.path / rhs.path;
+}
 
 namespace std
 {

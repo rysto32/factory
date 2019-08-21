@@ -71,9 +71,15 @@ PermissionList::CheckPerm(Permission allowed, int mode) const
 }
 
 int
-PermissionList::IsPermitted(const Path & origPath, int mode) const
+PermissionList::IsPermitted(const Path & workdir, const Path & origPath, int mode) const
 {
-	Path path(origPath);
+	Path path;
+	if (origPath.is_relative()) {
+		path = workdir / origPath;
+	} else {
+		path = origPath;
+	}
+
 	while (true) {
 		auto it = filePerm.find(path);
 		if (it != filePerm.end()) {

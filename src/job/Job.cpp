@@ -37,11 +37,12 @@
 #include <err.h>
 #include <fcntl.h>
 
-Job::Job(const PermissionList &perm, JobCompletion &c, int id, pid_t pid)
+Job::Job(const PermissionList &perm, JobCompletion &c, int id, pid_t pid, Path wd)
   : perm(perm),
     completer(c),
     jobId(id),
-    pid(pid)
+    pid(pid),
+    workdir(std::move(wd))
 {
 }
 
@@ -74,7 +75,7 @@ Job::SendResponse(MsgSocket * sock, int error)
 void
 Job::HandleMessage(MsgSocket * sock, const SandboxMsg & msg)
 {
-	int permitted = perm.IsPermitted(msg.open.path, msg.open.flags & O_ACCMODE);
+	int permitted = perm.IsPermitted(workdir, msg.open.path, msg.open.flags & O_ACCMODE);
 	if (permitted != 0) {
 		fprintf(stderr, "Denied access to '%s' for %x\n", msg.open.path, msg.open.flags);
 	}

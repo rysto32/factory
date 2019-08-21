@@ -139,8 +139,10 @@ class Interpreter
 	CommandOptions GetCommandOptions(Lua::Table &);
 
 	auto FunctionField(Lua::Function & func);
-	auto StringField(std::optional<std::string> &);
 	auto StringListField(std::vector<std::string> & list);
+
+	template <typename T>
+	auto StringField(T &);
 
 public:
 	Interpreter(IngestManager &, CommandFactory &);

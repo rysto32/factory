@@ -236,8 +236,9 @@ Interpreter::FunctionField(Lua::Function & func)
 		};
 }
 
+template <typename T>
 auto
-Interpreter::StringField(std::optional<std::string> & str)
+Interpreter::StringField(T & str)
 {
 	return [&str](const std::string & name, std::string && value)
 		{

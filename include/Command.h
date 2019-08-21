@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "JobCompletion.h"
+#include "Path.h"
 #include "PermissionList.h"
 
 class Job;
@@ -48,10 +49,10 @@ class Command : public JobCompletion
 
 	ArgList argList;
 	PermissionList permissions;
-	std::optional<std::string> workdir;
+	Path workdir;
 
 public:
-	Command (ProductList && products, ArgList && a, PermissionList && p, std::optional<std::string> && wd);
+	Command (ProductList && products, ArgList && a, PermissionList && p, Path && wd);
 	virtual ~Command() = default;
 
 	Command (const Command &) = delete;
@@ -72,7 +73,7 @@ public:
 		return permissions;
 	}
 	
-	const std::optional<std::string> & GetWorkDir()
+	const Path & GetWorkDir()
 	{
 		return workdir;
 	}

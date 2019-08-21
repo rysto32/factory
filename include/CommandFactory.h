@@ -29,6 +29,8 @@
 #ifndef COMMAND_FACTORY_H
 #define COMMAND_FACTORY_H
 
+#include "Path.h"
+
 #include <memory>
 #include <optional>
 #include <string>
@@ -43,12 +45,13 @@ class ProductManager;
 struct CommandOptions
 {
 	std::vector<std::string> tmpdirs;
-	std::optional<std::string> workdir;
+	std::optional<Path> workdir;
 };
 
 class CommandFactory
 {
 	ProductManager &productManager;
+	Path factoryWorkDir;
 	std::vector<std::unique_ptr<Command>> commandList;
 
 public:
