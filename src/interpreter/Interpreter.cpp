@@ -53,6 +53,7 @@ const char Interpreter::INTERPRETER_REGISTRY_ENTRY = 0;
 const struct luaL_Reg Interpreter::factoryModule [] = {
 	{"add_definitions", AddDefinitionsWrapper},
 	{"define_command", DefineCommandWrapper},
+	{ "evaluate_vars", EvaluateVarsWrapper},
 	{"include_script", IncludeScriptWrapper},
 	{"include_config", IncludeConfigWrapper},
 	{nullptr, nullptr}
@@ -216,6 +217,12 @@ Interpreter::DefineCommandWrapper(lua_State *lua)
 }
 
 int
+Interpreter::EvaluateVarsWrapper(lua_State *lua)
+{
+	return GetInterpreter(lua)->EvaluateVars();
+}
+
+int
 Interpreter::IncludeConfigWrapper(lua_State *lua)
 {
 	return GetInterpreter(lua)->Include("factory.include_config", IncludeFile::CONFIG);
@@ -314,18 +321,18 @@ Interpreter::GetStringList(Lua::Table & configList)
 	return list;
 }
 
-CommandOptions 
+CommandOptions
 Interpreter::GetCommandOptions(Lua::Table &table)
 {
 	CommandOptions opt;
-	
+
 	Lua::ValueParser parser {
 		Lua::FieldSpec("tmpdirs", StringListField(opt.tmpdirs)).Optional(true),
 		Lua::FieldSpec("workdir", StringField(opt.workdir)).Optional(true)
 	};
-	
+
 	table.ParseMap(parser);
-	
+
 	return opt;
 }
 
@@ -346,7 +353,7 @@ Interpreter::DefineCommand()
 
 	auto optTable = lua.GetTable(optionsArg);
 	CommandOptions options = GetCommandOptions(optTable);
-	
+
 	if (argList.empty()) {
 		errx(1, "In %s: cannot be empty", argListArg.ToString().c_str());
 	}
@@ -418,4 +425,180 @@ Interpreter::Include(const char * funcName, IncludeFile::Type t)
 	includeQueue.emplace_back(std::move(fileList), t, std::move(config));
 
 	return 0;
+}
+
+std::string_view
+Interpreter::ExpandVar(std::string_view varName,
+    const std::unordered_map<std::string_view, std::string_view> & vars)
+{
+	auto it = vars.find(varName);
+	if (it == vars.end()) {
+		errx(1, "Undefined variable '%s'", std::string(varName).c_str());
+	}
+
+	return it->second;
+}
+
+void
+Interpreter::VarRemoveWord(std::string & expansion, std::string_view word)
+{
+	enum { WORD_BOUNDARY, IN_CANDIDATE, NEXT_WORD } state;
+
+	state = WORD_BOUNDARY;
+	size_t wordIndex = 0;
+	std::string::iterator candidateStart;
+	for (auto it = expansion.begin(); it != expansion.end();) {
+		auto ch = *it;
+
+		switch (state) {
+		case WORD_BOUNDARY:
+			if (isspace(ch)) {
+				break;
+			}
+
+			state = IN_CANDIDATE;
+			wordIndex = 0;
+			candidateStart = it;
+
+			/* Fall through */
+		case IN_CANDIDATE:
+			if (isspace(ch)) {
+				if (wordIndex == word.size()) {
+					it = expansion.erase(candidateStart, it);
+				}
+				state = WORD_BOUNDARY;
+				continue;
+			}
+
+			if (wordIndex == word.size() || ch != word.at(wordIndex)) {
+				state = NEXT_WORD;
+			} else {
+				wordIndex++;
+			}
+			break;
+		case NEXT_WORD:
+			if (isspace(ch)) {
+				state = WORD_BOUNDARY;
+			}
+
+			break;
+		}
+
+		 ++it;
+	}
+}
+
+void
+Interpreter::ApplyVarOption(std::string & expansion, char option, std::string_view param)
+{
+	switch (option) {
+		case 'N':
+			VarRemoveWord(expansion, param);
+			break;
+		default:
+			errx(1, "Unhandled var expansion option '%c'", option);
+	}
+}
+
+std::string
+Interpreter::EvaluateVarWithOptions(std::string_view str, size_t & i, char endVar,
+    std::string_view varName, const std::unordered_map<std::string_view, std::string_view> & vars)
+{
+	auto option = str.at(i);
+	++i;
+
+	std::string expansion(ExpandVar(varName, vars));
+	size_t paramStart = i;
+	for (; i < str.size(); ++i) {
+		auto ch = str.at(i);
+		if (ch == ':' || ch == endVar) {
+			std::string_view param = str.substr(paramStart, i - paramStart);
+			ApplyVarOption(expansion, option, param);
+			if (ch == endVar)
+				return expansion;
+		}
+	}
+	errx(1, "Incomplete variable expansion in '%s'", str.data());
+}
+
+void
+Interpreter::EvaluateVar(std::string_view str, size_t & i, char varType, std::ostringstream & output,
+    const std::unordered_map<std::string_view, std::string_view> & vars)
+{
+	char endVar;
+	if (varType == '{')
+		endVar = '}';
+	else
+		endVar = ')';
+
+	size_t varStart = i;
+	for (; i < str.size(); ++i) {
+		auto ch = str.at(i);
+
+		if (ch == endVar) {
+			output << ExpandVar(str.substr(varStart, i - varStart), vars);
+			return;
+		} else if (ch == ':') {
+			std::string_view varName = str.substr(varStart, i - varStart);
+			++i;
+			if (i >= str.size()) {
+				errx(1, "Incomplete variable expansion in '%s'", str.data());
+			}
+
+			output << EvaluateVarWithOptions(str, i, endVar, varName, vars);
+			return;
+		}
+	}
+
+	errx(1, "Incomplete variable expansion in '%s'", str.data());
+}
+
+int
+Interpreter::EvaluateVars()
+{
+	std::ostringstream output;
+	{
+		Lua::View lua(luaState);
+
+		Lua::Parameter strArg("evaluate_vars", "str", 1);
+		Lua::Parameter varsArg("evaluate_vars", "vars", 2);
+
+		std::string_view str = lua.GetString(strArg);
+		Lua::Table varsTable = lua.GetTable(varsArg);
+
+		std::unordered_map<std::string_view, std::string_view> vars;
+
+		varsTable.IterateMap([&vars](const char * key, const char * value)
+			{
+				vars.emplace(key, value);
+			});
+
+		for (size_t i = 0; i < str.size(); ++i) {
+			auto ch = str.at(i);
+
+			if (ch != '$') {
+				output.put(ch);
+				continue;
+			}
+
+			++i;
+			if (i >= str.size()) {
+				errx(1, "Incomplete variable expansion in '%s'", str.data());
+			}
+
+			auto next = str.at(i);
+			if (next == '{' || next == '(') {
+				i++;
+				if (i >= str.size()) {
+					errx(1, "Incomplete variable expansion in '%s'", str.data());
+				}
+				EvaluateVar(str, i, next, output, vars);
+			} else {
+				output << ExpandVar(str.substr(i, 1), vars);
+			}
+		}
+	}
+
+	lua_pushstring(luaState.get(), output.str().c_str());
+	return 1;
 }

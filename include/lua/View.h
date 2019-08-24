@@ -197,21 +197,7 @@ public:
 	}
 
 	Table GetTable(const NamedValue & index);
-
-	bool isstring(int stackIndex)
-	{
-		return lua_isstring(lua, stackIndex);
-	}
-
-	bool isfunction(int index)
-	{
-		return lua_isfunction(lua, index);
-	}
-
-	const char * tostring(int stackIndex)
-	{
-		return lua_tostring(lua, stackIndex);
-	}
+	std::string_view GetString(const NamedValue & value);
 
 	/*
 	 * Conver an index to an equivalant absolute index that references the

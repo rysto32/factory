@@ -39,4 +39,14 @@ View::GetTable(const NamedValue & value)
 	return Table(*this, value);
 }
 
+std::string_view
+View::GetString(const NamedValue & value)
+{
+	if (!lua_isstring(lua, value.GetStackIndex())) {
+		errx(1, "In %s: expected a string", value.ToString().c_str());
+	}
+
+	return lua_tostring(lua, value.GetStackIndex());
+}
+
 }

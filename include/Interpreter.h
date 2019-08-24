@@ -113,6 +113,7 @@ class Interpreter
 	static Interpreter * GetInterpreter(lua_State *);
 	static int AddDefinitionsWrapper(lua_State *);
 	static int DefineCommandWrapper(lua_State *);
+	static int EvaluateVarsWrapper(lua_State *);
 	static int IncludeConfigWrapper(lua_State *);
 	static int IncludeScriptWrapper(lua_State *);
 
@@ -120,6 +121,7 @@ class Interpreter
 
 	int AddDefinitions();
 	int DefineCommand();
+	int EvaluateVars();
 	int Include(const char * funcName, IncludeFile::Type);
 
 	void PushConfig(const ConfigNode & node);
@@ -143,6 +145,15 @@ class Interpreter
 
 	template <typename T>
 	auto StringField(T &);
+
+	std::string_view ExpandVar(std::string_view varName,
+	    const std::unordered_map<std::string_view, std::string_view> & vars);
+	void VarRemoveWord(std::string & expansion, std::string_view word);
+	void ApplyVarOption(std::string & expansion, char option, std::string_view param);
+	std::string EvaluateVarWithOptions(std::string_view str, size_t & i, char endVar,
+	    std::string_view varName, const std::unordered_map<std::string_view, std::string_view> & vars);
+	void EvaluateVar(std::string_view str, size_t & i, char varType, std::ostringstream & output,
+	    const std::unordered_map<std::string_view, std::string_view> & vars);
 
 public:
 	Interpreter(IngestManager &, CommandFactory &);
