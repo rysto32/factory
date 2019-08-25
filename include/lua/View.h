@@ -32,6 +32,8 @@
 #include "lua/NamedValue.h"
 #include "lua/Util.h"
 
+#include "InterpreterException.h"
+
 #include <lua.hpp>
 
 #include <cassert>
@@ -123,7 +125,7 @@ private:
 		    "Callback function does not accept correct args");
 		int keyPos = stackPos -  1;
 		if (!lua_isinteger(lua, keyPos)) {
-			errx(1, "Expected a list in %s", value.ToString().c_str());
+			throw InterpreterException("Expected a list in %s", value.ToString().c_str());
 		}
 
 		InvokeCallback(value, func, lua_tointeger(lua, keyPos), stackPos);
@@ -136,7 +138,7 @@ private:
 		    "Callback function does not accept correct args");
 		int keyPos = stackPos -  1;
 		if (lua_isinteger(lua, keyPos)) {
-			errx(1, "Expected a map in %s", value.ToString().c_str());
+			throw InterpreterException("Expected a map in %s", value.ToString().c_str());
 		}
 
 		InvokeCallback(value, func, lua_tostring(lua, keyPos), stackPos);

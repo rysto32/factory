@@ -43,7 +43,7 @@ View::InvokeIntCallback(const F & func, const NamedValue & subvalue, IndexType i
 	if constexpr (takes_int_value<F, IndexType>())
 		func(index, lua_tointeger(lua, stackPos));
 	else
-		errx(1, "Did not expect an int in %s", subvalue.ToString().c_str());
+		throw InterpreterException("Did not expect an int in %s", subvalue.ToString().c_str());
 }
 
 template <typename F, typename IndexType>
@@ -53,7 +53,7 @@ View::InvokeStrCallback(const F & func, const NamedValue & subvalue, IndexType i
 	if constexpr (takes_str_value<F, IndexType>())
 		func(index, lua_tostring(lua, stackPos));
 	else
-		errx(1, "Did not expect a string in %s", subvalue.ToString().c_str());
+		throw InterpreterException("Did not expect a string in %s", subvalue.ToString().c_str());
 }
 
 template <typename F, typename IndexType>
@@ -64,7 +64,7 @@ View::InvokeTableCallback(const F & func, const NamedValue & subvalue, IndexType
 		Lua::View view(lua);
 		func(index, Table(view, subvalue));
 	} else {
-		errx(1, "Did not expect a table in %s", subvalue.ToString().c_str());
+		throw InterpreterException("Did not expect a table in %s", subvalue.ToString().c_str());
 	}
 }
 template <typename F, typename IndexType>
@@ -74,7 +74,7 @@ View::InvokeFunctionCallback(const F & func, const NamedValue & subvalue, IndexT
 	if constexpr (takes_func_value<F, IndexType>()) {
 		func(index, Function(lua, stackPos));
 	} else {
-		errx(1, "Did not expect a table in %s", subvalue.ToString().c_str());
+		throw InterpreterException("Did not expect a table in %s", subvalue.ToString().c_str());
 	}
 }
 
@@ -92,7 +92,7 @@ View::InvokeCallback(const NamedValue & value, const F & func, IndexType index, 
 	} else if (lua_isfunction(lua, stackPos)) {
 		InvokeFunctionCallback(func, subvalue, index, stackPos);
 	} else {
-		errx(1, "Invalid type '%s' in %s",
+		throw InterpreterException("Invalid type '%s' in %s",
 		    lua_typename(lua, stackPos), subvalue.ToString().c_str());
 	}
 }

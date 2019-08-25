@@ -34,6 +34,8 @@
 #include "lua/ValueParser.h"
 #include "lua/View.h"
 
+#include "InterpreterException.h"
+
 #include <cassert>
 #include <err.h>
 #include <functional>
@@ -69,7 +71,7 @@ public:
 	void IterateList(const F & func)
 	{
 		if (!lua_istable(lua, stackIndex))
-			errx(1, "Expected a table in %s", value.ToString().c_str());
+			throw InterpreterException("Expected a table in %s", value.ToString().c_str());
 
 		lua_pushnil(lua);
 		while (lua_next(lua, stackIndex) != 0) {
@@ -82,7 +84,7 @@ public:
 	void IterateMap(const F & func)
 	{
 		if (!lua_istable(lua, stackIndex))
-			errx(1, "Expected a table in %s", value.ToString().c_str());
+			throw InterpreterException("Expected a table in %s", value.ToString().c_str());
 
 		lua_pushnil(lua);
 		while (lua_next(lua, stackIndex) != 0) {
@@ -95,7 +97,7 @@ public:
 	void Iterate(const F & func)
 	{
 		if (!lua_istable(lua, stackIndex))
-			errx(1, "Expected a table in %s, got %s", value.ToString().c_str(), lua_typename(lua, stackIndex));
+			throw InterpreterException("Expected a table in %s, got %s", value.ToString().c_str(), lua_typename(lua, stackIndex));
 
 		lua_pushnil(lua);
 		while (lua_next(lua, stackIndex) != 0) {
@@ -108,7 +110,7 @@ public:
 	void ParseMap(ValueParser<C...> & parser)
 	{
 		if (!lua_istable(lua, stackIndex))
-			errx(1, "Expected a table in %s, got %s", value.ToString().c_str(),
+			throw InterpreterException("Expected a table in %s, got %s", value.ToString().c_str(),
 			     lua_typename(lua, stackIndex));
 
 		parser.Reset();
@@ -116,7 +118,7 @@ public:
 		lua_pushnil(lua);
 		while (lua_next(lua, stackIndex) != 0) {
 			if (lua_isinteger(lua, -2))
-				errx(1, "Expected a map in %s", value.ToString().c_str());
+				throw InterpreterException("Expected a map in %s", value.ToString().c_str());
 
 			parser.Parse(lua, value, lua_tostring(lua, -2), -1);
 			lua_pop(lua, 1);
@@ -130,7 +132,7 @@ public:
 		FetchValue(name);
 
 		if (!lua_isstring(lua, -1))
-			errx(1, "Field '%s' in %s is expected to be a string", name, value.ToString().c_str());
+			throw InterpreterException("Field '%s' in %s is expected to be a string", name, value.ToString().c_str());
 		const char * val = lua_tostring(lua, -1);
 		lua_pop(lua, 1);
 		return val;

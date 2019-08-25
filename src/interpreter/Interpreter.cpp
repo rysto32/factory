@@ -31,6 +31,7 @@
 #include "CommandFactory.h"
 #include "ConfigNode.h"
 #include "IngestManager.h"
+#include "InterpreterException.h"
 #include "PermissionList.h"
 #include "VectorUtil.h"
 
@@ -204,34 +205,67 @@ Interpreter::GetInterpreter(lua_State *lua)
 	return interp;
 }
 
+template <typename F>
+int
+Interpreter::FuncImplementationWrapper(lua_State *lua, const F & implementation)
+{
+	try {
+		return implementation();
+	} catch (InterpreterException & e)
+	{
+		luaL_traceback(lua, lua, e.what(), 1);
+		errx(1, "error in lua script: %s", lua_tostring(lua, -1));
+	}
+}
+
 int
 Interpreter::AddDefinitionsWrapper(lua_State *lua)
 {
-	return GetInterpreter(lua)->AddDefinitions();
+	return FuncImplementationWrapper(lua,
+	    [lua]()
+	    {
+		return GetInterpreter(lua)->AddDefinitions();
+	    });
 }
 
 int
 Interpreter::DefineCommandWrapper(lua_State *lua)
 {
-	return GetInterpreter(lua)->DefineCommand();
+	return FuncImplementationWrapper(lua,
+	    [lua]()
+	    {
+		return GetInterpreter(lua)->DefineCommand();
+	    });
 }
 
 int
 Interpreter::EvaluateVarsWrapper(lua_State *lua)
 {
-	return GetInterpreter(lua)->EvaluateVars();
+	return FuncImplementationWrapper(lua,
+	    [lua]()
+	    {
+		return GetInterpreter(lua)->EvaluateVars();
+	    });
 }
 
 int
 Interpreter::IncludeConfigWrapper(lua_State *lua)
 {
-	return GetInterpreter(lua)->Include("factory.include_config", IncludeFile::CONFIG);
+	return FuncImplementationWrapper(lua,
+	    [lua]()
+	    {
+		return GetInterpreter(lua)->Include("factory.include_config", IncludeFile::CONFIG);
+	    });
 }
 
 int
 Interpreter::IncludeScriptWrapper(lua_State *lua)
 {
-	return GetInterpreter(lua)->Include("factory.include_script", IncludeFile::SCRIPT);
+	return FuncImplementationWrapper(lua,
+	    [lua]()
+	    {
+		return GetInterpreter(lua)->Include("factory.include_script", IncludeFile::SCRIPT);
+	    });
 }
 
 auto
@@ -355,7 +389,7 @@ Interpreter::DefineCommand()
 	CommandOptions options = GetCommandOptions(optTable);
 
 	if (argList.empty()) {
-		errx(1, "In %s: cannot be empty", argListArg.ToString().c_str());
+		throw InterpreterException("In %s: cannot be empty", argListArg.ToString().c_str());
 	}
 
 	commandFactory.AddCommand(products, inputs, std::move(argList), std::move(options));
@@ -397,7 +431,7 @@ Interpreter::SerializeConfig(Lua::Table & config)
 	));
 
 	if (!list.empty() && !map.empty()) {
-		errx(1, "Unsupported mixture of table and list in %s",
+		throw InterpreterException("Unsupported mixture of table and list in %s",
 		    config.GetNamedValue().ToString().c_str());
 	}
 
@@ -433,7 +467,7 @@ Interpreter::ExpandVar(std::string_view varName,
 {
 	auto it = vars.find(varName);
 	if (it == vars.end()) {
-		errx(1, "Undefined variable '%s'", std::string(varName).c_str());
+		throw InterpreterException("Undefined variable '%s'", std::string(varName).c_str());
 	}
 
 	return it->second;
@@ -496,7 +530,7 @@ Interpreter::ApplyVarOption(std::string & expansion, char option, std::string_vi
 			VarRemoveWord(expansion, param);
 			break;
 		default:
-			errx(1, "Unhandled var expansion option '%c'", option);
+			throw InterpreterException("Unhandled var expansion option '%c'", option);
 	}
 }
 
@@ -518,7 +552,7 @@ Interpreter::EvaluateVarWithOptions(std::string_view str, size_t & i, char endVa
 				return expansion;
 		}
 	}
-	errx(1, "Incomplete variable expansion in '%s'", str.data());
+	throw InterpreterException("Incomplete variable expansion in '%s'", str.data());
 }
 
 void
@@ -542,7 +576,7 @@ Interpreter::EvaluateVar(std::string_view str, size_t & i, char varType, std::os
 			std::string_view varName = str.substr(varStart, i - varStart);
 			++i;
 			if (i >= str.size()) {
-				errx(1, "Incomplete variable expansion in '%s'", str.data());
+				throw InterpreterException("Incomplete variable expansion in '%s'", str.data());
 			}
 
 			output << EvaluateVarWithOptions(str, i, endVar, varName, vars);
@@ -550,7 +584,7 @@ Interpreter::EvaluateVar(std::string_view str, size_t & i, char varType, std::os
 		}
 	}
 
-	errx(1, "Incomplete variable expansion in '%s'", str.data());
+	throw InterpreterException("Incomplete variable expansion in '%s'", str.data());
 }
 
 int
@@ -583,14 +617,14 @@ Interpreter::EvaluateVars()
 
 			++i;
 			if (i >= str.size()) {
-				errx(1, "Incomplete variable expansion in '%s'", str.data());
+				throw InterpreterException("Incomplete variable expansion in '%s'", str.data());
 			}
 
 			auto next = str.at(i);
 			if (next == '{' || next == '(') {
 				i++;
 				if (i >= str.size()) {
-					errx(1, "Incomplete variable expansion in '%s'", str.data());
+					throw InterpreterException("Incomplete variable expansion in '%s'", str.data());
 				}
 				EvaluateVar(str, i, next, output, vars);
 			} else {

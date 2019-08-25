@@ -33,6 +33,7 @@
 #include "lua/View.h"
 
 #include "ConfigNode.h"
+#include "InterpreterException.h"
 #include "Visitor.h"
 
 #include <lua.hpp>
@@ -75,7 +76,7 @@ private:
 	{
 		int result = lua_pcall(lua, argCount, 0, handlerIndex);
 		if (result != LUA_OK) {
-			errx(1, "Error running lua callback: %s", lua_tostring(lua, -1));
+			throw InterpreterException("Error running lua callback: %s", lua_tostring(lua, -1));
 		}
 
 	}

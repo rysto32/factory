@@ -155,6 +155,9 @@ class Interpreter
 	void EvaluateVar(std::string_view str, size_t & i, char varType, std::ostringstream & output,
 	    const std::unordered_map<std::string_view, std::string_view> & vars);
 
+	template <typename F>
+	static int FuncImplementationWrapper(lua_State *lua, const F & implementation);
+
 public:
 	Interpreter(IngestManager &, CommandFactory &);
 	~Interpreter();

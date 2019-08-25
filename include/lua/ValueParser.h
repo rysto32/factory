@@ -31,6 +31,8 @@
 
 #include "lua/View.h"
 
+#include "InterpreterException.h"
+
 #include <string>
 
 namespace Lua
@@ -91,14 +93,14 @@ class ValueParser
 	static void TryParser(Lua::View & lua, const NamedValue & value, const char * name,
 	    int valuePos)
 	{
-		errx(1, "In %s: unexpected field '%s'", value.ToString().c_str(), name);
+		throw InterpreterException("In %s: unexpected field '%s'", value.ToString().c_str(), name);
 	}
 
 	template <typename F, typename... Rest>
 	static void CheckRequired(const NamedValue & value, const FieldSpec<F> & cb, Rest... rest)
 	{
 		if (!cb.optional && !cb.used) {
-			errx(1, "In %s: required field '%s' not specified", value.ToString().c_str(),
+			throw InterpreterException("In %s: required field '%s' not specified", value.ToString().c_str(),
 			     cb.name.data());
 		}
 
