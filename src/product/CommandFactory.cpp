@@ -100,8 +100,11 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 	else
 		workdir = factoryWorkDir;
 
-	Product * exe = productManager.GetProduct(GetExecutablePath(argList.front()));
+	Path exePath = GetExecutablePath(argList.front());
+	Product * exe = productManager.GetProduct(exePath);
 	inputs.push_back(exe);
+
+	argList.front() = exePath.string();
 
 	permList.AddPermission(exe->GetPath(), Permission::READ | Permission::EXEC);
 
