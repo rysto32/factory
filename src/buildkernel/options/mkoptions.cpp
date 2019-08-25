@@ -267,7 +267,7 @@ SetOptionFromObject(const std::string & filename, const ConfigPairMap & map,
 			},
 			[&filename, &option](const auto & value)
 			{
-				errx(1, "Malformed kernconf file %s: option '%s' must set to a string, int or bool",
+				errx(1, "Malformed kernconf file %s: option '%s' must be set to a string, int or bool",
 				     filename.c_str(), option.c_str());
 			}
 		), node->GetValue());
