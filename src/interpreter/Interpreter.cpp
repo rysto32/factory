@@ -33,6 +33,7 @@
 #include "IngestManager.h"
 #include "InterpreterException.h"
 #include "PermissionList.h"
+#include "VariableExpander.h"
 #include "VectorUtil.h"
 
 #include "lua/Function.h"
@@ -461,136 +462,10 @@ Interpreter::Include(const char * funcName, IncludeFile::Type t)
 	return 0;
 }
 
-std::string_view
-Interpreter::ExpandVar(std::string_view varName,
-    const std::unordered_map<std::string_view, std::string_view> & vars)
-{
-	auto it = vars.find(varName);
-	if (it == vars.end()) {
-		throw InterpreterException("Undefined variable '%s'", std::string(varName).c_str());
-	}
-
-	return it->second;
-}
-
-void
-Interpreter::VarRemoveWord(std::string & expansion, std::string_view word)
-{
-	enum { WORD_BOUNDARY, IN_CANDIDATE, NEXT_WORD } state;
-
-	state = WORD_BOUNDARY;
-	size_t wordIndex = 0;
-	std::string::iterator candidateStart;
-	for (auto it = expansion.begin(); it != expansion.end();) {
-		auto ch = *it;
-
-		switch (state) {
-		case WORD_BOUNDARY:
-			if (isspace(ch)) {
-				break;
-			}
-
-			state = IN_CANDIDATE;
-			wordIndex = 0;
-			candidateStart = it;
-
-			/* Fall through */
-		case IN_CANDIDATE:
-			if (isspace(ch)) {
-				if (wordIndex == word.size()) {
-					it = expansion.erase(candidateStart, it);
-				}
-				state = WORD_BOUNDARY;
-				continue;
-			}
-
-			if (wordIndex == word.size() || ch != word.at(wordIndex)) {
-				state = NEXT_WORD;
-			} else {
-				wordIndex++;
-			}
-			break;
-		case NEXT_WORD:
-			if (isspace(ch)) {
-				state = WORD_BOUNDARY;
-			}
-
-			break;
-		}
-
-		 ++it;
-	}
-}
-
-void
-Interpreter::ApplyVarOption(std::string & expansion, char option, std::string_view param)
-{
-	switch (option) {
-		case 'N':
-			VarRemoveWord(expansion, param);
-			break;
-		default:
-			throw InterpreterException("Unhandled var expansion option '%c'", option);
-	}
-}
-
-std::string
-Interpreter::EvaluateVarWithOptions(std::string_view str, size_t & i, char endVar,
-    std::string_view varName, const std::unordered_map<std::string_view, std::string_view> & vars)
-{
-	auto option = str.at(i);
-	++i;
-
-	std::string expansion(ExpandVar(varName, vars));
-	size_t paramStart = i;
-	for (; i < str.size(); ++i) {
-		auto ch = str.at(i);
-		if (ch == ':' || ch == endVar) {
-			std::string_view param = str.substr(paramStart, i - paramStart);
-			ApplyVarOption(expansion, option, param);
-			if (ch == endVar)
-				return expansion;
-		}
-	}
-	throw InterpreterException("Incomplete variable expansion in '%s'", str.data());
-}
-
-void
-Interpreter::EvaluateVar(std::string_view str, size_t & i, char varType, std::ostringstream & output,
-    const std::unordered_map<std::string_view, std::string_view> & vars)
-{
-	char endVar;
-	if (varType == '{')
-		endVar = '}';
-	else
-		endVar = ')';
-
-	size_t varStart = i;
-	for (; i < str.size(); ++i) {
-		auto ch = str.at(i);
-
-		if (ch == endVar) {
-			output << ExpandVar(str.substr(varStart, i - varStart), vars);
-			return;
-		} else if (ch == ':') {
-			std::string_view varName = str.substr(varStart, i - varStart);
-			++i;
-			if (i >= str.size()) {
-				throw InterpreterException("Incomplete variable expansion in '%s'", str.data());
-			}
-
-			output << EvaluateVarWithOptions(str, i, endVar, varName, vars);
-			return;
-		}
-	}
-
-	throw InterpreterException("Incomplete variable expansion in '%s'", str.data());
-}
-
 int
 Interpreter::EvaluateVars()
 {
-	std::ostringstream output;
+	std::string output;
 	{
 		Lua::View lua(luaState);
 
@@ -600,39 +475,18 @@ Interpreter::EvaluateVars()
 		std::string_view str = lua.GetString(strArg);
 		Lua::Table varsTable = lua.GetTable(varsArg);
 
-		std::unordered_map<std::string_view, std::string_view> vars;
+		VariableExpander::VarMap vars;
 
 		varsTable.IterateMap([&vars](const char * key, const char * value)
 			{
 				vars.emplace(key, value);
 			});
 
-		for (size_t i = 0; i < str.size(); ++i) {
-			auto ch = str.at(i);
+		VariableExpander expander(std::move(vars));
 
-			if (ch != '$') {
-				output.put(ch);
-				continue;
-			}
-
-			++i;
-			if (i >= str.size()) {
-				throw InterpreterException("Incomplete variable expansion in '%s'", str.data());
-			}
-
-			auto next = str.at(i);
-			if (next == '{' || next == '(') {
-				i++;
-				if (i >= str.size()) {
-					throw InterpreterException("Incomplete variable expansion in '%s'", str.data());
-				}
-				EvaluateVar(str, i, next, output, vars);
-			} else {
-				output << ExpandVar(str.substr(i, 1), vars);
-			}
-		}
+		output = expander.ExpandVars(str);
 	}
 
-	lua_pushstring(luaState.get(), output.str().c_str());
+	lua_pushstring(luaState.get(), output.c_str());
 	return 1;
 }

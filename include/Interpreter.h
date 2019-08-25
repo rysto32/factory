@@ -146,15 +146,6 @@ class Interpreter
 	template <typename T>
 	auto StringField(T &);
 
-	std::string_view ExpandVar(std::string_view varName,
-	    const std::unordered_map<std::string_view, std::string_view> & vars);
-	void VarRemoveWord(std::string & expansion, std::string_view word);
-	void ApplyVarOption(std::string & expansion, char option, std::string_view param);
-	std::string EvaluateVarWithOptions(std::string_view str, size_t & i, char endVar,
-	    std::string_view varName, const std::unordered_map<std::string_view, std::string_view> & vars);
-	void EvaluateVar(std::string_view str, size_t & i, char varType, std::ostringstream & output,
-	    const std::unordered_map<std::string_view, std::string_view> & vars);
-
 	template <typename F>
 	static int FuncImplementationWrapper(lua_State *lua, const F & implementation);
 
