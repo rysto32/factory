@@ -237,3 +237,64 @@ ProductManager::SubmitProductJob(Product *product)
 
 	jobQueue.Submit(c);
 }
+
+void
+ProductManager::CheckBlockedCommands()
+{
+	for (auto & [path, product] : products) {
+		if (IsBlocked(product.get()))
+			ReportCycle(product.get());
+	}
+}
+
+bool
+ProductManager::IsBlocked(Product *product)
+{
+
+	if (!product->NeedsBuild())
+		return false;
+
+	Command *command = product->GetCommand();
+	if (command == nullptr) {
+		/*
+		 * Could happen if we have a dependency cycle and are
+		 * also lacking a build rule.
+		 */
+		Product * dependee = product->GetDependees().front();
+		errx(1, "No rule to make product '%s', needed by '%s'",
+			product->GetPath().c_str(), dependee->GetPath().c_str());
+	}
+
+	// If the command was queued then it wasn't blocked
+	if (command->WasQueued())
+		return false;
+
+	return true;
+}
+
+void
+ProductManager::ReportCycle(Product *product)
+{
+	std::unordered_set<Product*> seenNodes;
+
+	fprintf(stderr, "Dependency cycle blocks '%s'\n", product->GetPath().c_str());
+	while (seenNodes.count(product) == 0) {
+		Product * blocked = nullptr;
+		for (Product * input : product->GetInputs()) {
+			if (IsBlocked(input)) {
+				blocked = input;
+				break;
+			}
+		}
+
+		/* Should be impossible. */
+		if (blocked == nullptr)
+			errx(1, "Couldn't find cycle");
+
+		fprintf(stderr, "\tDepends on %s\n", blocked->GetPath().c_str());
+		seenNodes.insert(product);
+		product = blocked;
+	}
+
+	errx(1, "Build terminated due to cycle");
+}

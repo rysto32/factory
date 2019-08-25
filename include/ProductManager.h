@@ -56,6 +56,9 @@ class ProductManager
 
 	void SubmitProductJob(Product *product);
 
+	bool IsBlocked(Product *product);
+	void ReportCycle(Product * product);
+
 public:
 	ProductManager(JobQueue &);
 
@@ -67,6 +70,7 @@ public:
 	Product * GetProduct(const Path &);
 	void SetInputs(Product * product, const std::vector<Product*> & inputs);
 
+	void CheckBlockedCommands();
 	void SubmitLeafJobs();
 
 	void ProductReady(Product *);

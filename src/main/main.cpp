@@ -141,6 +141,8 @@ Main::Run()
 
 	loop.Run();
 
+	productMgr.CheckBlockedCommands();
+
 	return (0);
 }
 
