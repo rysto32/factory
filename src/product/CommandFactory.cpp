@@ -80,7 +80,6 @@ CommandFactory::GetExecutablePath(Path path)
 			return candidate;
 
 		error = errno;
-		fprintf(stderr, "%s failed: %s\n", candidate.c_str(), strerror(error));
 	}
 
 	errx(1, "No executable '%s' in PATH", path.c_str());
