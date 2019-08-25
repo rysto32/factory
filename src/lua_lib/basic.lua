@@ -28,6 +28,12 @@ function factory.include_script(paths, config)
 	factory.internal.include_script(factory.listify(paths), config)
 end
 
+function factory.file_ext(file)
+	local _, ext
+	_, _, ext = file:find('.+%.([^.]+)$')
+	return ext
+end
+
 function factory.replace_ext(file, old, new)
 	return string.gsub(file, "%." .. old .. "$", "." .. new)
 end
