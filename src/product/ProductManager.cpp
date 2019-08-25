@@ -97,7 +97,7 @@ ProductManager::CheckNeedsBuild(Product * product, const Product * input)
 {
 
 	if (input->NeedsBuild()) {
-		fprintf(stderr, "'%s' needs build because '%s' needs build\n", product->GetPath().c_str(), input->GetPath().c_str());
+// 		fprintf(stderr, "'%s' needs build because '%s' needs build\n", product->GetPath().c_str(), input->GetPath().c_str());
 		product->SetNeedsBuild();
 		return true;
 	}
