@@ -79,7 +79,7 @@ public:
 		return workdir;
 	}
 
-	bool IsQueued() const
+	bool WasQueued() const
 	{
 		return queued;
 	}

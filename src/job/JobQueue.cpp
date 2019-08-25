@@ -45,7 +45,7 @@ JobQueue::RemoveNext()
 void
 JobQueue::Submit(Command *j)
 {
-	if (!j->IsQueued()) {
+	if (!j->WasQueued()) {
 		j->SetQueued();
 		queue.push_back(j);
 	}
