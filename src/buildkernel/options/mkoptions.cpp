@@ -364,6 +364,8 @@ GenerateHeaders(const std::string outdir, const std::string & filename, const Co
 		std::ostringstream optpath;
 		optpath << outdir << "/" << optfile;
 		FILE * fout = fopen(optpath.str().c_str(), "w");
+		if (fout == nullptr)
+			err(1, "Could not open '%s' for reading", optpath.str().c_str());
 
 		for (const OptionValue & opt : optlist) {
 			fprintf(fout, "#define %s", opt.name.c_str());
