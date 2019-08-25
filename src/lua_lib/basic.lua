@@ -38,7 +38,7 @@ function factory.replace_ext(file, old, new)
 	return string.gsub(file, "%." .. old .. "$", "." .. new)
 end
 
-function factory.array_concat(t1, t2)
+function factory.list_concat(t1, t2)
 	for _,v in ipairs(t2) do
 		table.insert(t1, v)
 	end
@@ -83,7 +83,7 @@ function factory.flat_list(...)
 
 	for _, v in ipairs{...} do
 		if (type(v) == 'table') then
-			factory.array_concat(list, v)
+			factory.list_concat(list, v)
 		else
 			table.insert(list, tostring(v))
 		end
