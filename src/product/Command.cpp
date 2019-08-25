@@ -36,7 +36,8 @@ Command::Command(ProductList && productList, ArgList && a, PermissionList && per
   : products(std::move(productList)),
     argList(std::move(a)),
     permissions(std::move(perm)),
-    workdir(std::move(wd))
+    workdir(std::move(wd)),
+    queued(false)
 {
 	for (Product * p : products) {
 		p->SetCommand(this);

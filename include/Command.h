@@ -50,6 +50,7 @@ class Command : public JobCompletion
 	ArgList argList;
 	PermissionList permissions;
 	Path workdir;
+	bool queued;
 
 public:
 	Command (ProductList && products, ArgList && a, PermissionList && p, Path && wd);
@@ -76,6 +77,16 @@ public:
 	const Path & GetWorkDir()
 	{
 		return workdir;
+	}
+
+	bool IsQueued() const
+	{
+		return queued;
+	}
+
+	void SetQueued()
+	{
+		queued = true;
 	}
 };
 

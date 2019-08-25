@@ -29,6 +29,8 @@
 
 #include "JobQueue.h"
 
+#include "Command.h"
+
 Command *
 JobQueue::RemoveNext()
 {
@@ -43,5 +45,8 @@ JobQueue::RemoveNext()
 void
 JobQueue::Submit(Command *j)
 {
-	queue.push_back(j);
+	if (!j->IsQueued()) {
+		j->SetQueued();
+		queue.push_back(j);
+	}
 }
