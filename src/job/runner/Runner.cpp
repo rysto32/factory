@@ -73,7 +73,7 @@ public:
 };
 
 static Permission
-ParsePermission(const std::string & opt, std::string &path)
+ParsePermission(const std::string & opt, Path &path)
 {
 	auto pos = opt.find_first_of(':');
 	if (pos == std::string::npos) {
@@ -114,13 +114,18 @@ int main(int argc, char **argv)
 	ArgList list;
 	int ch;
 
+	Path cwd(std::filesystem::current_path());
+
 	while ((ch = getopt(argc, argv, "a:")) != -1) {
-		std::string permPath;
+		Path permPath;
 		Permission p;
 
 		switch (ch) {
 		case 'a':
 			p = ParsePermission(optarg, permPath);
+			if (permPath.is_relative()) {
+				permPath = cwd / permPath;
+			}
 			perms.AddPermission(permPath, p);
 			break;
 		}
@@ -146,7 +151,7 @@ int main(int argc, char **argv)
 	JobManager jobManager(loop, msgSock.get(), jobQueue);
 	MsgSocketServer server(std::move(msgSock), loop, jobManager);
 	SimpleCompletion completer(loop);
-	Command pending({}, std::move(list), std::move(perms), {});
+	Command pending({}, std::move(list), std::move(perms), std::move(cwd));
 
 	Job * job = jobManager.StartJob(pending, completer);
 	if (job == NULL)
