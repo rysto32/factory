@@ -34,12 +34,56 @@
 #include "ProductManager.h"
 
 #include <err.h>
-#include <sys/stat.h>
+#include <paths.h>
+#include <unistd.h>
 
 CommandFactory::CommandFactory(ProductManager &p)
   : productManager(p),
-    factoryWorkDir(std::filesystem::current_path())
+    factoryWorkDir(std::filesystem::current_path()),
+    shellPath(GetShellPath())
 {
+}
+
+std::vector<Path>
+CommandFactory::GetShellPath()
+{
+	std::vector<Path> list;
+	const char * pathStorage = getenv("PATH");
+	if (!pathStorage || pathStorage[0] == '\0')
+		pathStorage = _PATH_DEFPATH;
+
+	std::string_view path(pathStorage);
+
+	std::string_view::size_type dirStart;
+	std::string_view::size_type dirEnd = 0;
+	while (dirEnd != std::string_view::npos) {
+		dirStart = path.find_first_not_of(":", dirEnd);
+		dirEnd = path.find_first_of(":", dirStart);
+
+		list.push_back(path.substr(dirStart, dirEnd - dirStart));
+	}
+
+	return list;
+}
+
+Path
+CommandFactory::GetExecutablePath(Path path)
+{
+	if (!path.parent_path().empty())
+		return path;
+
+	for (const Path & dir : shellPath) {
+		Path candidate = dir / path;
+
+		int error = eaccess(candidate.c_str(), R_OK | X_OK);
+		if (error == 0)
+			return candidate;
+
+		error = errno;
+		fprintf(stderr, "%s failed: %s\n", candidate.c_str(), strerror(error));
+	}
+
+	errx(1, "No executable '%s' in PATH", path.c_str());
 }
 
 void
@@ -57,7 +101,7 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 	else
 		workdir = factoryWorkDir;
 
-	Product * exe = productManager.GetProduct(argList.front());
+	Product * exe = productManager.GetProduct(GetExecutablePath(argList.front()));
 	inputs.push_back(exe);
 
 	permList.AddPermission(exe->GetPath(), Permission::READ | Permission::EXEC);

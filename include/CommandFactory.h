@@ -53,6 +53,11 @@ class CommandFactory
 	ProductManager &productManager;
 	Path factoryWorkDir;
 	std::vector<std::unique_ptr<Command>> commandList;
+	std::vector<Path> shellPath;
+
+	static std::vector<Path> GetShellPath();
+
+	Path GetExecutablePath(Path path);
 
 public:
 	CommandFactory(ProductManager &);
