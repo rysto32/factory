@@ -4,7 +4,9 @@ function factory.add_definitions(defs)
 end
 
 function factory.basename(path)
-	return path:gsub('^.+/([^/]+)', '%1')
+	local _, ext
+	_, _, base = path:find('^.+/([^/]+)$')
+	return base
 end
 
 function factory.define_command(products, inputs, arglist, options)
