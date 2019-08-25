@@ -257,7 +257,7 @@ SetOptionFromObject(const std::string & filename, const ConfigPairMap & map,
 			{
 				SetOption(filename, option, value, content, optHeaders);
 			},
-			[&filename, &option, &content, &optHeaders](int value)
+			[&filename, &option, &content, &optHeaders](int64_t value)
 			{
 				SetOption(filename, option, value, content, optHeaders);
 			},
