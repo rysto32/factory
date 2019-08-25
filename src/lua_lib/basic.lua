@@ -72,7 +72,7 @@ end
 
 function factory.evaluate_vars(str, vars)
 	if str == nil then
-		return ''
+		return nil
 	end
 
 	return factory.internal.evaluate_vars(str, vars)
@@ -84,7 +84,7 @@ function factory.flat_list(...)
 	for _, v in ipairs{...} do
 		if (type(v) == 'table') then
 			factory.list_concat(list, v)
-		else
+		elseif (v ~= nil) then
 			table.insert(list, tostring(v))
 		end
 	end
@@ -113,6 +113,10 @@ function factory.map(func, list)
 end
 
 function factory.shell_split(str)
+	if str == nil then
+		return nil
+	end
+
 	local out = {}
 	local cur = ''
 	local explicit_empty = false
@@ -155,14 +159,17 @@ function factory.shell_split(str)
 end
 
 function factory.split(inputstr, sep)
-        if sep == nil then
-                sep = "%s"
-        end
-        local t={}
-        for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
-                table.insert(t, str)
-        end
-        return t
+	if inputstr == nil then
+		return nil
+	end
+
+	sep = sep or "%s"
+	local t={}
+	local str
+	for str in inputstr:gmatch("([^"..sep.."]+)") do
+		table.insert(t, str)
+	end
+	return t
 end
 
 function factory.addprefix(prefix, list)
