@@ -37,6 +37,7 @@
 #include <lua.hpp>
 
 #include <cassert>
+#include <exception>
 #include <memory>
 
 #include <err.h>
@@ -54,7 +55,8 @@ class View
 {
 private:
 	lua_State *lua;
-	int startStackTop;
+	const int startStackTop;
+	const int uncaught;
 
 	friend class Lua::Function;
 	friend class Lua::Table;
@@ -63,7 +65,8 @@ private:
 
 	View(lua_State *l)
 	  : lua(l),
-	    startStackTop(lua_gettop(lua))
+	    startStackTop(lua_gettop(lua)),
+	    uncaught(std::uncaught_exceptions())
 	{
 
 	}
@@ -172,14 +175,31 @@ public:
 	template <typename Free>
 	View(const std::unique_ptr<lua_State, Free> & l)
 	  : lua(l.get()),
-	    startStackTop(lua_gettop(lua))
+	    startStackTop(lua_gettop(lua)),
+	    uncaught(std::uncaught_exceptions())
 	{
 
 	}
 
 	~View()
 	{
-		assert (lua_gettop(lua) == startStackTop);
+		/*
+		 * If we're destroying a View because of a thrown exception,
+		 * the stack might have extra things pushed onto it.  Just pop
+		 * them off until the stack is back where it should be so that
+		 * our exception handler can generate a lua backtrace.
+		 */
+		if (std::uncaught_exceptions() > uncaught) {
+			int top = lua_gettop(lua);
+			while (top > startStackTop) {
+				lua_pop(lua, -1);
+				top--;
+			}
+
+		} else if (lua_gettop(lua) != startStackTop) {
+			errx(1, "Internal Error: stack top moved from %d to %d",
+			    startStackTop, lua_gettop(lua));
+		}
 	}
 
 	View(View &&) = default;
