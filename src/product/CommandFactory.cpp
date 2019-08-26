@@ -117,7 +117,10 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 		inputs.push_back(input);
 	}
 
-	for (auto & path : options.tmpdirs) {
+	for (Path path : options.tmpdirs) {
+		if (path.is_relative()) {
+			path = workdir / path;
+		}
 		permList.AddPermission(path, Permission::READ | Permission::WRITE);
 	}
 
