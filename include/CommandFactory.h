@@ -46,6 +46,8 @@ struct CommandOptions
 {
 	std::vector<std::string> tmpdirs;
 	std::optional<Path> workdir;
+	std::optional<Path> stdin;
+	std::optional<Path> stdout;
 };
 
 class CommandFactory

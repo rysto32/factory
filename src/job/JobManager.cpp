@@ -60,11 +60,11 @@ extern char ** environ;
 
 static int
 StartChild(const std::vector<char *> & argp, const std::vector<char *> & envpm, int shm_fd,
-    const Path & workdir) __attribute__((noreturn));
+    const Command & command) __attribute__((noreturn));
 
 static int
 StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, int shm_fd,
-    const Path & workdir)
+    const Command & command)
 {
 	int fd = dup2(shm_fd, SHARED_MEM_FD);
 	if (fd < 0) {
@@ -78,12 +78,42 @@ StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, i
 		exit(1);
 	}
 
-	error = chdir(workdir.c_str());
+	error = chdir(command.GetWorkDir().c_str());
 	if (error != 0) {
-		err(1, "Could not change cwd to '%s'\n", workdir.c_str());
+		err(1, "Could not change cwd to '%s'\n", command.GetWorkDir().c_str());
 	}
 
+	auto stdin = command.GetStdin();
+	if (stdin) {
+		fd = open(stdin->c_str(), O_RDONLY);
+		if (fd < 0) {
+			err(1, "Could not open '%s' for reading\n", stdin->c_str());
+		}
+
+		fd = dup2(fd, STDIN_FILENO);
+		if (fd != STDIN_FILENO) {
+			err(1, "Could not set fd %d", STDIN_FILENO);
+		}
+	}
+
+	auto stdout = command.GetStdout();
+	if (stdout) {
+		fd = open(stdout->c_str(), O_WRONLY | O_CREAT, 0700);
+		if (fd < 0) {
+			err(1, "Could not open '%s' for writing\n", stdout->c_str());
+		}
+
+		fd = dup2(fd, STDOUT_FILENO);
+		if (fd != STDOUT_FILENO) {
+			err(1, "Could not set fd %d", STDOUT_FILENO);
+		}
+	}
+
+	for (int i = STDERR_FILENO + 1; i < SHARED_MEM_FD; ++i) {
+		(void)close(i);
+	}
 	closefrom(SHARED_MEM_FD + 1);
+
 	execve(argp.at(0), &argp[0], &envp[0]);
 	err(1, "execve %s failed", argp.at(0));
 	_exit(1);
@@ -142,7 +172,7 @@ JobManager::StartJob(Command & command, JobCompletion & completer)
 		return NULL;
 
 	if (child == 0) {
-		StartChild(argp, envp, shm->GetFD(), command.GetWorkDir());
+		StartChild(argp, envp, shm->GetFD(), command);
 	} else {
 		auto job = std::make_unique<Job>(command.GetPermissions(), completer, jobId, child, command.GetWorkDir());
 

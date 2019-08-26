@@ -136,5 +136,6 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 	}
 
 	commandList.emplace_back(std::make_unique<Command>(std::move(products), std::move(argList),
-	    std::move(permList), std::move(workdir)));
+	    std::move(permList), std::move(workdir), std::move(options.stdin),
+	    std::move(options.stdout)));
 }

@@ -32,11 +32,13 @@
 
 
 Command::Command(ProductList && productList, ArgList && a, PermissionList && perm,
-    Path && wd)
+    Path && wd, std::optional<Path> && in, std::optional<Path> && out)
   : products(std::move(productList)),
     argList(std::move(a)),
     permissions(std::move(perm)),
     workdir(std::move(wd)),
+    stdin(std::move(in)),
+    stdout(std::move(out)),
     queued(false)
 {
 	for (Product * p : products) {

@@ -50,10 +50,13 @@ class Command : public JobCompletion
 	ArgList argList;
 	PermissionList permissions;
 	Path workdir;
+	std::optional<Path> stdin;
+	std::optional<Path> stdout;
 	bool queued;
 
 public:
-	Command (ProductList && products, ArgList && a, PermissionList && p, Path && wd);
+	Command(ProductList && products, ArgList && a, PermissionList && p, Path && wd,
+	    std::optional<Path> && in, std::optional<Path> && out);
 	virtual ~Command() = default;
 
 	Command (const Command &) = delete;
@@ -74,9 +77,19 @@ public:
 		return permissions;
 	}
 	
-	const Path & GetWorkDir()
+	const Path & GetWorkDir() const
 	{
 		return workdir;
+	}
+
+	const std::optional<Path> & GetStdin() const
+	{
+		return stdin;
+	}
+
+	const std::optional<Path> & GetStdout() const
+	{
+		return stdout;
 	}
 
 	bool WasQueued() const
