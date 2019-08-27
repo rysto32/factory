@@ -90,16 +90,21 @@ StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, i
 	}
 
 	auto stdin = command.GetStdin();
+	const char * stdin_file;
 	if (stdin) {
-		fd = open(stdin->c_str(), O_RDONLY);
-		if (fd < 0) {
-			err(1, "Could not open '%s' for reading\n", stdin->c_str());
-		}
+		stdin_file = stdin->c_str();
+	} else {
+		stdin_file = "/dev/null";
+	}
 
-		fd = dup2(fd, STDIN_FILENO);
-		if (fd != STDIN_FILENO) {
-			err(1, "Could not set fd %d", STDIN_FILENO);
-		}
+	fd = open(stdin_file, O_RDONLY);
+	if (fd < 0) {
+		err(1, "Could not open '%s' for reading\n", stdin_file);
+	}
+
+	fd = dup2(fd, STDIN_FILENO);
+	if (fd != STDIN_FILENO) {
+		err(1, "Could not set fd %d", STDIN_FILENO);
 	}
 
 	auto stdout = command.GetStdout();
