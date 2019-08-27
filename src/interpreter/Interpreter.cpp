@@ -402,6 +402,10 @@ Interpreter::DefineCommand()
 	auto optTable = lua.GetTable(optionsArg);
 	CommandOptions options = GetCommandOptions(optTable);
 
+	if (products.empty()) {
+		throw InterpreterException("In %s: cannot be empty", productsArg.ToString().c_str());
+	}
+
 	if (argList.empty()) {
 		throw InterpreterException("In %s: cannot be empty", argListArg.ToString().c_str());
 	}
