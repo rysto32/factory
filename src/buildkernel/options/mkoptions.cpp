@@ -30,6 +30,7 @@
 
 #include "ConfigNode.h"
 #include "ConfigParser.h"
+#include "Path.h"
 #include "Visitor.h"
 
 #include <err.h>
@@ -356,16 +357,15 @@ GetContent(const std::string & filename, const ConfigNode & top, const OptionMap
 }
 
 static void
-GenerateHeaders(const std::string outdir, const std::string & filename, const ConfigNode & top, const OptionMap & optHeaders)
+GenerateHeaders(const Path & outdir, const std::string & filename, const ConfigNode & top, const OptionMap & optHeaders)
 {
 	HeaderContentMap content = GetContent(filename, top, optHeaders);
 
 	for (const auto &  [optfile, optlist] : content) {
-		std::ostringstream optpath;
-		optpath << outdir << "/" << optfile;
-		FILE * fout = fopen(optpath.str().c_str(), "w");
+		Path optpath = outdir / optfile;
+		FILE * fout = fopen(optpath.string().c_str(), "w");
 		if (fout == nullptr)
-			err(1, "Could not open '%s' for reading", optpath.str().c_str());
+			err(1, "Could not open '%s' for reading", optpath.string().c_str());
 
 		for (const OptionValue & opt : optlist) {
 			fprintf(fout, "#define %s", opt.name.c_str());
@@ -394,7 +394,7 @@ int main(int argc, char **argv)
 {
 	int ch;
 	std::string confFile;
-	std::string outdir;
+	Path outdir;
 	std::vector<std::string> optionFiles;
 	OptionMap optionHeaders;
 
@@ -442,6 +442,12 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	std::error_code code;
+	Path canonical = outdir.canonical(code);
+	if (code) {
+		errx(1, "%s: %s", outdir.c_str(), code.message().c_str());
+	}
+
 	ConfigParser confParser(confFile);
 	std::string errors;
 	if (!confParser.Parse(errors)) {
@@ -459,5 +465,5 @@ int main(int argc, char **argv)
 		FindHeaders(path, optionParser.GetConfig(), optionHeaders);
 	}
 
-	GenerateHeaders(outdir, confFile, confParser.GetConfig(), optionHeaders);
+	GenerateHeaders(canonical, confFile, confParser.GetConfig(), optionHeaders);
 }
