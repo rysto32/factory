@@ -116,6 +116,7 @@ class Interpreter
 	static int EvaluateVarsWrapper(lua_State *);
 	static int IncludeConfigWrapper(lua_State *);
 	static int IncludeScriptWrapper(lua_State *);
+	static int RealpathWrapper(lua_State *);
 
 	static int ErrorHandler(lua_State *);
 
@@ -123,6 +124,7 @@ class Interpreter
 	int DefineCommand();
 	int EvaluateVars();
 	int Include(const char * funcName, IncludeFile::Type);
+	int Realpath();
 
 	void PushConfig(const ConfigNode & node);
 

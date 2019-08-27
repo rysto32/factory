@@ -5,7 +5,7 @@ end
 
 function factory.basename(path)
 	local _, ext
-	_, _, base = path:find('^.+/([^/]+)$')
+	_, _, base = path:find('([^/]+)$')
 	return base
 end
 
@@ -110,6 +110,10 @@ function factory.map(func, list)
 	end
 
 	return result
+end
+
+function factory.realpath(path)
+	return factory.internal.realpath(path)
 end
 
 function factory.shell_split(str)

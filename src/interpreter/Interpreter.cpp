@@ -58,6 +58,7 @@ const struct luaL_Reg Interpreter::factoryModule [] = {
 	{ "evaluate_vars", EvaluateVarsWrapper},
 	{"include_script", IncludeScriptWrapper},
 	{"include_config", IncludeConfigWrapper},
+	{      "realpath", RealpathWrapper},
 	{nullptr, nullptr}
 };
 
@@ -266,6 +267,16 @@ Interpreter::IncludeScriptWrapper(lua_State *lua)
 	    [](Interpreter *interp)
 	    {
 		return interp->Include("factory.include_script", IncludeFile::SCRIPT);
+	    });
+}
+
+int
+Interpreter::RealpathWrapper(lua_State *lua)
+{
+	return FuncImplementationWrapper(lua,
+	    [](Interpreter *interp)
+	    {
+		return interp->Realpath();
 	    });
 }
 
@@ -487,6 +498,29 @@ Interpreter::EvaluateVars()
 		VariableExpander expander(std::move(vars));
 
 		output = expander.ExpandVars(str);
+	}
+
+	lua_pushstring(luaState.get(), output.c_str());
+	return 1;
+}
+
+int
+Interpreter::Realpath()
+{
+	std::string output;
+	{
+		Lua::View lua(luaState);
+
+		Lua::Parameter pathArg("realpath", "path", 1);
+		Path path(lua.GetString(pathArg));
+
+		std::error_code error;
+		Path canonical = path.weakly_canonical(error);
+		if (error) {
+			throw InterpreterException("%s: %s", path.c_str(), error.message().c_str());
+		}
+
+		output = canonical.string();
 	}
 
 	lua_pushstring(luaState.get(), output.c_str());

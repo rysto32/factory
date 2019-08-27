@@ -97,6 +97,16 @@ public:
 		return path.root_path();
 	}
 
+	Path weakly_canonical(std::error_code & code) const
+	{
+		return std::filesystem::weakly_canonical(path, code);
+	}
+
+	Path canonical(std::error_code & code) const
+	{
+		return std::filesystem::canonical(path, code);
+	}
+
 	bool is_relative() const
 	{
 		return path.is_relative();
