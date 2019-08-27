@@ -68,7 +68,7 @@ definitions = {
 			end
 
 			arglist = { parent_config["AR"], "crs", libpath}
-			factory.array_concat(arglist, objs)
+			factory.list_concat(arglist, objs)
 
 			factory.define_command(libpath, objs, arglist)
 		end,
