@@ -73,7 +73,12 @@ MsgSocket::Dispatch(int fd, short flags)
 		errx(1, "Got message of invalid type %d from fd %d", t, this->fd);
 
 	if (t == MSG_TYPE_INIT) {
-		job = server->CompleteSocket(this, msg.init.jid);
+		Job * j = server->CompleteSocket(this, msg.init.jid);
+		if (j == nullptr) {
+			// this is already freed so get out of here
+			return;
+		}
+		job = j;
 	} else {
 		if (job == NULL)
 			errx(1, "Got unexpected message type %d from fd %d", t, this->fd);

@@ -237,9 +237,16 @@ Job *
 JobManager::RegisterSocket(uint64_t jobId, std::unique_ptr<MsgSocket> sock)
 {
 	auto it = jobMap.find(jobId);
-	if (it == jobMap.end())
-		err(1, "Process attempted to register against non-existnt job %ld",
-		    jobId);
+	if (it == jobMap.end()) {
+		if (jobId >= next_job_id) {
+			err(1, "Process attempted to register against non-existant job %ld",
+			    jobId);
+		}
+		// Process never sent any queries before exiting, and we lost a
+		// race and didn't see that it had started before we got notified
+		// that it exited.  Just return, there's nothing to do.
+		return nullptr;
+	}
 
 	it->second->RegisterSocket(std::move(sock));
 	return it->second.get();
