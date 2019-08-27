@@ -83,6 +83,12 @@ StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, i
 		err(1, "Could not change cwd to '%s'\n", command.GetWorkDir().c_str());
 	}
 
+	/* Create a new process group and put this process in it. */
+	error = setpgid(0, 0);
+	if (error != 0) {
+		err(1, "Could not create process group");
+	}
+
 	auto stdin = command.GetStdin();
 	if (stdin) {
 		fd = open(stdin->c_str(), O_RDONLY);
@@ -132,6 +138,12 @@ JobManager::JobManager(EventLoop & loop, TempFile *msgSock, JobQueue &q, int max
 
 JobManager::~JobManager()
 {
+	int status;
+
+	for (auto [pid, job] : pidMap) {
+		kill(-pid, SIGTERM);
+		waitpid(pid, &status, 0);
+	}
 }
 
 uint64_t
