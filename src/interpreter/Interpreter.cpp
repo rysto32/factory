@@ -211,7 +211,7 @@ int
 Interpreter::FuncImplementationWrapper(lua_State *lua, const F & implementation)
 {
 	try {
-		return implementation();
+		return implementation(GetInterpreter(lua));
 	} catch (InterpreterException & e)
 	{
 		luaL_traceback(lua, lua, e.what(), 1);
@@ -223,9 +223,9 @@ int
 Interpreter::AddDefinitionsWrapper(lua_State *lua)
 {
 	return FuncImplementationWrapper(lua,
-	    [lua]()
+	    [](Interpreter *interp)
 	    {
-		return GetInterpreter(lua)->AddDefinitions();
+		return interp->AddDefinitions();
 	    });
 }
 
@@ -233,9 +233,9 @@ int
 Interpreter::DefineCommandWrapper(lua_State *lua)
 {
 	return FuncImplementationWrapper(lua,
-	    [lua]()
+	    [](Interpreter *interp)
 	    {
-		return GetInterpreter(lua)->DefineCommand();
+		return interp->DefineCommand();
 	    });
 }
 
@@ -243,9 +243,9 @@ int
 Interpreter::EvaluateVarsWrapper(lua_State *lua)
 {
 	return FuncImplementationWrapper(lua,
-	    [lua]()
+	    [](Interpreter *interp)
 	    {
-		return GetInterpreter(lua)->EvaluateVars();
+		return interp->EvaluateVars();
 	    });
 }
 
@@ -253,9 +253,9 @@ int
 Interpreter::IncludeConfigWrapper(lua_State *lua)
 {
 	return FuncImplementationWrapper(lua,
-	    [lua]()
+	    [](Interpreter *interp)
 	    {
-		return GetInterpreter(lua)->Include("factory.include_config", IncludeFile::CONFIG);
+		return interp->Include("factory.include_config", IncludeFile::CONFIG);
 	    });
 }
 
@@ -263,9 +263,9 @@ int
 Interpreter::IncludeScriptWrapper(lua_State *lua)
 {
 	return FuncImplementationWrapper(lua,
-	    [lua]()
+	    [](Interpreter *interp)
 	    {
-		return GetInterpreter(lua)->Include("factory.include_script", IncludeFile::SCRIPT);
+		return interp->Include("factory.include_script", IncludeFile::SCRIPT);
 	    });
 }
 
