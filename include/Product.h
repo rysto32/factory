@@ -63,7 +63,7 @@ public:
 	bool SetCommand(Command * j);
 	void AddDependency(Product *);
 
-	void BuildComplete(int status);
+	void BuildComplete(int status, uintmax_t jobId);
 	void DependencyComplete(Product *);
 
 	const Path & GetPath() const

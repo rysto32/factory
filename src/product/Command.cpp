@@ -28,6 +28,7 @@
 
 #include "Command.h"
 
+#include "Job.h"
 #include "Product.h"
 
 
@@ -50,6 +51,6 @@ void
 Command::JobComplete(Job * job, int status)
 {
 	for (Product *p : products) {
-		p->BuildComplete(status);
+		p->BuildComplete(status, job->GetJobId());
 	}
 }

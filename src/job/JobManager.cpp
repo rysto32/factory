@@ -155,7 +155,10 @@ JobManager::StartJob(Command & command, JobCompletion & completer)
 	}
 	argp.push_back(NULL);
 
-	printf("Run: %s\n", commandStr.str().c_str());
+	uint64_t jobId = AllocJobId();
+	auto shm = std::make_unique<JobSharedMemory>(msgSock, jobId);
+
+	fprintf(stderr, "Run: \"%s\" as job %lld\n", commandStr.str().c_str(), (long long)jobId);
 
 	std::vector<char *> envp;
 	for (int i = 0; environ[i] != NULL; ++i) {
@@ -164,9 +167,6 @@ JobManager::StartJob(Command & command, JobCompletion & completer)
 	char ld_preload[] = "LD_PRELOAD=" LIB_LOCATION;
 	envp.push_back(ld_preload);
 	envp.push_back(NULL);
-
-	uint64_t jobId = AllocJobId();
-	auto shm = std::make_unique<JobSharedMemory>(msgSock, jobId);
 
 	pid_t child = fork();
 	if (child < 0)

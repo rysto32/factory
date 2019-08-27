@@ -71,27 +71,27 @@ Product::DependencyComplete(Product * d)
 }
 
 void
-Product::BuildComplete(int status)
+Product::BuildComplete(int status, uintmax_t jobId)
 {
 	if (WIFEXITED(status)) {
 		int code = WEXITSTATUS(status);
 		if (code == 0) {
-			fprintf(stderr, "'%s' is built\n", path.c_str());
+			fprintf(stderr, "Job %jd: '%s' is built\n", jobId, path.c_str());
 			for (Product * d : dependees)
 				d->DependencyComplete(this);
 
 		} else {
-			fprintf(stderr, "%s: job exited with code %d\n",
-			     path.c_str(), code);
+			fprintf(stderr, "Job %jd: %s: job exited with code %d\n",
+			     jobId, path.c_str(), code);
 			exit(1);
 		}
 	} else if(WIFSIGNALED(status)) {
-		fprintf(stderr, "%s: job terminated on signal %d\n",
-		     path.c_str(), WTERMSIG(status));
+		fprintf(stderr, "Job %jd: %s: job terminated on signal %d\n",
+		     jobId, path.c_str(), WTERMSIG(status));
 		exit(1);
 	} else {
-		fprintf(stderr, "%s: job terminated on unknown code %d\n",
-		     path.c_str(), status);
+		fprintf(stderr, "Job %jd: %s: job terminated on unknown code %d\n",
+		     jobId, path.c_str(), status);
 		exit(1);
 	}
 }
