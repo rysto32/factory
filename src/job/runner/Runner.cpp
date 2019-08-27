@@ -143,12 +143,12 @@ int main(int argc, char **argv)
 
 	EventLoop loop;
 	TempFileManager tmpMgr;
-	auto msgSock = tmpMgr.GetUnixSocket("msg_sock");
+	auto msgSock = tmpMgr.GetUnixSocket("msg_sock", 1);
 	if (!msgSock)
 		err(1, "Failed to get msgsock");
 
 	JobQueue jobQueue;
-	JobManager jobManager(loop, msgSock.get(), jobQueue);
+	JobManager jobManager(loop, msgSock.get(), jobQueue, 1);
 	MsgSocketServer server(std::move(msgSock), loop, jobManager);
 	SimpleCompletion completer(loop);
 	Command pending({}, std::move(list), std::move(perms), std::move(cwd), {}, {});

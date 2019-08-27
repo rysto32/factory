@@ -58,13 +58,14 @@ private:
 	EventLoop &loop;
 	TempFile *msgSock;
 	JobQueue & jobQueue;
+	const int maxRunning;
 
 	uint64_t next_job_id;
 
 	uint64_t AllocJobId();
 
 public:
-	JobManager(EventLoop &, TempFile *, JobQueue &);
+	JobManager(EventLoop &, TempFile *, JobQueue &, int max);
 	~JobManager();
 
 	JobManager(const JobManager &) = delete;

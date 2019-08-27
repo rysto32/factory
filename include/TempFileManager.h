@@ -46,7 +46,7 @@ public:
 	TempFileManager & operator=(const TempFileManager &) = delete;
 	TempFileManager & operator=(TempFileManager &&) = delete;
 
-	std::unique_ptr<TempFile> GetUnixSocket(const std::string & name);
+	std::unique_ptr<TempFile> GetUnixSocket(const std::string & name, int maxConnect);
 };
 
 #endif

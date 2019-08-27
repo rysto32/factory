@@ -119,10 +119,11 @@ StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, i
 	_exit(1);
 }
 
-JobManager::JobManager(EventLoop & loop, TempFile *msgSock, JobQueue &q)
+JobManager::JobManager(EventLoop & loop, TempFile *msgSock, JobQueue &q, int max)
   : loop(loop),
     msgSock(msgSock),
     jobQueue(q),
+    maxRunning(max),
     next_job_id(0)
 
 {
@@ -218,16 +219,18 @@ JobManager::Dispatch(int sig, short flags)
 bool
 JobManager::ScheduleJob()
 {
-	Command * command = jobQueue.RemoveNext();
+	while (jobMap.size() < maxRunning) {
+		Command * command = jobQueue.RemoveNext();
 
-	if (command == nullptr) {
-		if (jobMap.empty())
-			loop.SignalExit();
-		return false;
+		if (command == nullptr) {
+			if (jobMap.empty())
+				loop.SignalExit();
+			break;
+		}
+
+		StartJob(*command, *command);
 	}
-
-	StartJob(*command, *command);
-	return true;
+	return jobMap.size() > 0;
 }
 
 Job *

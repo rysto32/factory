@@ -47,6 +47,7 @@
 #include <err.h>
 #include <unistd.h>
 
+#include <limits>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -69,9 +70,9 @@ private:
 	void IncludeConfig(Interpreter & interp, const IncludeFile & file);
 
 public:
-	Main()
-	  : msgSock(tmpMgr.GetUnixSocket("msg_sock")),
-	    jobManager(loop, msgSock.get(), jq),
+	Main(int maxJobs)
+	  : msgSock(tmpMgr.GetUnixSocket("msg_sock", maxJobs)),
+	    jobManager(loop, msgSock.get(), jq, maxJobs),
 	    server(std::move(msgSock), loop, jobManager),
 	    productMgr(jq),
 	    commandFactory(productMgr),
@@ -155,6 +156,22 @@ std::unique_ptr<Main> mainObj;
 
 int main(int argc, char **argv)
 {
-	mainObj = std::make_unique<Main>();
+	char *endp;
+	u_long maxJobs = 1;
+	int ch;
+
+	while ((ch = getopt(argc, argv, "j:")) != -1) {
+		switch (ch) {
+		case 'j':
+			maxJobs = strtoul(optarg, &endp, 0);
+			if (optarg[0] == '\0' || *endp != '\0' ||
+			    maxJobs == 0 || maxJobs > std::numeric_limits<int>::max()) {
+				errx(1, "-j <jobs> parameter must be a positive int");
+			}
+			break;
+		}
+	}
+
+	mainObj = std::make_unique<Main>(maxJobs);
 	return mainObj->Run();
 }

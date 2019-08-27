@@ -43,7 +43,7 @@ TempFileManager::TempFileManager()
 }
 
 std::unique_ptr<TempFile>
-TempFileManager::GetUnixSocket(const std::string & name)
+TempFileManager::GetUnixSocket(const std::string & name, int maxConnect)
 {
 	std::string path(tempDir->GetPath());
 	path += '/';
@@ -64,7 +64,7 @@ TempFileManager::GetUnixSocket(const std::string & name)
 		return std::unique_ptr<TempFile>();
 	}
 
-	error = listen(fd, 0);
+	error = listen(fd, maxConnect);
 	if (error != 0) {
 		close(fd);
 		return std::unique_ptr<TempFile>();
