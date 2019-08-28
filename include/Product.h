@@ -81,7 +81,7 @@ public:
 		return dependees;
 	}
 
-	const std::unordered_set<Product *> GetInputs() const
+	const std::unordered_set<Product *> & GetInputs() const
 	{
 		return dependencies;
 	}
