@@ -34,7 +34,7 @@
 void
 PermissionList::AddPermission(const Path &path, Permission p)
 {
-	filePerm.emplace(path, p);
+	filePerm.emplace(path.lexically_normal(), p);
 }
 
 Permission

@@ -55,7 +55,6 @@ TEST_F(PermissionListTestSuite, TestDirPerm)
 	EXPECT_EQ(list.IsPermitted({}, "/home/", O_RDONLY), 0);
 	EXPECT_EQ(list.IsPermitted({}, "/tmp/test", O_RDONLY), EPERM);
 	EXPECT_EQ(list.IsPermitted({}, "/etc", O_RDONLY), EPERM);
-	EXPECT_EQ(list.IsPermitted({}, "/usr/home", O_RDONLY), EPERM);
 }
 
 TEST_F(PermissionListTestSuite, TestMultiDirPerm)
@@ -76,7 +75,6 @@ TEST_F(PermissionListTestSuite, TestMultiDirPerm)
 	EXPECT_EQ(list.IsPermitted({}, "/homer", O_RDONLY), EPERM);
 	EXPECT_EQ(list.IsPermitted({}, "/home/", O_RDONLY), 0);
 	EXPECT_EQ(list.IsPermitted({}, "/etc", O_RDONLY), EPERM);
-	EXPECT_EQ(list.IsPermitted({}, "/usr/home", O_RDONLY), EPERM);
 }
 
 TEST_F(PermissionListTestSuite, TestSubDirPerm)

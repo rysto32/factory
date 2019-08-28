@@ -89,9 +89,10 @@ Job::SendResponse(MsgSocket * sock, int error)
 void
 Job::HandleMessage(MsgSocket * sock, const SandboxMsg & msg)
 {
-	int permitted = perm.IsPermitted(workdir, msg.open.path, msg.open.flags & O_ACCMODE);
+	Path path = Path(msg.open.path).lexically_normal();
+	int permitted = perm.IsPermitted(workdir, path, msg.open.flags & O_ACCMODE);
 	if (permitted != 0) {
-		fprintf(stderr, "Denied access to '%s' for %x\n", msg.open.path, msg.open.flags & O_ACCMODE);
+		fprintf(stderr, "Denied access to '%s' for %x\n", path.c_str(), msg.open.flags & O_ACCMODE);
 	}
 
 	SendResponse(sock, permitted);

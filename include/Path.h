@@ -97,6 +97,11 @@ public:
 		return path.root_path();
 	}
 
+	Path lexically_normal() const
+	{
+		return path.lexically_normal();
+	}
+
 	Path weakly_canonical(std::error_code & code) const
 	{
 		return std::filesystem::weakly_canonical(path, code);
