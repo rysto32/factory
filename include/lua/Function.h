@@ -172,6 +172,10 @@ public:
 
 	Function & operator=(Function && f) noexcept
 	{
+		if (this == &f) {
+			return *this;
+		}
+
 		Release();
 		lua = f.lua;
 		ref = f.ref;
