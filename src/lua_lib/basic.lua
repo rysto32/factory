@@ -10,11 +10,11 @@ function factory.basename(path)
 end
 
 function factory.define_command(products, inputs, arglist, options)
-	print('products: ' .. factory.pretty_print_str(products))
-	print('inputs: ' .. factory.pretty_print_str(inputs))
-	print('arglist: ' .. factory.pretty_print_str(arglist))
-	print('options: ' .. factory.pretty_print_str(options))
-	print("")
+-- 	print('products: ' .. factory.pretty_print_str(products))
+-- 	print('inputs: ' .. factory.pretty_print_str(inputs))
+-- 	print('arglist: ' .. factory.pretty_print_str(arglist))
+-- 	print('options: ' .. factory.pretty_print_str(options))
+-- 	print("")
 	factory.internal.define_command(factory.listify(products),
 	    factory.listify(inputs), factory.listify(arglist),
 	    factory.listify(options))
