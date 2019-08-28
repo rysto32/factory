@@ -31,6 +31,7 @@
 #define INTERPRETER_H
 
 #include "ConfigNode.h"
+#include "IngestManager.h"
 #include "Visitor.h"
 
 #include <deque>
@@ -101,7 +102,7 @@ class Interpreter
 
 	typedef std::unique_ptr<lua_State, LuaStateFree> LuaStatePtr;
 	LuaStatePtr luaState;
-	IngestManager & ingestMgr;
+	IngestManager ingestMgr;
 	CommandFactory & commandFactory;
 	std::deque<IncludeFile> includeQueue;
 
@@ -152,7 +153,7 @@ class Interpreter
 	static int FuncImplementationWrapper(lua_State *lua, const F & implementation);
 
 public:
-	Interpreter(IngestManager &, CommandFactory &);
+	Interpreter(CommandFactory &);
 	~Interpreter();
 
 	Interpreter(const Interpreter &) = delete;

@@ -63,7 +63,6 @@ private:
 	MsgSocketServer server;
 	ProductManager productMgr;
 	CommandFactory commandFactory;
-	IngestManager ingestMgr;
 	Interpreter interp;
 
 	void IncludeScript(Interpreter & interp, const IncludeFile & file);
@@ -76,7 +75,7 @@ public:
 	    server(std::move(msgSock), loop, jobManager),
 	    productMgr(jq),
 	    commandFactory(productMgr),
-	    interp(ingestMgr, commandFactory)
+	    interp(commandFactory)
 	{
 	}
 

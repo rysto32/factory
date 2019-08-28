@@ -68,9 +68,8 @@ Interpreter::LuaStateFree::operator()(lua_State *luaState)
 	lua_close(luaState);
 }
 
-Interpreter::Interpreter(IngestManager &ingest, CommandFactory & c)
+Interpreter::Interpreter(CommandFactory & c)
   : luaState(LuaStatePtr(luaL_newstate())),
-    ingestMgr(ingest),
     commandFactory(c)
 {
 	// XXX this adds the io standard lib -- do we want that?
