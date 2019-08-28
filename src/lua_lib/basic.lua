@@ -56,7 +56,8 @@ function factory.build_path(...)
 		end
 	end
 
-	return path
+	-- XXX calling realpath here is the wrong thing to do
+	return factory.realpath(path)
 end
 
 function factory.internal.expand_var(name, vars)
