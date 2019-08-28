@@ -54,3 +54,13 @@ Command::JobComplete(Job * job, int status)
 		p->BuildComplete(status, job->GetJobId());
 	}
 }
+
+void
+Command::Abort()
+{
+	for (Product *p : products) {
+		std::error_code code;
+
+		std::filesystem::remove_all(p->GetPath());
+	}
+}

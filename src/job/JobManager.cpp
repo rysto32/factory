@@ -143,11 +143,8 @@ JobManager::JobManager(EventLoop & loop, TempFile *msgSock, JobQueue &q, int max
 
 JobManager::~JobManager()
 {
-	int status;
-
 	for (auto [pid, job] : pidMap) {
-		kill(-pid, SIGTERM);
-		waitpid(pid, &status, 0);
+		job->Abort();
 	}
 }
 

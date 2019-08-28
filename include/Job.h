@@ -66,6 +66,7 @@ public:
 	void RegisterSocket(std::unique_ptr<MsgSocket> sock);
 	void HandleMessage(MsgSocket * sock, const SandboxMsg &);
 	void Complete(int status);
+	void Abort();
 
 	int GetJobId() const
 	{

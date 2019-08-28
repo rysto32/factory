@@ -32,10 +32,14 @@
 #include "MsgSocket.h"
 #include "PermissionList.h"
 
+#include <sys/types.h>
+#include <sys/wait.h>
+
 #include <cstdlib>
 #include <errno.h>
 #include <err.h>
 #include <fcntl.h>
+#include <signal.h>
 
 Job::Job(const PermissionList &perm, JobCompletion &c, int id, pid_t pid, Path wd)
   : perm(perm),
@@ -54,6 +58,16 @@ void
 Job::Complete(int status)
 {
 	completer.JobComplete(this, status);
+}
+
+void
+Job::Abort()
+{
+	int status;
+
+	kill(-pid, SIGTERM);
+	waitpid(pid, &status, 0);
+	completer.Abort();
 }
 
 void

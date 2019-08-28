@@ -35,6 +35,7 @@ class JobCompletion
 {
 public:
 	virtual void JobComplete(Job * job, int status) = 0;
+	virtual void Abort() = 0;
 };
 
 #endif

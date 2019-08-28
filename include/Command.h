@@ -66,6 +66,7 @@ public:
 	Command & operator=( Command &&) = delete;
 
 	virtual void JobComplete(Job * job, int status) override;
+	virtual void Abort() override;
 
 	const ArgList & GetArgList() const
 	{

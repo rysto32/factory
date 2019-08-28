@@ -70,6 +70,11 @@ public:
 
 		loop.SignalExit();
 	}
+
+	void Abort() override
+	{
+		assert(0);
+	}
 };
 
 static Permission
