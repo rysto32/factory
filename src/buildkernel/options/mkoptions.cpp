@@ -381,7 +381,63 @@ GenerateHeaders(const Path & outdir, const std::string & filename, const ConfigN
 			), opt.value);
 			fprintf(fout, "\n");
 		}
+		fclose(fout);
 	}
+}
+
+static void
+GenerateConfigSrc(const Path & outdir, const ConfigNode & top)
+{
+	Path configSrc = outdir / "config.c";
+	FILE * fout = fopen(configSrc.c_str(), "w");
+	if (fout == nullptr) {
+		err(1, "Could not open '%s' for writing", configSrc.c_str());
+	}
+
+	fprintf(fout, "#include \"opt_config.h\"\n");
+	fprintf(fout, "#ifdef INCLUDE_CONFIG_FILE\n");
+	fprintf(fout, "const char kernconfstring[] __attribute__ ((section(\"kern_conf\"))) =\n\"");
+	//XXX config content
+	fprintf(fout, "\";\n\n#endif /* INCLUDE_CONFIG_FILE */\n");
+	fclose(fout);
+}
+
+static void
+GenerateEnvSrc(const Path & outdir, const ConfigNode & top)
+{
+	Path configSrc = outdir / "env.c";
+	FILE * fout = fopen(configSrc.c_str(), "w");
+	if (fout == nullptr) {
+		err(1, "Could not open '%s' for writing", configSrc.c_str());
+	}
+
+	fprintf(fout, "#include <sys/types.h>\n");
+	fprintf(fout, "#include <sys/systm.h>\n\n");
+	fprintf(fout, "int envmode = 0;\n");
+	fprintf(fout, "char static_env[] = {");
+	fprintf(fout, "\"\\0\"\n");
+	//XXX env content
+	fprintf(fout, "};\n");
+	fclose(fout);
+}
+
+static void
+GenerateHintsSrc(const Path & outdir, const ConfigNode & top)
+{
+	Path configSrc = outdir / "hints.c";
+	FILE * fout = fopen(configSrc.c_str(), "w");
+	if (fout == nullptr) {
+		err(1, "Could not open '%s' for writing", configSrc.c_str());
+	}
+
+	fprintf(fout, "#include <sys/types.h>\n");
+	fprintf(fout, "#include <sys/systm.h>\n\n");
+	fprintf(fout, "int hintmode = 0;\n");
+	fprintf(fout, "char static_hints[] = {");
+	fprintf(fout, "\"\\0\"\n");
+	//XXX env content
+	fprintf(fout, "};\n");
+	fclose(fout);
 }
 
 static void
@@ -466,4 +522,8 @@ int main(int argc, char **argv)
 	}
 
 	GenerateHeaders(canonical, confFile, confParser.GetConfig(), optionHeaders);
+
+	GenerateConfigSrc(canonical, confParser.GetConfig());
+	GenerateEnvSrc(canonical, confParser.GetConfig());
+	GenerateHintsSrc(canonical, confParser.GetConfig());
 }
