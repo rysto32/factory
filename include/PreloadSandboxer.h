@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018 Ryan Stone
+ * Copyright (c) 2019 Ryan Stone
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,53 +26,39 @@
  * SUCH DAMAGE.
  */
 
-#ifndef JOB_MANAGER_H
-#define JOB_MANAGER_H
+#ifndef PRELOAD_SANDBOXER_H
+#define PRELOAD_SANDBOXER_H
 
-#include "Event.h"
-#include "Command.h"
+#include "Sandbox.h"
 
-#include <sys/types.h>
+#include "JobSharedMemory.h"
 
 #include <memory>
-#include <string>
-#include <unordered_map>
 #include <vector>
 
-class EventLoop;
-class Job;
-class JobCompletion;
-class JobQueue;
-class SandboxFactory;
+class JobSharedMemory;
+class MsgSocket;
+class Command;
+struct SandboxMsg;
 
-class JobManager : private Event
+class PreloadSandboxer : public Sandbox
 {
 private:
-	typedef std::unordered_map<pid_t, std::unique_ptr<Job>> PidMap;
+	const Command & command;
+	JobSharedMemory shm;
+	std::vector<std::unique_ptr<MsgSocket>> sockets;
 
-	PidMap pidMap;
-	EventLoop &loop;
-	JobQueue & jobQueue;
-	std::unique_ptr<SandboxFactory> sandboxFactory;
-	const int maxRunning;
-
-	uint64_t next_job_id;
-
-	uint64_t AllocJobId();
+	void SendResponse(MsgSocket * sock, int error);
 
 public:
-	JobManager(EventLoop &, JobQueue &, std::unique_ptr<SandboxFactory> &&, int max);
-	~JobManager();
+	PreloadSandboxer(uint64_t jobId, const Command & c, const TempFile *msgSock);
 
-	JobManager(const JobManager &) = delete;
-	JobManager(JobManager &&) = delete;
-	JobManager & operator=(const JobManager &) = delete;
-	JobManager & operator=(JobManager &&) = delete;
+	virtual void Enable() override;
+	virtual void EnvironAppend(std::vector<char*> & envp) override;
 
-	Job * StartJob(Command &, JobCompletion &);
-
-	void Dispatch(int fd, short flags) override;
-	bool ScheduleJob();
+	void RegisterSocket(std::unique_ptr<MsgSocket> sock);
+	void HandleMessage(MsgSocket * sock, const SandboxMsg &);
 };
 
 #endif
+

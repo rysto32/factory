@@ -35,8 +35,8 @@
 #include <unordered_map>
 
 class EventLoop;
-class Job;
-class JobManager;
+class PreloadSandboxer;
+class PreloadSandboxerFactory;
 class MsgSocket;
 class TempFile;
 
@@ -46,11 +46,11 @@ private:
 	std::unique_ptr<TempFile> listenSock;
 	std::unordered_map<int, std::unique_ptr<MsgSocket> > incompleteSockets;
 	EventLoop &eventLoop;
-	JobManager &jobMgr;
+	PreloadSandboxerFactory &factory;
 
 public:
 	MsgSocketServer(std::unique_ptr<TempFile> fd, EventLoop & loop,
-	    JobManager &jobMgr);
+	    PreloadSandboxerFactory &preload);
 	~MsgSocketServer();
 
 	MsgSocketServer(const MsgSocketServer&) = delete;
@@ -60,7 +60,12 @@ public:
 
 	void Dispatch(int fd, short flags) override;
 
-	Job * CompleteSocket(MsgSocket *, uint64_t jobId);
+	PreloadSandboxer * CompleteSocket(MsgSocket *, uint64_t jobId);
+
+	const TempFile * GetSock() const
+	{
+		return listenSock.get();
+	}
 };
 
 #endif

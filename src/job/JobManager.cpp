@@ -31,10 +31,9 @@
 #include "EventLoop.h"
 #include "Job.h"
 #include "JobQueue.h"
-#include "JobSharedMemory.h"
 #include "MsgSocket.h"
-#include "SharedMem.h"
-#include "TempFile.h"
+#include "Sandbox.h"
+#include "SandboxFactory.h"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -59,24 +58,14 @@
 extern char ** environ;
 
 static int
-StartChild(const std::vector<char *> & argp, const std::vector<char *> & envpm, int shm_fd,
-    const Command & command) __attribute__((noreturn));
+StartChild(const std::vector<char *> & argp, const std::vector<char *> & envpm,
+    Sandbox & boxer, const Command & command) __attribute__((noreturn));
 
 static int
-StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, int shm_fd,
-    const Command & command)
+StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp,
+    Sandbox & sandbox, const Command & command)
 {
-	int fd = dup2(shm_fd, SHARED_MEM_FD);
-	if (fd < 0) {
-		perror("Could not dup shm_fd");
-		exit(1);
-	}
-
-	int error = fcntl(SHARED_MEM_FD, F_SETFD, 0);
-	if (error < 0) {
-		perror("Could not disable close-on-exec");
-		exit(1);
-	}
+	int fd, error;
 
 	error = chdir(command.GetWorkDir().c_str());
 	if (error != 0) {
@@ -120,20 +109,17 @@ StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp, i
 		}
 	}
 
-	for (int i = STDERR_FILENO + 1; i < SHARED_MEM_FD; ++i) {
-		(void)close(i);
-	}
-	closefrom(SHARED_MEM_FD + 1);
+	sandbox.Enable();
 
 	execve(argp.at(0), &argp[0], &envp[0]);
 	err(1, "execve %s failed", argp.at(0));
 	_exit(1);
 }
 
-JobManager::JobManager(EventLoop & loop, TempFile *msgSock, JobQueue &q, int max)
+JobManager::JobManager(EventLoop & loop, JobQueue &q, std::unique_ptr<SandboxFactory> &&f, int max)
   : loop(loop),
-    msgSock(msgSock),
     jobQueue(q),
+    sandboxFactory(std::move(f)),
     maxRunning(max),
     next_job_id(0)
 
@@ -143,7 +129,7 @@ JobManager::JobManager(EventLoop & loop, TempFile *msgSock, JobQueue &q, int max
 
 JobManager::~JobManager()
 {
-	for (auto [pid, job] : pidMap) {
+	for (auto & [pid, job] : pidMap) {
 		job->Abort();
 	}
 }
@@ -170,7 +156,7 @@ JobManager::StartJob(Command & command, JobCompletion & completer)
 	argp.push_back(NULL);
 
 	uint64_t jobId = AllocJobId();
-	auto shm = std::make_unique<JobSharedMemory>(msgSock, jobId);
+	Sandbox &sandbox = sandboxFactory->MakeSandbox(jobId, command);
 
 	fprintf(stderr, "Run: \"%s\" as job %lld\n", commandStr.str().c_str(), (long long)jobId);
 
@@ -178,8 +164,7 @@ JobManager::StartJob(Command & command, JobCompletion & completer)
 	for (int i = 0; environ[i] != NULL; ++i) {
 		envp.push_back(environ[i]);
 	}
-	char ld_preload[] = "LD_PRELOAD=" LIB_LOCATION;
-	envp.push_back(ld_preload);
+	sandbox.EnvironAppend(envp);
 	envp.push_back(NULL);
 
 	pid_t child = fork();
@@ -187,12 +172,13 @@ JobManager::StartJob(Command & command, JobCompletion & completer)
 		return NULL;
 
 	if (child == 0) {
-		StartChild(argp, envp, shm->GetFD(), command);
+		StartChild(argp, envp, sandbox, command);
 	} else {
-		auto job = std::make_unique<Job>(command.GetPermissions(), completer, jobId, child, command.GetWorkDir());
+		sandbox.ParentCleanup();
 
-		pidMap.insert(std::make_pair(child, job.get()));
-		auto ins = jobMap.insert(std::make_pair(jobId, std::move(job)));
+		auto job = std::make_unique<Job>(completer, jobId, child, command.GetWorkDir());
+
+		auto ins = pidMap.insert(std::make_pair(child, std::move(job)));
 		assert (ins.second);
 		return ins.first->second.get();
 	}
@@ -223,7 +209,7 @@ JobManager::Dispatch(int sig, short flags)
 		}
 
 		it->second->Complete(status);
-		jobMap.erase(it->second->GetJobId());
+		sandboxFactory->ReleaseSandbox(it->second->GetJobId());
 		pidMap.erase(it);
 
 		ScheduleJob();
@@ -233,35 +219,16 @@ JobManager::Dispatch(int sig, short flags)
 bool
 JobManager::ScheduleJob()
 {
-	while (jobMap.size() < maxRunning) {
+	while (pidMap.size() < maxRunning) {
 		Command * command = jobQueue.RemoveNext();
 
 		if (command == nullptr) {
-			if (jobMap.empty())
+			if (pidMap.empty())
 				loop.SignalExit();
 			break;
 		}
 
 		StartJob(*command, *command);
 	}
-	return jobMap.size() > 0;
-}
-
-Job *
-JobManager::RegisterSocket(uint64_t jobId, std::unique_ptr<MsgSocket> sock)
-{
-	auto it = jobMap.find(jobId);
-	if (it == jobMap.end()) {
-		if (jobId >= next_job_id) {
-			err(1, "Process attempted to register against non-existant job %ld",
-			    jobId);
-		}
-		// Process never sent any queries before exiting, and we lost a
-		// race and didn't see that it had started before we got notified
-		// that it exited.  Just return, there's nothing to do.
-		return nullptr;
-	}
-
-	it->second->RegisterSocket(std::move(sock));
-	return it->second.get();
+	return pidMap.size() > 0;
 }

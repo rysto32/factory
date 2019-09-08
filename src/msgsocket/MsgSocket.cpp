@@ -29,9 +29,9 @@
 #include "MsgSocket.h"
 
 #include "EventLoop.h"
-#include "Job.h"
 #include "MsgSocketServer.h"
 #include "MsgType.h"
+#include "PreloadSandboxer.h"
 
 #include <assert.h>
 #include <err.h>
@@ -73,7 +73,7 @@ MsgSocket::Dispatch(int fd, short flags)
 		errx(1, "Got message of invalid type %d from fd %d", t, this->fd);
 
 	if (t == MSG_TYPE_INIT) {
-		Job * j = server->CompleteSocket(this, msg.init.jid);
+		PreloadSandboxer * j = server->CompleteSocket(this, msg.init.jid);
 		if (j == nullptr) {
 			// this is already freed so get out of here
 			return;

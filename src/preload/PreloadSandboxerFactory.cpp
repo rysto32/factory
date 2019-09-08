@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018 Ryan Stone
+ * Copyright (c) 2019 Ryan Stone
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,53 +26,50 @@
  * SUCH DAMAGE.
  */
 
-#ifndef JOB_MANAGER_H
-#define JOB_MANAGER_H
+#include "PreloadSandboxerFactory.h"
 
-#include "Event.h"
-#include "Command.h"
+#include "MsgSocket.h"
+#include "PreloadSandboxer.h"
+#include "TempFileManager.h"
+#include "TempFile.h"
 
-#include <sys/types.h>
-
-#include <memory>
-#include <string>
-#include <unordered_map>
-#include <vector>
-
-class EventLoop;
-class Job;
-class JobCompletion;
-class JobQueue;
-class SandboxFactory;
-
-class JobManager : private Event
+PreloadSandboxerFactory::PreloadSandboxerFactory(TempFileManager & tmpMgr,
+    EventLoop &loop, int maxJobs)
+  : server(tmpMgr.GetUnixSocket("msg_sock", maxJobs), loop, *this)
 {
-private:
-	typedef std::unordered_map<pid_t, std::unique_ptr<Job>> PidMap;
 
-	PidMap pidMap;
-	EventLoop &loop;
-	JobQueue & jobQueue;
-	std::unique_ptr<SandboxFactory> sandboxFactory;
-	const int maxRunning;
+}
 
-	uint64_t next_job_id;
+PreloadSandboxerFactory::~PreloadSandboxerFactory()
+{
 
-	uint64_t AllocJobId();
+}
 
-public:
-	JobManager(EventLoop &, JobQueue &, std::unique_ptr<SandboxFactory> &&, int max);
-	~JobManager();
+Sandbox &
+PreloadSandboxerFactory::MakeSandbox(uint64_t jid, const Command &command)
+{
+	auto [it, inserted] = jobMap.emplace(jid, std::make_unique<PreloadSandboxer>(jid, command, server.GetSock()));
 
-	JobManager(const JobManager &) = delete;
-	JobManager(JobManager &&) = delete;
-	JobManager & operator=(const JobManager &) = delete;
-	JobManager & operator=(JobManager &&) = delete;
+	return *it->second;
+}
 
-	Job * StartJob(Command &, JobCompletion &);
+void
+PreloadSandboxerFactory::ReleaseSandbox(uint64_t jid)
+{
+	jobMap.erase(jid);
+}
 
-	void Dispatch(int fd, short flags) override;
-	bool ScheduleJob();
-};
+PreloadSandboxer *
+PreloadSandboxerFactory::RegisterSocket(uint64_t jobId, std::unique_ptr<MsgSocket> sock)
+{
+	auto it = jobMap.find(jobId);
+	if (it == jobMap.end()) {
+		// Process never sent any queries before exiting, and we lost a
+		// race and didn't see that it had started before we got notified
+		// that it exited.  Just return, there's nothing to do.
+		return nullptr;
+	}
 
-#endif
+	it->second->RegisterSocket(std::move(sock));
+	return it->second.get();
+}

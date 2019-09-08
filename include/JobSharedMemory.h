@@ -41,10 +41,10 @@ class JobSharedMemory
 private:
 	int shm_fd;
 
-	void InitUnixAddr(struct sockaddr_un &addr, TempFile *msgSock);
+	void InitUnixAddr(struct sockaddr_un &addr, const TempFile *msgSock);
 
 public:
-	JobSharedMemory(TempFile *msgSock, uint64_t jobId);
+	JobSharedMemory(const TempFile *msgSock, uint64_t jobId);
 	~JobSharedMemory();
 
 	JobSharedMemory(const JobSharedMemory &) = delete;

@@ -30,6 +30,7 @@
 #define TEMP_FILE_MANAGER_H
 
 #include <memory>
+#include <string>
 
 class TempDir;
 class TempFile;

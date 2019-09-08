@@ -28,17 +28,17 @@
 #include "MsgSocketServer.h"
 
 #include "EventLoop.h"
-#include "JobManager.h"
 #include "MsgSocket.h"
+#include "PreloadSandboxerFactory.h"
 #include "TempFile.h"
 
 #include <cassert>
 
 MsgSocketServer::MsgSocketServer(std::unique_ptr<TempFile> fd, EventLoop & loop,
-    JobManager &jobMgr)
+    PreloadSandboxerFactory &f)
   : listenSock(std::move(fd)),
     eventLoop(loop),
-    jobMgr(jobMgr)
+    factory(f)
 {
 	loop.RegisterListenSocket(this, listenSock->GetFD());
 }
@@ -62,7 +62,7 @@ MsgSocketServer::Dispatch(int fd, short flags)
 	}
 }
 
-Job *
+PreloadSandboxer *
 MsgSocketServer::CompleteSocket(MsgSocket *s, uint64_t jobId)
 {
 	auto it = incompleteSockets.find(s->GetFD());
@@ -71,5 +71,5 @@ MsgSocketServer::CompleteSocket(MsgSocket *s, uint64_t jobId)
 	auto ptr = std::move(it->second);
 	incompleteSockets.erase(s->GetFD());
 
-	return jobMgr.RegisterSocket(jobId, std::move(ptr));
+	return factory.RegisterSocket(jobId, std::move(ptr));
 }

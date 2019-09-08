@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018 Ryan Stone
+ * Copyright (c) 2019 Ryan Stone
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,53 +26,23 @@
  * SUCH DAMAGE.
  */
 
-#ifndef JOB_MANAGER_H
-#define JOB_MANAGER_H
-
-#include "Event.h"
-#include "Command.h"
-
-#include <sys/types.h>
+#ifndef SANDBOX_FACTORY_H
+#define SANDBOX_FACTORY_H
 
 #include <memory>
-#include <string>
-#include <unordered_map>
-#include <vector>
+#include <stdint.h>
 
-class EventLoop;
-class Job;
-class JobCompletion;
-class JobQueue;
-class SandboxFactory;
+class Command;
+class Sandbox;
 
-class JobManager : private Event
+class SandboxFactory
 {
-private:
-	typedef std::unordered_map<pid_t, std::unique_ptr<Job>> PidMap;
-
-	PidMap pidMap;
-	EventLoop &loop;
-	JobQueue & jobQueue;
-	std::unique_ptr<SandboxFactory> sandboxFactory;
-	const int maxRunning;
-
-	uint64_t next_job_id;
-
-	uint64_t AllocJobId();
-
 public:
-	JobManager(EventLoop &, JobQueue &, std::unique_ptr<SandboxFactory> &&, int max);
-	~JobManager();
+	virtual ~SandboxFactory() = default;
 
-	JobManager(const JobManager &) = delete;
-	JobManager(JobManager &&) = delete;
-	JobManager & operator=(const JobManager &) = delete;
-	JobManager & operator=(JobManager &&) = delete;
-
-	Job * StartJob(Command &, JobCompletion &);
-
-	void Dispatch(int fd, short flags) override;
-	bool ScheduleJob();
+	virtual Sandbox& MakeSandbox(uint64_t jid, const Command &command) = 0;
+	virtual void ReleaseSandbox(uint64_t jid) = 0;
 };
 
 #endif
+

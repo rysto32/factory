@@ -34,14 +34,14 @@
 
 class EventLoop;
 class MsgSocketServer;
-class Job;
+class PreloadSandboxer;
 
 class MsgSocket : public Event
 {
 private:
 	int fd;
 	MsgSocketServer *server;
-	Job *job;
+	PreloadSandboxer *job;
 
 	uint8_t *next;
 	size_t msg_left;

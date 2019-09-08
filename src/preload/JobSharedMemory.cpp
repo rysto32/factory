@@ -46,7 +46,7 @@ T RoundUp(T value, U mult)
 	return ((value + (mult - 1)) / mult) * mult;
 }
 
-JobSharedMemory::JobSharedMemory(TempFile *msgSock, uint64_t jobId)
+JobSharedMemory::JobSharedMemory(const TempFile *msgSock, uint64_t jobId)
 {
 	shm_fd = shm_open(SHM_ANON, O_CREAT | O_TRUNC | O_RDWR, 0600);
 	if (shm_fd < 0)
@@ -82,7 +82,7 @@ JobSharedMemory::~JobSharedMemory()
 }
 
 void
-JobSharedMemory::InitUnixAddr(struct sockaddr_un &addr, TempFile *msgSock)
+JobSharedMemory::InitUnixAddr(struct sockaddr_un &addr, const TempFile *msgSock)
 {
 	addr.sun_len = sizeof(addr);
 	addr.sun_family = AF_UNIX;

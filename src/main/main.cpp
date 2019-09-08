@@ -30,15 +30,11 @@
 #include "ConfigNode.h"
 #include "ConfigParser.h"
 #include "EventLoop.h"
-#include "IngestManager.h"
 #include "Interpreter.h"
 #include "Job.h"
-#include "JobCompletion.h"
 #include "JobManager.h"
 #include "JobQueue.h"
-#include "MsgSocketServer.h"
-#include "Permission.h"
-#include "PermissionList.h"
+#include "PreloadSandboxerFactory.h"
 #include "Product.h"
 #include "ProductManager.h"
 #include "TempFileManager.h"
@@ -52,15 +48,19 @@
 #include <string>
 #include <vector>
 
+std::unique_ptr<SandboxFactory>
+GetSandboxerFactory(TempFileManager & tmpMgr, EventLoop &loop, int maxJobs)
+{
+	return std::make_unique<PreloadSandboxerFactory>(tmpMgr, loop, maxJobs);
+}
+
 class Main
 {
 private:
 	EventLoop loop;
 	TempFileManager tmpMgr;
-	std::unique_ptr<TempFile> msgSock;
 	JobQueue jq;
 	JobManager jobManager;
-	MsgSocketServer server;
 	ProductManager productMgr;
 	CommandFactory commandFactory;
 	Interpreter interp;
@@ -70,9 +70,7 @@ private:
 
 public:
 	Main(int maxJobs)
-	  : msgSock(tmpMgr.GetUnixSocket("msg_sock", maxJobs)),
-	    jobManager(loop, msgSock.get(), jq, maxJobs),
-	    server(std::move(msgSock), loop, jobManager),
+	  : jobManager(loop, jq, GetSandboxerFactory(tmpMgr, loop, maxJobs), maxJobs),
 	    productMgr(jq),
 	    commandFactory(productMgr),
 	    interp(commandFactory)

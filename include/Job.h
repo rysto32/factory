@@ -35,27 +35,21 @@
 #include <memory>
 #include <vector>
 
-#include "MsgType.h"
 #include "Path.h"
 
 class JobCompletion;
-class MsgSocket;
 class PermissionList;
 
 class Job
 {
 private:
-	const PermissionList &perm;
 	JobCompletion &completer;
-	std::vector<std::unique_ptr<MsgSocket>> sockets;
 	uint64_t jobId;
 	pid_t pid;
 	Path workdir;
 
-	void SendResponse(MsgSocket * sock, int error);
-
 public:
-	Job(const PermissionList &, JobCompletion &, int id, pid_t pid, Path wd);
+	Job(JobCompletion &, int id, pid_t pid, Path wd);
 	~Job();
 
 	Job(const Job &) = delete;
@@ -63,8 +57,6 @@ public:
 	Job & operator=(const Job &) = delete;
 	Job & operator=(Job &&) = delete;
 
-	void RegisterSocket(std::unique_ptr<MsgSocket> sock);
-	void HandleMessage(MsgSocket * sock, const SandboxMsg &);
 	void Complete(int status);
 	void Abort();
 

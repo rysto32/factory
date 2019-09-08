@@ -1,6 +1,7 @@
 
 SUBDIRS := \
 	buildkernel \
+	capsicum \
 	config \
 	eventloop \
 	ingest \
@@ -9,8 +10,8 @@ SUBDIRS := \
 	main \
 	msgsocket \
 	perm \
+	preload \
 	product \
-	sandbox \
 	temp_files \
 	util \
 

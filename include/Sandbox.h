@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018 Ryan Stone
+ * Copyright (c) 2019 Ryan Stone
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,53 +26,26 @@
  * SUCH DAMAGE.
  */
 
-#ifndef JOB_MANAGER_H
-#define JOB_MANAGER_H
+#ifndef SANDBOX_H
+#define SANDBOX_H
 
-#include "Event.h"
-#include "Command.h"
-
-#include <sys/types.h>
-
-#include <memory>
-#include <string>
-#include <unordered_map>
 #include <vector>
 
-class EventLoop;
-class Job;
-class JobCompletion;
-class JobQueue;
-class SandboxFactory;
-
-class JobManager : private Event
+class Sandbox
 {
-private:
-	typedef std::unordered_map<pid_t, std::unique_ptr<Job>> PidMap;
-
-	PidMap pidMap;
-	EventLoop &loop;
-	JobQueue & jobQueue;
-	std::unique_ptr<SandboxFactory> sandboxFactory;
-	const int maxRunning;
-
-	uint64_t next_job_id;
-
-	uint64_t AllocJobId();
-
 public:
-	JobManager(EventLoop &, JobQueue &, std::unique_ptr<SandboxFactory> &&, int max);
-	~JobManager();
+	virtual ~Sandbox() = default;
 
-	JobManager(const JobManager &) = delete;
-	JobManager(JobManager &&) = delete;
-	JobManager & operator=(const JobManager &) = delete;
-	JobManager & operator=(JobManager &&) = delete;
+	virtual void Enable() = 0;
 
-	Job * StartJob(Command &, JobCompletion &);
+	virtual void ParentCleanup()
+	{
+	}
 
-	void Dispatch(int fd, short flags) override;
-	bool ScheduleJob();
+	virtual void EnvironAppend(std::vector<char*> &)
+	{
+	}
 };
 
 #endif
+

@@ -29,8 +29,6 @@
 #include "Job.h"
 
 #include "JobCompletion.h"
-#include "MsgSocket.h"
-#include "PermissionList.h"
 
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -41,9 +39,8 @@
 #include <fcntl.h>
 #include <signal.h>
 
-Job::Job(const PermissionList &perm, JobCompletion &c, int id, pid_t pid, Path wd)
-  : perm(perm),
-    completer(c),
+Job::Job(JobCompletion &c, int id, pid_t pid, Path wd)
+  : completer(c),
     jobId(id),
     pid(pid),
     workdir(std::move(wd))
@@ -68,32 +65,4 @@ Job::Abort()
 	kill(-pid, SIGTERM);
 	waitpid(pid, &status, 0);
 	completer.Abort();
-}
-
-void
-Job::RegisterSocket(std::unique_ptr<MsgSocket> sock)
-{
-	sockets.push_back(std::move(sock));
-}
-
-void
-Job::SendResponse(MsgSocket * sock, int error)
-{
-	SandboxResp resp;
-
-	resp.type = MSG_TYPE_OPEN_REQUEST;
-	resp.error = error;
-	sock->Send(resp);
-}
-
-void
-Job::HandleMessage(MsgSocket * sock, const SandboxMsg & msg)
-{
-	Path path = Path(msg.open.path).lexically_normal();
-	int permitted = perm.IsPermitted(workdir, path, msg.open.flags & O_ACCMODE);
-	if (permitted != 0) {
-		fprintf(stderr, "Denied access to '%s' for %x\n", path.c_str(), msg.open.flags & O_ACCMODE);
-	}
-
-	SendResponse(sock, permitted);
 }

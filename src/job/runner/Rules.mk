@@ -6,6 +6,7 @@ PROG_LIBS := \
 	job \
 	perm \
 	product \
+	preload_sb \
 	msgsocket \
 	eventloop \
 	temp_files \
