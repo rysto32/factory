@@ -1,5 +1,5 @@
 
-objdirprefix = "/home/rstone/obj/tcplat"
+objdirprefix = "/usr/home/rstone/obj/tcplat"
 libdir = objdirprefix .. "/lib"
 bindir = objdirprefix .. "/bin"
 
