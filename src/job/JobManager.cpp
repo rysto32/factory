@@ -109,9 +109,14 @@ StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp,
 		}
 	}
 
+	fd = open(argp.at(0), O_RDONLY | O_EXEC);
+	if (fd < 0) {
+		err(1, "Could not open '%s' for exec", argp.at(0));
+	}
+
 	sandbox.Enable();
 
-	execve(argp.at(0), &argp[0], &envp[0]);
+	fexecve(fd, &argp[0], &envp[0]);
 	err(1, "execve %s failed", argp.at(0));
 	_exit(1);
 }

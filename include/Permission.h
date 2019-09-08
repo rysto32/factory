@@ -31,7 +31,7 @@
 
 #include <type_traits>
 
-enum class Permission
+enum Permission
 {
 	NONE = 0x00,
 	READ = 0x01,

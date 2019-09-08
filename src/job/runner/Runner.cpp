@@ -26,6 +26,7 @@
  * SUCH DAMAGE.
  */
 
+#include "CapsicumSandboxFactory.h"
 #include "EventLoop.h"
 #include "Job.h"
 #include "JobCompletion.h"
@@ -151,7 +152,7 @@ int main(int argc, char **argv)
 	TempFileManager tmpMgr;
 	JobQueue jobQueue;
 	JobManager jobManager(loop, jobQueue,
-	    std::make_unique<PreloadSandboxerFactory>(tmpMgr, loop, 1), 1);
+	    std::make_unique<CapsicumSandboxFactory>(), 1);
 	SimpleCompletion completer(loop);
 	Command pending({}, std::move(list), std::move(perms), std::move(cwd), {}, {});
 

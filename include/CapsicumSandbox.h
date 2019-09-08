@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018 Ryan Stone
+ * Copyright (c) 2019 Ryan Stone
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,47 +26,75 @@
  * SUCH DAMAGE.
  */
 
-#ifndef PERMSSION_LIST_H
-#define PERMSSION_LIST_H
+#ifndef CAPSICUM_SANDBOX_H
+#define CAPSICUM_SANDBOX_H
+
+#include "Sandbox.h"
 
 #include "Path.h"
-#include "Permission.h"
 
-#include <sys/types.h>
+extern "C" {
+#include <gbpf/gbpf.h>
+}
 
-#include <memory>
-#include <string>
-#include <unordered_map>
 #include <vector>
 
-class PermissionList
+class Command;
+class PermissionList;
+
+class CapsicumSandbox : public Sandbox
 {
-public:
-	typedef std::unordered_map<Path, Permission> PermMap;
-
-private:
-	PermMap filePerm;
-
-	static Permission ModeToPermission(int);
-
-	int CheckPerm(Permission allowed, int mode) const;
-
-public:
-	PermissionList() = default;
-	PermissionList(PermissionList &&) = default;
-
-	PermissionList(const PermissionList &) = delete;
-	PermissionList &operator=(const PermissionList&) = delete;
-	PermissionList &operator=(PermissionList &&) = delete;
-
-	void AddPermission(const Path &, Permission);
-
-	int IsPermitted(const Path & cwd, const Path &, int) const;
-
-	const PermMap & GetPermMap() const
+	struct PreopenDesc
 	{
-		return filePerm;
-	}
+		PreopenDesc(Path p, int f)
+		  : path(std::move(p)), fd(f)
+		{
+		}
+
+		PreopenDesc(const PreopenDesc &) = delete;
+
+		PreopenDesc(PreopenDesc && d) noexcept
+		  : path(std::move(d.path)), fd(d.fd)
+		{
+			d.fd = -1;
+		}
+
+		PreopenDesc & operator=(const PreopenDesc &) = delete;
+		PreopenDesc & operator=(PreopenDesc &&) = delete;
+
+		~PreopenDesc();
+
+		Path path;
+		int fd;
+	};
+
+	std::vector<PreopenDesc> descriptors;
+	EBPFDevDriver *ebpf;
+
+	int open_prog;
+	int fd_map;
+
+	void PreopenDescriptors(const PermissionList &);
+	void CreateEbpfRules();
+
+	static void DefineProgram(GBPFElfWalker *walker, const char *name,
+			struct ebpf_inst *prog, uint32_t prog_len);
+	static void DefineMap(GBPFElfWalker *walker, const char *name, int desc,
+		       struct ebpf_map_def *map);
+
+public:
+	CapsicumSandbox(const Command & c);
+	~CapsicumSandbox();
+
+	CapsicumSandbox(CapsicumSandbox &&) = delete;
+	CapsicumSandbox(const CapsicumSandbox &) = delete;
+
+	CapsicumSandbox & operator=(CapsicumSandbox &&) = delete;
+	CapsicumSandbox & operator=(const CapsicumSandbox &) = delete;
+
+	virtual void Enable() override;
+	virtual void ParentCleanup() override;
 };
 
 #endif
+

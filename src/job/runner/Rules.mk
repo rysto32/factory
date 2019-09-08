@@ -6,6 +6,7 @@ PROG_LIBS := \
 	job \
 	perm \
 	product \
+	capsicum_sb \
 	preload_sb \
 	msgsocket \
 	eventloop \
@@ -13,7 +14,8 @@ PROG_LIBS := \
 
 PROG_STDLIBS := \
 	event_core \
-	nv \
+	elf \
+	gbpf \
 
 LIB :=	runner
 

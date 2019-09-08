@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018 Ryan Stone
+ * Copyright (c) 2019 Ryan Stone
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,47 +26,30 @@
  * SUCH DAMAGE.
  */
 
-#ifndef PERMSSION_LIST_H
-#define PERMSSION_LIST_H
+#ifndef CAPSICUM_SANDBOX_FACTORY_H
+#define CAPSICUM_SANDBOX_FACTORY_H
 
-#include "Path.h"
-#include "Permission.h"
-
-#include <sys/types.h>
+#include "SandboxFactory.h"
 
 #include <memory>
-#include <string>
 #include <unordered_map>
-#include <vector>
 
-class PermissionList
+class CapsicumSandbox;
+
+class CapsicumSandboxFactory : public SandboxFactory
 {
-public:
-	typedef std::unordered_map<Path, Permission> PermMap;
+	typedef std::unordered_map<uint64_t, std::unique_ptr<CapsicumSandbox>> SandboxMap;
 
-private:
-	PermMap filePerm;
-
-	static Permission ModeToPermission(int);
-
-	int CheckPerm(Permission allowed, int mode) const;
+	SandboxMap sandboxMap;
 
 public:
-	PermissionList() = default;
-	PermissionList(PermissionList &&) = default;
+	CapsicumSandboxFactory();
+	~CapsicumSandboxFactory();
 
-	PermissionList(const PermissionList &) = delete;
-	PermissionList &operator=(const PermissionList&) = delete;
-	PermissionList &operator=(PermissionList &&) = delete;
+	virtual Sandbox& MakeSandbox(uint64_t jid, const Command &command);
+	virtual void ReleaseSandbox(uint64_t jid);
 
-	void AddPermission(const Path &, Permission);
-
-	int IsPermitted(const Path & cwd, const Path &, int) const;
-
-	const PermMap & GetPermMap() const
-	{
-		return filePerm;
-	}
 };
 
 #endif
+
