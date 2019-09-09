@@ -34,8 +34,11 @@
 
 #include <sys/capsicum.h>
 
+#include <elf.h>
 #include <err.h>
 #include <fcntl.h>
+#include <gelf.h>
+#include <libelf.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -47,12 +50,15 @@ CapsicumSandbox::PreopenDesc::~PreopenDesc()
 CapsicumSandbox::CapsicumSandbox(const Command & c)
   : ebpf(ebpf_dev_driver_create()),
     open_prog(-1),
-    fd_map(-1)
+    fd_map(-1),
+    fexec_fd(-1),
+    interp_fd(-1)
 {
 	if (!ebpf) {
 		err(1, "Could not create ebpf instance.");
 	}
 
+	FindInterpreter(c.GetExecutable());
 	PreopenDescriptors(c.GetPermissions());
 	CreateEbpfRules();
 }
@@ -65,8 +71,76 @@ CapsicumSandbox::~CapsicumSandbox()
 	if (fd_map >= 0)
 		gbpf_close_map_desc(&ebpf->base, fd_map);
 
+	if (interp_fd >= 0) {
+		close(interp_fd);
+	}
+
+	if (fexec_fd >= 0) {
+		close(fexec_fd);
+	}
+
 	if (ebpf)
 		ebpf_dev_driver_destroy(ebpf);
+}
+
+
+void
+CapsicumSandbox::FindInterpreter(Path exe)
+{
+	GElf_Phdr phdr;
+	size_t filesize, i, phnum;
+	int fd;
+	Elf *elf;
+	const char *s, *interp;
+
+	fd = open(exe.c_str(), O_RDONLY);
+	if (fd < 0) {
+		err(1, "Could not open executable '%s'", exe.c_str());
+	}
+
+	elf = elf_begin(fd, ELF_C_READ, NULL);
+	if (elf == nullptr) {
+		errx(1, "Could not init elf object: %s", elf_errmsg(-1));
+	}
+
+	s = elf_rawfile(elf, &filesize);
+	if (s == NULL) {
+		errx(1, "elf_rawfile failed: %s", elf_errmsg(-1));
+		return;
+	}
+
+	if (!elf_getphnum(elf, &phnum)) {
+		errx(1, "elf_getphnum failed: %s", elf_errmsg(-1));
+		return;
+	}
+	for (i = 0; i < phnum; i++) {
+		if (gelf_getphdr(elf, i, &phdr) != &phdr) {
+			errx(1, "elf_getphdr failed: %s", elf_errmsg(-1));
+			continue;
+		}
+		if (phdr.p_type == PT_INTERP) {
+			if (phdr.p_offset >= filesize) {
+				warnx("invalid phdr offset");
+				continue;
+			}
+			interp = s + phdr.p_offset;
+
+			fexec_fd = open(interp, O_RDONLY | O_EXEC);
+			if (fexec_fd < 0) {
+				err(1, "Failed to open rtld '%s'", interp);
+			}
+
+			interp_fd = fd;
+			interp_fd_str = std::to_string(fd);
+			goto out;
+		}
+	}
+
+	/* Did not find an interpreter; must be statically linked. */
+	fexec_fd = fd;
+
+out:
+	elf_end(elf);
 }
 
 void
@@ -76,21 +150,21 @@ CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 	int fd, mode;
 
 	for (const auto & [path, perm] : permList.GetPermMap()) {
-		cap_rights_init(&rights, CAP_MMAP, CAP_LOOKUP);
+		cap_rights_init(&rights, CAP_MMAP, CAP_LOOKUP, CAP_FSTAT);
 		mode = 0;
 
 		if (perm & Permission::READ) {
-			cap_rights_set(&rights, CAP_READ, CAP_SEEK);
+			cap_rights_set(&rights, CAP_READ, CAP_SEEK, CAP_MMAP_R);
 			mode = O_RDONLY;
 		}
 
 		if (perm & Permission::WRITE) {
-			cap_rights_set(&rights, CAP_WRITE, CAP_SEEK);
+			cap_rights_set(&rights, CAP_WRITE, CAP_SEEK, CAP_MMAP_W);
 			mode = O_RDWR | O_CREAT;
 		}
 
 		if (perm & Permission::EXEC) {
-			cap_rights_set(&rights, CAP_FEXECVE, CAP_READ);
+			cap_rights_set(&rights, CAP_FEXECVE, CAP_READ, CAP_MMAP_X);
 			mode |= O_EXEC;
 		}
 
@@ -162,6 +236,25 @@ CapsicumSandbox::CreateEbpfRules()
 		int fd = desc.fd;
 		gbpf_map_update_elem(&ebpf->base, fd_map, path, &fd, EBPF_NOEXIST);
 	}
+}
+
+void
+CapsicumSandbox::ArgvPrepend(std::vector<char*> & argp)
+{
+
+	if (interp_fd >= 0) {
+		// Blame POSIX for the const_cast :()
+		argp.push_back(const_cast<char*>("rtld"));
+		argp.push_back(const_cast<char*>("-f"));
+		argp.push_back(const_cast<char*>(interp_fd_str.c_str()));
+		argp.push_back(const_cast<char*>("--"));
+	}
+}
+
+int
+CapsicumSandbox::GetExecFd()
+{
+	return fexec_fd;
 }
 
 void

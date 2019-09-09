@@ -47,12 +47,15 @@ private:
 	const Command & command;
 	JobSharedMemory shm;
 	std::vector<std::unique_ptr<MsgSocket>> sockets;
+	int exec_fd;
 
 	void SendResponse(MsgSocket * sock, int error);
 
 public:
 	PreloadSandboxer(uint64_t jobId, const Command & c, const TempFile *msgSock);
+	~PreloadSandboxer();
 
+	virtual int GetExecFd() override;
 	virtual void Enable() override;
 	virtual void EnvironAppend(std::vector<char*> & envp) override;
 

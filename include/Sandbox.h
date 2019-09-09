@@ -37,8 +37,13 @@ public:
 	virtual ~Sandbox() = default;
 
 	virtual void Enable() = 0;
+	virtual int GetExecFd() = 0;
 
 	virtual void ParentCleanup()
+	{
+	}
+
+	virtual void ArgvPrepend(std::vector<char*> & argp)
 	{
 	}
 

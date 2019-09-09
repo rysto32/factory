@@ -40,6 +40,7 @@
 #include "TempFile.h"
 
 #include <err.h>
+#include <libelf.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -141,7 +142,11 @@ int main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if (argc < 2) {
+	if (elf_version(EV_CURRENT) == EV_NONE)
+		errx(1, "ELF library initialization failed: %s",
+		    elf_errmsg(-1));
+
+	if (argc < 1) {
 		errx(1, "Usage: %s <prog> [args...]", getprogname());
 	}
 

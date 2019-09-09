@@ -35,6 +35,7 @@
 #include "Path.h"
 #include "SharedMem.h"
 
+#include <err.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -45,6 +46,21 @@ PreloadSandboxer::PreloadSandboxer(uint64_t jobId, const Command & c, const Temp
   : command(c),
     shm(msgSock, jobId)
 {
+	exec_fd = open(c.GetExecutable().c_str(), O_RDONLY | O_EXEC);
+	if (exec_fd < 0) {
+		err(1, "Could not open '%s' for exec", c.GetExecutable().c_str());
+	}
+}
+
+PreloadSandboxer::~PreloadSandboxer()
+{
+	close(exec_fd);
+}
+
+int
+PreloadSandboxer::GetExecFd()
+{
+	return exec_fd;
 }
 
 void

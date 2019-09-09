@@ -109,14 +109,9 @@ StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp,
 		}
 	}
 
-	fd = open(argp.at(0), O_RDONLY | O_EXEC);
-	if (fd < 0) {
-		err(1, "Could not open '%s' for exec", argp.at(0));
-	}
-
 	sandbox.Enable();
 
-	fexecve(fd, &argp[0], &envp[0]);
+	fexecve(sandbox.GetExecFd(), &argp[0], &envp[0]);
 	err(1, "execve %s failed", argp.at(0));
 	_exit(1);
 }
@@ -153,15 +148,17 @@ JobManager::StartJob(Command & command, JobCompletion & completer)
 	const ArgList & argList = command.GetArgList();
 	std::ostringstream commandStr;
 
+	uint64_t jobId = AllocJobId();
+	Sandbox &sandbox = sandboxFactory->MakeSandbox(jobId, command);
+
+	sandbox.ArgvPrepend(argp);
+
 	for (const std::string & arg : argList) {
 		// Blame POSIX for the const_cast :()
 		argp.push_back(const_cast<char*>(arg.c_str()));
 		commandStr << arg << " ";
 	}
 	argp.push_back(NULL);
-
-	uint64_t jobId = AllocJobId();
-	Sandbox &sandbox = sandboxFactory->MakeSandbox(jobId, command);
 
 	fprintf(stderr, "Run: \"%s\" as job %lld\n", commandStr.str().c_str(), (long long)jobId);
 

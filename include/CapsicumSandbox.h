@@ -37,6 +37,7 @@ extern "C" {
 #include <gbpf/gbpf.h>
 }
 
+#include <string>
 #include <vector>
 
 class Command;
@@ -74,6 +75,11 @@ class CapsicumSandbox : public Sandbox
 	int open_prog;
 	int fd_map;
 
+	int fexec_fd;
+	int interp_fd;
+	std::string interp_fd_str;
+
+	void FindInterpreter(Path exe);
 	void PreopenDescriptors(const PermissionList &);
 	void CreateEbpfRules();
 
@@ -92,6 +98,8 @@ public:
 	CapsicumSandbox & operator=(CapsicumSandbox &&) = delete;
 	CapsicumSandbox & operator=(const CapsicumSandbox &) = delete;
 
+	virtual int GetExecFd() override;
+	virtual void ArgvPrepend(std::vector<char*> & argp) override;
 	virtual void Enable() override;
 	virtual void ParentCleanup() override;
 };

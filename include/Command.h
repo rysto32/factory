@@ -77,6 +77,11 @@ public:
 	{
 		return permissions;
 	}
+
+	Path GetExecutable() const
+	{
+		return argList.at(0);
+	}
 	
 	const Path & GetWorkDir() const
 	{
