@@ -50,6 +50,7 @@ CapsicumSandbox::PreopenDesc::~PreopenDesc()
 CapsicumSandbox::CapsicumSandbox(const Command & c)
   : ebpf(ebpf_dev_driver_create()),
     open_prog(-1),
+    stat_prog(-1),
     fd_map(-1),
     fexec_fd(-1),
     interp_fd(-1)
@@ -67,6 +68,9 @@ CapsicumSandbox::~CapsicumSandbox()
 {
 	if (open_prog >= 0)
 		gbpf_close_prog_desc(&ebpf->base, open_prog);
+
+	if (stat_prog >= 0)
+		gbpf_close_prog_desc(&ebpf->base, stat_prog);
 
 	if (fd_map >= 0)
 		gbpf_close_map_desc(&ebpf->base, fd_map);
@@ -187,11 +191,19 @@ CapsicumSandbox::DefineProgram(GBPFElfWalker *walker, const char *name,
 {
 	CapsicumSandbox *sandbox = reinterpret_cast<CapsicumSandbox*>(walker->data);
 
-	assert (strcmp(name, "open_syscall_probe") == 0);
-	sandbox->open_prog = gbpf_load_prog(walker->driver, EBPF_PROG_TYPE_VFS,
-	    prog, prog_len);
-	if (sandbox->open_prog < 0)
-		err(1, "Could not load EBPF program");
+	if (strcmp(name, "open_syscall_probe") == 0) {
+		sandbox->open_prog = gbpf_load_prog(walker->driver, EBPF_PROG_TYPE_VFS,
+		    prog, prog_len);
+		if (sandbox->open_prog < 0)
+			err(1, "Could not load open EBPF program");
+	} else if (strcmp(name, "stat_syscall_probe") == 0) {
+		sandbox->stat_prog = gbpf_load_prog(walker->driver, EBPF_PROG_TYPE_VFS,
+		    prog, prog_len);
+		if (sandbox->stat_prog < 0)
+			err(1, "Could not load stat EBPF program");
+	} else {
+		errx(1, "Unexpected probe '%s'", name);
+	}
 }
 
 void
@@ -214,13 +226,17 @@ CapsicumSandbox::CreateEbpfRules()
 		.data = this,
 	};
 
-	error = gbpf_walk_elf(&walker, &ebpf->base, "/home/rstone/src/ebpf/sample.o");
+	error = gbpf_walk_elf(&walker, &ebpf->base, "/home/rstone/repos/factory/src/capsicum/ebpf_progs/open/open.o");
 	if (error != 0) {
 		err(1, "Could not walk EBPF object");
 	}
 
 	if (open_prog < 0) {
-		errx(1, "EBPF object did not define program");
+		errx(1, "EBPF object did not define open program");
+	}
+
+	if (stat_prog < 0) {
+		errx(1, "EBPF object did not define stat program");
 	}
 
 	if (fd_map < 0) {
@@ -265,6 +281,10 @@ CapsicumSandbox::Enable()
 	error = gbpf_attach_probe(&ebpf->base, open_prog, "open_syscall_probe", 0);
 	if (error != 0) {
 		err(1, "Could not attach EBPF program to open probe");
+	}
+	error = gbpf_attach_probe(&ebpf->base, stat_prog, "stat_syscall_probe", 0);
+	if (error != 0) {
+		err(1, "Could not attach EBPF program to stat probe");
 	}
 
 	cap_enter();

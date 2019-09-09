@@ -73,6 +73,7 @@ class CapsicumSandbox : public Sandbox
 	EBPFDevDriver *ebpf;
 
 	int open_prog;
+	int stat_prog;
 	int fd_map;
 
 	int fexec_fd;
