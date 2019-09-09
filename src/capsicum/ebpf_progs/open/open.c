@@ -32,7 +32,7 @@ void open_syscall_probe(struct open_args *args)
 	void *path = args->path;
 	int *fd = ebpf_map_lookup_path(&fd_map, &path);
 	if (fd) {
-		if (*args->path == '\0') {
+		if (*(char*)path == '\0') {
 			/* Exact match; dup existing descriptor. */
 			*args->fd = *fd;
 			*args->action = EBPF_ACTION_DUP;
@@ -51,7 +51,7 @@ void stat_syscall_probe(struct stat_probe_args *args)
 	void *path = args->path;
 	int *fd = ebpf_map_lookup_path(&fd_map, &path);
 	if (fd) {
-		if (*args->path == '\0') {
+		if (*(char*)path == '\0') {
 			/* Exact match; fstat existing descriptor. */
 			*args->fd = *fd;
 			*args->action = EBPF_ACTION_FSTAT;
