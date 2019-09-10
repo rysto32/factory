@@ -37,6 +37,7 @@ enum Permission
 	READ = 0x01,
 	WRITE = 0x02,
 	EXEC = 0x04,
+	STAT = 0x08,
 };
 
 template <typename T>

@@ -154,7 +154,7 @@ CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 	int fd, mode;
 
 	for (const auto & [path, perm] : permList.GetPermMap()) {
-		cap_rights_init(&rights, CAP_MMAP, CAP_LOOKUP, CAP_FSTAT);
+		cap_rights_init(&rights, CAP_LOOKUP, CAP_FSTAT);
 		mode = 0;
 
 		if (perm & Permission::READ) {

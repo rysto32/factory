@@ -106,6 +106,9 @@ ParsePermission(const std::string & opt, Path &path)
 		case 'x':
 			p |= Permission::EXEC;
 			break;
+		case 's':
+			p |= Permission::STAT;
+			break;
 		default:
 			errx(1, "Unknown permission flag '%c' in '%s'", opt.at(pos), opt.c_str());
 			break;
