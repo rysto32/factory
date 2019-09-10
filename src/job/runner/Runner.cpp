@@ -52,9 +52,11 @@ class SimpleCompletion : public JobCompletion
 {
 private:
 	EventLoop &loop;
+	int code;
+
 public:
 	SimpleCompletion(EventLoop & loop)
-	  : loop(loop)
+	  : loop(loop), code(0)
 	{
 	}
 
@@ -63,15 +65,23 @@ public:
 		if (WIFEXITED(status)) {
 			printf("PID %d (jid %d) exited with code %d\n",
 			    job->GetPid(), job->GetJobId(), WEXITSTATUS(status));
+			code = WEXITSTATUS(status);
 		} else if(WIFSIGNALED(status)) {
 			printf("PID %d (jid %d) terminated on signal %d\n",
 			    job->GetPid(), job->GetJobId(), WTERMSIG(status));
+			code = 1;
 		} else {
 			printf("PID %d (jid %d) terminated on unknown code %d\n",
 			    job->GetPid(), job->GetJobId(), status);
+			code = 1;
 		}
 
 		loop.SignalExit();
+	}
+
+	int GetExitCode() const
+	{
+		return code;
 	}
 
 	void Abort() override
@@ -170,5 +180,5 @@ int main(int argc, char **argv)
 
 	loop.Run();
 
-	return (0);
+	return (completer.GetExitCode());
 }
