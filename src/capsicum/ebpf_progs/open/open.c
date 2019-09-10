@@ -38,7 +38,7 @@ void open_syscall_probe(struct open_args *args)
 			*args->action = EBPF_ACTION_DUP;
 		} else {
 			*args->fd = *fd;
-			args->path = path + 1;
+			args->path = path;
 			*args->action = EBPF_ACTION_OPENAT;
 		}
 		return;
@@ -57,7 +57,7 @@ void stat_syscall_probe(struct stat_probe_args *args)
 			*args->action = EBPF_ACTION_FSTAT;
 		} else {
 			*args->fd = *fd;
-			args->path = path + 1;
+			args->path = path;
 			*args->action = EBPF_ACTION_FSTATAT;
 		}
 		return;
