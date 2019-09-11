@@ -201,7 +201,7 @@ CapsicumSandbox::DefineProgram(GBPFElfWalker *walker, const char *name,
 		    prog, prog_len);
 		if (sandbox->open_prog < 0)
 			err(1, "Could not load open EBPF program");
-	} else if (strcmp(name, "stat_syscall_probe") == 0) {
+	} else if (strcmp(name, "fstatat_syscall_probe") == 0) {
 		sandbox->stat_prog = gbpf_load_prog(walker->driver, EBPF_PROG_TYPE_VFS,
 		    prog, prog_len);
 		if (sandbox->stat_prog < 0)
@@ -292,7 +292,7 @@ CapsicumSandbox::Enable()
 	if (error != 0) {
 		err(1, "Could not attach EBPF program to open probe");
 	}
-	error = gbpf_attach_probe(&ebpf->base, stat_prog, "stat_syscall_probe", 0);
+	error = gbpf_attach_probe(&ebpf->base, stat_prog, "fstatat_syscall_probe", 0);
 	if (error != 0) {
 		err(1, "Could not attach EBPF program to stat probe");
 	}
