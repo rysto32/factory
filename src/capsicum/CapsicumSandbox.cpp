@@ -52,6 +52,7 @@ CapsicumSandbox::CapsicumSandbox(const Command & c)
     open_prog(-1),
     stat_prog(-1),
     fd_map(-1),
+    scratch_fd(-1),
     fexec_fd(-1),
     interp_fd(-1)
 {
@@ -74,6 +75,10 @@ CapsicumSandbox::~CapsicumSandbox()
 
 	if (fd_map >= 0)
 		gbpf_close_map_desc(&ebpf->base, fd_map);
+
+	if (scratch_fd >= 0) {
+		gbpf_close_map_desc(&ebpf->base, scratch_fd);
+	}
 
 	if (interp_fd >= 0) {
 		close(interp_fd);
@@ -212,8 +217,13 @@ CapsicumSandbox::DefineMap(GBPFElfWalker *walker, const char *name, int desc,
 {
 	CapsicumSandbox *sandbox = reinterpret_cast<CapsicumSandbox*>(walker->data);
 
-	assert (strcmp(name, "fd_map") == 0);
-	sandbox->fd_map = desc;
+	if (strcmp(name, "fd_map") == 0) {
+		sandbox->fd_map = desc;
+	} else if (strcmp(name, "scratch") == 0) {
+		sandbox->scratch_fd = desc;
+	} else {
+		errx(1, "Unexpected map '%s'", name);
+	}
 }
 
 void

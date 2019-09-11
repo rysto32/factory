@@ -75,6 +75,7 @@ class CapsicumSandbox : public Sandbox
 	int open_prog;
 	int stat_prog;
 	int fd_map;
+	int scratch_fd;
 
 	int fexec_fd;
 	int interp_fd;
