@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018 Ryan Stone
+ * Copyright (c) 2019 Ryan Stone
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,49 +26,58 @@
  * SUCH DAMAGE.
  */
 
-#include "TempFileManager.h"
+#ifndef FILEDESC_H
+#define FILEDESC_H
 
-#include "TempDir.h"
-#include "TempFile.h"
-
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <unistd.h>
 
-TempFileManager::TempFileManager()
-  : tempDir(std::make_shared<TempDir>())
+class FileDesc
 {
-}
+	int fd;
 
-std::unique_ptr<TempFile>
-TempFileManager::GetUnixSocket(const std::string & name, int maxConnect)
-{
-	std::string path(tempDir->GetPath());
-	path += '/';
-	path += name;
-
-	struct sockaddr_un addr;
-	addr.sun_len = sizeof(addr);
-	addr.sun_family = AF_UNIX;
-	strlcpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path));
-
-	int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
-	if (fd < 0)
-		return std::unique_ptr<TempFile>();
-
-	int error = bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
-	if (error != 0) {
-		close(fd);
-		return std::unique_ptr<TempFile>();
+public:
+	explicit FileDesc(int f)
+	  : fd(f)
+	{
 	}
 
-	error = listen(fd, maxConnect);
-	if (error != 0) {
-		close(fd);
-		return std::unique_ptr<TempFile>();
+	FileDesc(FileDesc && f)
+	  : fd(f.fd)
+	{
+		f.fd = -1;
 	}
 
-	return std::make_unique<TempFile>(path, tempDir, FileDesc(fd));
-}
+	~FileDesc()
+	{
+		Close();
+	}
+
+	FileDesc(const FileDesc &) = delete;
+
+	FileDesc & operator=(FileDesc &&f)
+	{
+		Close();
+		fd = f.fd;
+		f.fd = -1;
+
+		return *this;
+	}
+
+	FileDesc & operator=(const FileDesc &) = delete;
+
+	void Close()
+	{
+		if (fd > 0) {
+			close(fd);
+			fd = -1;
+		}
+	}
+
+	operator int() const
+	{
+		return fd;
+	}
+};
+
+#endif
+

@@ -32,15 +32,14 @@
 
 #include <unistd.h>
 
-TempFile::TempFile(const std::string & path, std::shared_ptr<TempDir> dir, int fd)
+TempFile::TempFile(const std::string & path, std::shared_ptr<TempDir> dir, FileDesc && fd)
   : path(path),
     dir(std::move(dir)),
-    fd(fd)
+    fd(std::move(fd))
 {
 }
 
 TempFile::~TempFile()
 {
-	close(fd);
 	unlink(path.c_str());
 }

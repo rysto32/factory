@@ -32,16 +32,18 @@
 #include <memory>
 #include <string>
 
+#include "FileDesc.h"
+
 class TempDir;
 
 class TempFile
 {
 	std::string path;
 	std::shared_ptr<TempDir> dir;
-	int fd;
+	FileDesc fd;
 
 public:
-	TempFile(const std::string & path, std::shared_ptr<TempDir> dir, int fd);
+	TempFile(const std::string & path, std::shared_ptr<TempDir> dir, FileDesc && fd);
 	~TempFile();
 
 	TempFile(const TempFile&) = delete;
