@@ -31,6 +31,8 @@
 
 #include "Sandbox.h"
 
+#include "ebpf/Map.h"
+#include "ebpf/Program.h"
 #include "Path.h"
 
 extern "C" {
@@ -72,10 +74,9 @@ class CapsicumSandbox : public Sandbox
 	std::vector<PreopenDesc> descriptors;
 	EBPFDevDriver *ebpf;
 
-	int open_prog;
-	int stat_prog;
-	int fd_map;
-	int scratch_fd;
+	std::vector<Ebpf::Program> programs;
+	Ebpf::Map fd_map;
+	Ebpf::Map scratch_map;
 
 	int fexec_fd;
 	int interp_fd;

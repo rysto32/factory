@@ -49,10 +49,6 @@ CapsicumSandbox::PreopenDesc::~PreopenDesc()
 
 CapsicumSandbox::CapsicumSandbox(const Command & c)
   : ebpf(ebpf_dev_driver_create()),
-    open_prog(-1),
-    stat_prog(-1),
-    fd_map(-1),
-    scratch_fd(-1),
     fexec_fd(-1),
     interp_fd(-1)
 {
@@ -67,18 +63,10 @@ CapsicumSandbox::CapsicumSandbox(const Command & c)
 
 CapsicumSandbox::~CapsicumSandbox()
 {
-	if (open_prog >= 0)
-		gbpf_close_prog_desc(&ebpf->base, open_prog);
+	programs.clear();
 
-	if (stat_prog >= 0)
-		gbpf_close_prog_desc(&ebpf->base, stat_prog);
-
-	if (fd_map >= 0)
-		gbpf_close_map_desc(&ebpf->base, fd_map);
-
-	if (scratch_fd >= 0) {
-		gbpf_close_map_desc(&ebpf->base, scratch_fd);
-	}
+	fd_map.Close();
+	scratch_map.Close();
 
 	if (interp_fd >= 0) {
 		close(interp_fd);
@@ -196,19 +184,8 @@ CapsicumSandbox::DefineProgram(GBPFElfWalker *walker, const char *name,
 {
 	CapsicumSandbox *sandbox = reinterpret_cast<CapsicumSandbox*>(walker->data);
 
-	if (strcmp(name, "open_syscall_probe") == 0) {
-		sandbox->open_prog = gbpf_load_prog(walker->driver, EBPF_PROG_TYPE_VFS,
-		    prog, prog_len);
-		if (sandbox->open_prog < 0)
-			err(1, "Could not load open EBPF program");
-	} else if (strcmp(name, "fstatat_syscall_probe") == 0) {
-		sandbox->stat_prog = gbpf_load_prog(walker->driver, EBPF_PROG_TYPE_VFS,
-		    prog, prog_len);
-		if (sandbox->stat_prog < 0)
-			err(1, "Could not load stat EBPF program");
-	} else {
-		errx(1, "Unexpected probe '%s'", name);
-	}
+	sandbox->programs.emplace_back(walker->driver, name, EBPF_PROG_TYPE_VFS,
+	    prog, prog_len);
 }
 
 void
@@ -218,9 +195,9 @@ CapsicumSandbox::DefineMap(GBPFElfWalker *walker, const char *name, int desc,
 	CapsicumSandbox *sandbox = reinterpret_cast<CapsicumSandbox*>(walker->data);
 
 	if (strcmp(name, "fd_map") == 0) {
-		sandbox->fd_map = desc;
+		sandbox->fd_map = Ebpf::Map(walker->driver, name, desc);
 	} else if (strcmp(name, "scratch") == 0) {
-		sandbox->scratch_fd = desc;
+		sandbox->scratch_map = Ebpf::Map(walker->driver, name, desc);
 	} else {
 		errx(1, "Unexpected map '%s'", name);
 	}
@@ -241,16 +218,12 @@ CapsicumSandbox::CreateEbpfRules()
 		err(1, "Could not walk EBPF object");
 	}
 
-	if (open_prog < 0) {
-		errx(1, "EBPF object did not define open program");
+	if (!fd_map) {
+		errx(1, "EBPF object did not define fd map");
 	}
 
-	if (stat_prog < 0) {
-		errx(1, "EBPF object did not define stat program");
-	}
-
-	if (fd_map < 0) {
-		errx(1, "EBPF object did not define map");
+	if (!scratch_map) {
+		errx(1, "EBPF object did not define scratch map");
 	}
 
 	for (const auto & desc : descriptors) {
@@ -260,7 +233,7 @@ CapsicumSandbox::CreateEbpfRules()
 		strlcpy(path, desc.path.c_str(), sizeof(path));
 
 		int fd = desc.fd;
-		gbpf_map_update_elem(&ebpf->base, fd_map, path, &fd, EBPF_NOEXIST);
+		fd_map.UpdateElem(path, &fd, EBPF_NOEXIST);
 	}
 }
 
@@ -288,13 +261,12 @@ CapsicumSandbox::Enable()
 {
 	int error;
 
-	error = gbpf_attach_probe(&ebpf->base, open_prog, "open_syscall_probe", 0);
-	if (error != 0) {
-		err(1, "Could not attach EBPF program to open probe");
-	}
-	error = gbpf_attach_probe(&ebpf->base, stat_prog, "fstatat_syscall_probe", 0);
-	if (error != 0) {
-		err(1, "Could not attach EBPF program to stat probe");
+	for (Ebpf::Program & prog : programs) {
+		error = prog.AttachProbe();
+		if (error != 0) {
+			err(1, "Could not attach to '%s' ebpf probe",
+			    prog.GetName().c_str());
+		}
 	}
 
 	cap_enter();

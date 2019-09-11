@@ -7,6 +7,7 @@ PROG_LIBS := \
 	perm \
 	product \
 	capsicum_sb \
+	ebpf \
 	preload_sb \
 	msgsocket \
 	eventloop \

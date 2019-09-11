@@ -3,6 +3,7 @@ SUBDIRS := \
 	buildkernel \
 	capsicum \
 	config \
+	ebpf \
 	eventloop \
 	ingest \
 	interpreter \
