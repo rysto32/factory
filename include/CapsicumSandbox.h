@@ -70,7 +70,7 @@ class CapsicumSandbox : public Sandbox
 
 	std::vector<Ebpf::Program> programs;
 	Ebpf::Map fd_map;
-	Ebpf::Map scratch_map;
+	std::vector<Ebpf::Map> maps;
 
 	FileDesc fexec_fd;
 	FileDesc interp_fd;

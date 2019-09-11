@@ -57,9 +57,9 @@ CapsicumSandbox::CapsicumSandbox(const Command & c)
 CapsicumSandbox::~CapsicumSandbox()
 {
 	programs.clear();
+	maps.clear();
 
 	fd_map.Close();
-	scratch_map.Close();
 
 	if (ebpf)
 		ebpf_dev_driver_destroy(ebpf);
@@ -182,10 +182,8 @@ CapsicumSandbox::DefineMap(GBPFElfWalker *walker, const char *name, int desc,
 
 	if (strcmp(name, "fd_map") == 0) {
 		sandbox->fd_map = Ebpf::Map(walker->driver, name, desc);
-	} else if (strcmp(name, "scratch") == 0) {
-		sandbox->scratch_map = Ebpf::Map(walker->driver, name, desc);
 	} else {
-		errx(1, "Unexpected map '%s'", name);
+		sandbox->maps.emplace_back(walker->driver, name, desc);
 	}
 }
 
@@ -206,10 +204,6 @@ CapsicumSandbox::CreateEbpfRules()
 
 	if (!fd_map) {
 		errx(1, "EBPF object did not define fd map");
-	}
-
-	if (!scratch_map) {
-		errx(1, "EBPF object did not define scratch map");
 	}
 
 	for (const auto & desc : descriptors) {
