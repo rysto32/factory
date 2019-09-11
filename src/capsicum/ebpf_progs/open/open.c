@@ -47,6 +47,7 @@ struct stat {
 
 EBPF_DEFINE_MAP(fd_map,  "hashtable", MAXPATHLEN, sizeof(int), 256, 0);
 EBPF_DEFINE_MAP(scratch, "percpu_array", sizeof(int), MAXPATHLEN, 8, 0);
+EBPF_DEFINE_MAP(pid_map, "hashtable", sizeof(pid_t), sizeof(int), 10, 0);
 
 static inline int do_open(const char * path, int flags, int mode) __attribute((always_inline));
 static inline int * lookup_fd(const char * userPath, char **path, int *) __attribute((always_inline));
@@ -150,4 +151,17 @@ int access_syscall_probe(struct access_args *args)
 	}
 
 	return action;
+}
+
+int vfork_syscall_probe(struct vfork_args *args)
+{
+	int fd;
+	pid_t pid;
+
+	pid = pdfork(&fd, 0);
+	if (pid > 0) {
+		ebpf_map_update_elem(&pid_map, &pid, &fd, 0);
+		set_syscall_retval(pid, 0);
+	}
+	return EBPF_ACTION_RETURN;
 }
