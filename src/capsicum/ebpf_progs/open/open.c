@@ -49,25 +49,37 @@ EBPF_DEFINE_MAP(fd_map,  "hashtable", MAXPATHLEN, sizeof(int), 256, 0);
 EBPF_DEFINE_MAP(scratch, "percpu_array", sizeof(int), MAXPATHLEN, 8, 0);
 
 static inline int do_open(const char * path, int flags, int mode) __attribute((always_inline));
+static inline int * lookup_fd(const char * userPath, char **path, int *) __attribute((always_inline));
 
-static inline int do_open(const char * userPath, int flags, int mode)
+static inline int * lookup_fd(const char * userPath, char **path, int *action)
 {
 	int index = 0;
 	void *pathBuf = ebpf_map_lookup_elem(&scratch, &index);
 	if (!pathBuf) {
 		set_errno(ENOMEM);
-		return EBPF_ACTION_RETURN;
+		*action = EBPF_ACTION_RETURN;
+		return 0;
 	}
 
 	size_t len;
 	int error = copyinstr(userPath, pathBuf, MAXPATHLEN, &len);
 	if (error != 0) {
-		return EBPF_ACTION_CONTINUE;
+		*action = EBPF_ACTION_CONTINUE;
+		return 0;
 	}
 
 	int *fd = ebpf_map_lookup_path(&fd_map, &pathBuf);
+	*path = pathBuf;
+	return fd;
+}
+
+static inline int do_open(const char * userPath, int flags, int mode)
+{
+	int action = EBPF_ACTION_CONTINUE;
+	char *path;
+
+	int *fd = lookup_fd(userPath, &path, &action);
 	if (fd) {
-		char *path = pathBuf;
 		if (path[0] == '\0') {
 			dup(*fd);
 			return EBPF_ACTION_RETURN;
@@ -77,7 +89,7 @@ static inline int do_open(const char * userPath, int flags, int mode)
 		}
 	}
 
-	return EBPF_ACTION_CONTINUE;
+	return action;
 }
 
 int open_syscall_probe(struct open_args *args)
@@ -94,36 +106,21 @@ int openat_syscall_probe(struct openat_args *args)
 	return do_open(args->path, args->flag, args->mode);
 }
 
-
 int fstatat_syscall_probe(struct fstatat_args *args)
 {
-	if (args->fd >= 0) {
-		return EBPF_ACTION_CONTINUE;
-	}
+	int action = EBPF_ACTION_CONTINUE;
+	char *path;
 
-	int index = 0;
-	void *pathBuf = ebpf_map_lookup_elem(&scratch, &index);
-	if (pathBuf == NULL) {
-		set_errno(ENOMEM);
-		return EBPF_ACTION_RETURN;
-	}
-
-	size_t len;
-	int error = copyinstr(args->path, pathBuf, MAXPATHLEN, &len);
-	if (error != 0) {
-		return EBPF_ACTION_CONTINUE;
-	}
-
-	int *fd = ebpf_map_lookup_path(&fd_map, &pathBuf);
+	int *fd = lookup_fd(args->path, &path, &action);
 	if (fd) {
-		index = 1;
+		int index = 1;
 		void *statBuf = ebpf_map_lookup_elem(&scratch, &index);
 		if (!statBuf) {
 			set_errno(ENOMEM);
 			return EBPF_ACTION_RETURN;
 		}
 
-		char *path = pathBuf;
+		int error;
 		if (path[0] == '\0') {
 			error = fstat(*fd, statBuf);
 		} else {
@@ -141,4 +138,16 @@ int fstatat_syscall_probe(struct fstatat_args *args)
 	return EBPF_ACTION_CONTINUE;
 }
 
+int access_syscall_probe(struct access_args *args)
+{
+	int action = EBPF_ACTION_CONTINUE;
+	char *path;
 
+	int *fd = lookup_fd(args->path, &path, &action);
+	if (fd) {
+		faccessat(*fd, path, args->amode, 0);
+		return EBPF_ACTION_RETURN;
+	}
+
+	return action;
+}
