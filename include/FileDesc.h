@@ -29,6 +29,8 @@
 #ifndef FILEDESC_H
 #define FILEDESC_H
 
+#include <cassert>
+#include <fcntl.h>
 #include <unistd.h>
 
 class FileDesc
@@ -36,12 +38,17 @@ class FileDesc
 	int fd;
 
 public:
+	FileDesc()
+	  : fd(-1)
+	{
+	}
+
 	explicit FileDesc(int f)
 	  : fd(f)
 	{
 	}
 
-	FileDesc(FileDesc && f)
+	FileDesc(FileDesc && f) noexcept
 	  : fd(f.fd)
 	{
 		f.fd = -1;
@@ -56,6 +63,9 @@ public:
 
 	FileDesc & operator=(FileDesc &&f)
 	{
+		if (this == &f)
+			return *this;
+
 		Close();
 		fd = f.fd;
 		f.fd = -1;
@@ -64,6 +74,11 @@ public:
 	}
 
 	FileDesc & operator=(const FileDesc &) = delete;
+
+	static FileDesc Open(const char * name, int flags, int mode = 0)
+	{
+		return FileDesc(open(name, flags, mode));
+	}
 
 	void Close()
 	{

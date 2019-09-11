@@ -42,15 +42,8 @@
 #include <string.h>
 #include <unistd.h>
 
-CapsicumSandbox::PreopenDesc::~PreopenDesc()
-{
-	close(fd);
-}
-
 CapsicumSandbox::CapsicumSandbox(const Command & c)
-  : ebpf(ebpf_dev_driver_create()),
-    fexec_fd(-1),
-    interp_fd(-1)
+  : ebpf(ebpf_dev_driver_create())
 {
 	if (!ebpf) {
 		err(1, "Could not create ebpf instance.");
@@ -68,14 +61,6 @@ CapsicumSandbox::~CapsicumSandbox()
 	fd_map.Close();
 	scratch_map.Close();
 
-	if (interp_fd >= 0) {
-		close(interp_fd);
-	}
-
-	if (fexec_fd >= 0) {
-		close(fexec_fd);
-	}
-
 	if (ebpf)
 		ebpf_dev_driver_destroy(ebpf);
 }
@@ -86,11 +71,11 @@ CapsicumSandbox::FindInterpreter(Path exe)
 {
 	GElf_Phdr phdr;
 	size_t filesize, i, phnum;
-	int fd;
+	FileDesc fd;
 	Elf *elf;
 	const char *s, *interp;
 
-	fd = open(exe.c_str(), O_RDONLY);
+	fd = FileDesc::Open(exe.c_str(), O_RDONLY);
 	if (fd < 0) {
 		err(1, "Could not open executable '%s'", exe.c_str());
 	}
@@ -122,19 +107,19 @@ CapsicumSandbox::FindInterpreter(Path exe)
 			}
 			interp = s + phdr.p_offset;
 
-			fexec_fd = open(interp, O_RDONLY | O_EXEC);
+			fexec_fd = FileDesc::Open(interp, O_RDONLY | O_EXEC);
 			if (fexec_fd < 0) {
 				err(1, "Failed to open rtld '%s'", interp);
 			}
 
-			interp_fd = fd;
 			interp_fd_str = std::to_string(fd);
+			interp_fd = std::move(fd);
 			goto out;
 		}
 	}
 
 	/* Did not find an interpreter; must be statically linked. */
-	fexec_fd = fd;
+	fexec_fd = std::move(fd);
 
 out:
 	elf_end(elf);
@@ -144,7 +129,8 @@ void
 CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 {
 	cap_rights_t rights;
-	int fd, mode;
+	FileDesc fd;
+	int mode;
 
 	for (const auto & [path, perm] : permList.GetPermMap()) {
 		cap_rights_init(&rights, CAP_LOOKUP, CAP_FSTAT);
@@ -165,7 +151,7 @@ CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 			mode |= O_EXEC;
 		}
 
-		fd = open(path.c_str(), mode, 0600);
+		fd = FileDesc::Open(path.c_str(), mode, 0600);
 		if (fd < 0) {
 			err(1, "Could not open '%s'", path.c_str());
 		}
@@ -174,7 +160,7 @@ CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 			err(1, "cap_rights_limit() failed");
 		}
 
-		descriptors.emplace_back(path, fd);
+		descriptors.emplace_back(path, std::move(fd));
 	}
 }
 

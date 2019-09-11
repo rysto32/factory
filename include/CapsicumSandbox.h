@@ -33,6 +33,7 @@
 
 #include "ebpf/Map.h"
 #include "ebpf/Program.h"
+#include "FileDesc.h"
 #include "Path.h"
 
 extern "C" {
@@ -49,26 +50,19 @@ class CapsicumSandbox : public Sandbox
 {
 	struct PreopenDesc
 	{
-		PreopenDesc(Path p, int f)
-		  : path(std::move(p)), fd(f)
+		PreopenDesc(Path p, FileDesc && f)
+		  : path(std::move(p)), fd(std::move(f))
 		{
 		}
 
 		PreopenDesc(const PreopenDesc &) = delete;
 
-		PreopenDesc(PreopenDesc && d) noexcept
-		  : path(std::move(d.path)), fd(d.fd)
-		{
-			d.fd = -1;
-		}
-
+		PreopenDesc(PreopenDesc && d) noexcept = default;
 		PreopenDesc & operator=(const PreopenDesc &) = delete;
 		PreopenDesc & operator=(PreopenDesc &&) = delete;
 
-		~PreopenDesc();
-
 		Path path;
-		int fd;
+		FileDesc fd;
 	};
 
 	std::vector<PreopenDesc> descriptors;
@@ -78,8 +72,8 @@ class CapsicumSandbox : public Sandbox
 	Ebpf::Map fd_map;
 	Ebpf::Map scratch_map;
 
-	int fexec_fd;
-	int interp_fd;
+	FileDesc fexec_fd;
+	FileDesc interp_fd;
 	std::string interp_fd_str;
 
 	void FindInterpreter(Path exe);
