@@ -49,8 +49,11 @@ EBPF_DEFINE_MAP(fd_map,  "hashtable", MAXPATHLEN, sizeof(int), 256, 0);
 EBPF_DEFINE_MAP(scratch, "percpu_array", sizeof(int), MAXPATHLEN, 8, 0);
 EBPF_DEFINE_MAP(pid_map, "hashtable", sizeof(pid_t), sizeof(int), 10, 0);
 
-static inline int do_open(const char * path, int flags, int mode) __attribute((always_inline));
-static inline int * lookup_fd(const char * userPath, char **path, int *) __attribute((always_inline));
+#define unlikely(x) (__builtin_expect(!!(x), 0))
+#define __force_inline __attribute((always_inline))
+
+static inline int do_open(const char * path, int flags, int mode) __force_inline;
+static inline int * lookup_fd(const char * userPath, char **path, int *) __force_inline;
 
 static inline int * lookup_fd(const char * userPath, char **path, int *action)
 {
