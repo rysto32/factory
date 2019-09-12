@@ -56,10 +56,12 @@ CapsicumSandbox::CapsicumSandbox(const Command & c)
 
 CapsicumSandbox::~CapsicumSandbox()
 {
-	programs.clear();
+	defer_programs.clear();
+	probe_programs.clear();
 	maps.clear();
 
 	fd_map.Close();
+	defer_map.Close();
 
 	if (ebpf)
 		ebpf_dev_driver_destroy(ebpf);
@@ -164,26 +166,53 @@ CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 	}
 }
 
+/* Indexes here must be kept in sync with the indexes used in the EBPF program */
+int
+CapsicumSandbox::GetDeferredIndex(const std::string & name)
+{
+
+	if (name == "defer_wait4") {
+		return 0;
+	} else {
+		errx(1, "Unexpected deferred program '%s'", name.c_str());
+	}
+}
+
 void
-CapsicumSandbox::DefineProgram(GBPFElfWalker *walker, const char *name,
+CapsicumSandbox::DefineProgram(GBPFElfWalker *walker, const char *n,
     struct ebpf_inst *prog, uint32_t prog_len)
 {
 	CapsicumSandbox *sandbox = reinterpret_cast<CapsicumSandbox*>(walker->data);
 
-	sandbox->programs.emplace_back(walker->driver, name, EBPF_PROG_TYPE_VFS,
-	    prog, prog_len);
+	std::string name(n);
+
+	if (name.find("defer_") == 0) {
+		sandbox->defer_programs.emplace_back(walker->driver, std::move(name),
+		    EBPF_PROG_TYPE_VFS, prog, prog_len);
+
+		fprintf(stderr, "Map prog '%s' to FD %d\n", n, sandbox->defer_programs.back().GetFD());
+	} else {
+		sandbox->probe_programs.emplace_back(walker->driver, std::move(name),
+		    EBPF_PROG_TYPE_VFS, prog, prog_len);
+
+		fprintf(stderr, "Map prog '%s' to FD %d\n", n, sandbox->probe_programs.back().GetFD());
+	}
 }
 
 void
-CapsicumSandbox::DefineMap(GBPFElfWalker *walker, const char *name, int desc,
+CapsicumSandbox::DefineMap(GBPFElfWalker *walker, const char *n, int desc,
     struct ebpf_map_def *map)
 {
 	CapsicumSandbox *sandbox = reinterpret_cast<CapsicumSandbox*>(walker->data);
 
-	if (strcmp(name, "fd_map") == 0) {
-		sandbox->fd_map = Ebpf::Map(walker->driver, name, desc);
+	std::string name(n);
+
+	if (name == "fd_map") {
+		sandbox->fd_map = Ebpf::Map(walker->driver, std::move(name), desc);
+	} else if (name == "defer_map") {
+		sandbox->defer_map = Ebpf::Map(walker->driver, std::move(name), desc);
 	} else {
-		sandbox->maps.emplace_back(walker->driver, name, desc);
+		sandbox->maps.emplace_back(walker->driver, std::move(name), desc);
 	}
 }
 
@@ -215,6 +244,16 @@ CapsicumSandbox::CreateEbpfRules()
 		int fd = desc.fd;
 		fd_map.UpdateElem(path, &fd, EBPF_NOEXIST);
 	}
+
+	for (const auto & prog : defer_programs) {
+		int index = GetDeferredIndex(prog.GetName());
+		int fd = prog.GetFD();
+
+		int error = defer_map.UpdateElem(&index, &fd, 0);
+		if (error != 0) {
+			err(1, "Failed to insert program %s in defer_map", prog.GetName().c_str());
+		}
+	}
 }
 
 void
@@ -241,7 +280,7 @@ CapsicumSandbox::Enable()
 {
 	int error;
 
-	for (Ebpf::Program & prog : programs) {
+	for (Ebpf::Program & prog : probe_programs) {
 		error = prog.AttachProbe();
 		if (error != 0) {
 			err(1, "Could not attach to '%s' ebpf probe",

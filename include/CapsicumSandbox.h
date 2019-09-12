@@ -68,8 +68,10 @@ class CapsicumSandbox : public Sandbox
 	std::vector<PreopenDesc> descriptors;
 	EBPFDevDriver *ebpf;
 
-	std::vector<Ebpf::Program> programs;
+	std::vector<Ebpf::Program> probe_programs;
+	std::vector<Ebpf::Program> defer_programs;
 	Ebpf::Map fd_map;
+	Ebpf::Map defer_map;
 	std::vector<Ebpf::Map> maps;
 
 	FileDesc fexec_fd;
@@ -84,6 +86,8 @@ class CapsicumSandbox : public Sandbox
 			struct ebpf_inst *prog, uint32_t prog_len);
 	static void DefineMap(GBPFElfWalker *walker, const char *name, int desc,
 		       struct ebpf_map_def *map);
+
+	static int GetDeferredIndex(const std::string & name);
 
 public:
 	CapsicumSandbox(const Command & c);

@@ -45,7 +45,7 @@ class Map
 
 public:
 	Map();
-	Map(GBPFDriver *ebpf, std::string name, int fd);
+	Map(GBPFDriver *ebpf, std::string && name, int fd);
 	Map(Map &&);
 	Map(const Map &) = delete;
 	~Map();

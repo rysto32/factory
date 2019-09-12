@@ -46,7 +46,7 @@ private:
 
 public:
 	Program(Program &&);
-	Program(GBPFDriver *ebpf, std::string name, int type, struct ebpf_inst *prog, uint32_t prog_len);
+	Program(GBPFDriver *ebpf, std::string && name, int type, struct ebpf_inst *prog, uint32_t prog_len);
 	~Program();
 
 	Program() = delete;
@@ -57,6 +57,11 @@ public:
 	const std::string & GetName() const
 	{
 		return name;
+	}
+
+	int GetFD() const
+	{
+		return fd;
 	}
 
 	operator bool() const
