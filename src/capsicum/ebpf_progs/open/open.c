@@ -156,7 +156,9 @@ int access_syscall_probe(struct access_args *args)
 	return action;
 }
 
-int vfork_syscall_probe(struct vfork_args *args)
+static inline int do_fork(void) __force_inline;
+
+static inline int do_fork(void)
 {
 	int fd;
 	pid_t pid;
@@ -167,4 +169,14 @@ int vfork_syscall_probe(struct vfork_args *args)
 		set_syscall_retval(pid, 0);
 	}
 	return EBPF_ACTION_RETURN;
+}
+
+int vfork_syscall_probe(struct vfork_args *args)
+{
+	return do_fork();
+}
+
+int fork_syscall_probe(struct fork_args *args)
+{
+	return do_fork();
 }
