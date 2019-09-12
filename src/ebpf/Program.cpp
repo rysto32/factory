@@ -39,7 +39,7 @@ Program::Program(Program &&p)
 	p.fd = -1;
 }
 
-Program::Program(GBPFDriver *ebpf, std::string name, int type, struct ebpf_inst *prog, uint32_t prog_len)
+Program::Program(GBPFDriver *ebpf, std::string && name, int type, struct ebpf_inst *prog, uint32_t prog_len)
   : ebpf(ebpf),
     name(std::move(name))
 {
