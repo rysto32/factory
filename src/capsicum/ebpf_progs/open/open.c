@@ -4,6 +4,7 @@ typedef int mcontext_t;
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/errno.h>
+#include <sys/resource.h>
 #include <sys/sysproto.h>
 #include <sys/ebpf.h>
 #include <sys/ebpf_probe_syscalls.h>
@@ -48,6 +49,7 @@ struct stat {
 EBPF_DEFINE_MAP(fd_map,  "hashtable", MAXPATHLEN, sizeof(int), 256, 0);
 EBPF_DEFINE_MAP(scratch, "percpu_array", sizeof(int), MAXPATHLEN, 8, 0);
 EBPF_DEFINE_MAP(pid_map, "hashtable", sizeof(pid_t), sizeof(int), 10, 0);
+EBPF_DEFINE_MAP(defer_map, "progarray", sizeof(int), sizeof(int), 4, 0);
 
 #define unlikely(x) (__builtin_expect(!!(x), 0))
 #define __force_inline __attribute((always_inline))
@@ -179,4 +181,46 @@ int vfork_syscall_probe(struct vfork_args *args)
 int fork_syscall_probe(struct fork_args *args)
 {
 	return do_fork();
+}
+
+int wait4_syscall_probe(struct wait4_args *args)
+{
+	if (args->pid < 0)
+		return EBPF_ACTION_CONTINUE;
+
+	pid_t pid = args->pid;
+	int *fd = ebpf_map_lookup_elem(&pid_map, &pid);
+	if (!fd) {
+		set_errno(ENOENT);
+		return EBPF_ACTION_RETURN;
+	}
+
+	int next_index = 0;
+	void * next = ebpf_map_lookup_elem(&defer_map, &next_index);
+
+	struct rusage ru;
+	struct rusage * rup = args->rusage ? &ru : 0;
+	int status;
+	pdwait4_defer(*fd, args->options, args, next);
+
+	/* If we got here we failed to jump to the next program */
+	return EBPF_ACTION_RETURN;
+}
+
+int defer_wait4(struct wait4_args *args, int error, int status, struct rusage *ru)
+{
+	if (unlikely(error != 0)) {
+		set_errno(error);
+		return EBPF_ACTION_RETURN;
+	}
+
+	if (args->status) {
+		error = copyout(&status, args->status, sizeof(status));
+		if (unlikely(error != 0))
+			return EBPF_ACTION_RETURN;
+	}
+	if (args->rusage) {
+		error = copyout(ru, args->rusage, sizeof(*ru));
+	}
+	return EBPF_ACTION_RETURN;
 }
