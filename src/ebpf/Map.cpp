@@ -44,7 +44,8 @@ Map::Map(GBPFDriver *ebpf, std::string && name, int fd)
 }
 
 Map::Map(Map &&map)
-  : name(std::move(map.name)),
+  : ebpf(map.ebpf),
+    name(std::move(map.name)),
     fd(map.fd)
 {
 	map.fd = -1;
