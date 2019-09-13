@@ -54,7 +54,7 @@ EBPF_DEFINE_MAP(defer_map, "progarray", sizeof(int), sizeof(int), 4, 0);
 #define unlikely(x) (__builtin_expect(!!(x), 0))
 #define __force_inline __attribute((always_inline))
 
-static inline int do_open(const char * path, int flags, int mode) __force_inline;
+static inline int do_open(const char * path, int flags, int mode, int*) __force_inline;
 static inline int * lookup_fd(const char * userPath, char **path, int *) __force_inline;
 
 static inline int * lookup_fd(const char * userPath, char **path, int *action)
@@ -81,28 +81,36 @@ static inline int * lookup_fd(const char * userPath, char **path, int *action)
 	return fd;
 }
 
-static inline int do_open(const char * userPath, int flags, int mode)
+static inline int do_open(const char * userPath, int flags, int mode, int *fd_out)
 {
-	int action = EBPF_ACTION_CONTINUE;
+	int action;
+	int fd;
 	char *path;
 
-	int *fd = lookup_fd(userPath, &path, &action);
-	if (fd) {
+	int *dir_fd = lookup_fd(userPath, &path, &action);
+	if (dir_fd) {
 		if (path[0] == '\0') {
-			dup(*fd);
-			return EBPF_ACTION_RETURN;
+			fd = dup(*dir_fd);
+
+			action = EBPF_ACTION_RETURN;
 		} else {
-			openat(*fd, path, flags, mode);
-			return EBPF_ACTION_RETURN;
+			fd = openat(*dir_fd, path, flags, mode);
+			action = EBPF_ACTION_RETURN;
 		}
+	} else {
+		action = EBPF_ACTION_CONTINUE;
+		fd = -1;
 	}
+
+	if (fd_out)
+		*fd_out = fd;
 
 	return action;
 }
 
 int open_syscall_probe(struct open_args *args)
 {
-	return do_open(args->path, args->flags, args->mode);
+	return do_open(args->path, args->flags, args->mode, NULL);
 }
 
 int openat_syscall_probe(struct openat_args *args)
@@ -111,7 +119,7 @@ int openat_syscall_probe(struct openat_args *args)
 		return EBPF_ACTION_CONTINUE;
 	}
 
-	return do_open(args->path, args->flag, args->mode);
+	return do_open(args->path, args->flag, args->mode, NULL);
 }
 
 int fstatat_syscall_probe(struct fstatat_args *args)
