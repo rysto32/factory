@@ -102,6 +102,8 @@ static inline int do_open(const char * userPath, int flags, int mode, int *fd_ou
 		if (path[0] == '\0') {
 			fd = dup(*dir_fd);
 
+			/* XXX handle O_TRUNC and other flags. */
+
 			action = EBPF_ACTION_RETURN;
 		} else {
 			fd = openat(*dir_fd, path, flags, mode);
@@ -175,6 +177,7 @@ int access_syscall_probe(struct access_args *args)
 
 	int *fd = lookup_fd(args->path, &path, &action);
 	if (fd) {
+		/* XXX need an faccess function for path == "" case */
 		faccessat(*fd, path, args->amode, 0);
 		return EBPF_ACTION_RETURN;
 	}
@@ -276,6 +279,9 @@ static inline int do_readlink(const char *userPath, char * buf, size_t len)
 		memset(scratchBuf, 0, MAXPATHLEN);
 
 		size_t arglen = len < MAXPATHLEN ? len : MAXPATHLEN;
+
+		/* XXX need an freadlink function for path == "" case */
+
 		int error = readlinkat(*fd, path, scratchBuf, arglen);
 		if (error == 0) {
 			copyout(scratchBuf, buf, arglen);
