@@ -46,6 +46,16 @@ struct stat {
 #define	EBPF_ACTION_CONTINUE	0
 #define EBPF_ACTION_RETURN	1
 
+/* open-only flags */
+#define O_RDONLY        0x0000          /* open for reading only */
+#define O_WRONLY        0x0001          /* open for writing only */
+#define O_RDWR          0x0002          /* open for reading and writing */
+#define O_ACCMODE       0x0003          /* mask for above modes */
+
+#define O_EXEC          0x00040000      /* Open for execute only */
+
+#define O_CLOEXEC       0x00100000
+
 EBPF_DEFINE_MAP(fd_map,  "hashtable", MAXPATHLEN, sizeof(int), 256, 0);
 EBPF_DEFINE_MAP(scratch, "percpu_array", sizeof(int), MAXPATHLEN, 8, 0);
 EBPF_DEFINE_MAP(pid_map, "hashtable", sizeof(pid_t), sizeof(int), 10, 0);
@@ -236,5 +246,18 @@ int defer_wait4(struct wait4_args *args, int error, int status, struct rusage *r
 	if (args->rusage) {
 		error = copyout(ru, args->rusage, sizeof(*ru));
 	}
+	return EBPF_ACTION_RETURN;
+}
+
+int execve_syscall_probe(struct execve_args *uap)
+{
+	int fd;
+
+	do_open(uap->fname, O_RDONLY | O_EXEC | O_CLOEXEC, 0, &fd);
+	if (fd < 0) {
+		return EBPF_ACTION_RETURN;
+	}
+
+	int error = fexecve(fd, uap->argv, uap->envv, 0);
 	return EBPF_ACTION_RETURN;
 }
