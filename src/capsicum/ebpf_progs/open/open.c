@@ -124,6 +124,10 @@ int openat_syscall_probe(struct openat_args *args)
 
 int fstatat_syscall_probe(struct fstatat_args *args)
 {
+	if (args->fd >= 0) {
+		return EBPF_ACTION_CONTINUE;
+	}
+
 	int action = EBPF_ACTION_CONTINUE;
 	char *path;
 
