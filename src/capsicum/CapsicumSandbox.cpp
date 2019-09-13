@@ -156,7 +156,15 @@ CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 
 		fd = FileDesc::Open(path.c_str(), mode, 0600);
 		if (!fd) {
-			err(1, "Could not open '%s'", path.c_str());
+			if (errno == EISDIR) {
+				mode &= ~O_ACCMODE;
+				mode |= O_RDONLY;
+
+				fd = FileDesc::Open(path.c_str(), mode, 0600);
+			}
+			if (!fd) {
+				err(1, "Could not open '%s'", path.c_str());
+			}
 		}
 
 		if (cap_rights_limit(fd, &rights) < 0 && errno != ENOSYS) {
