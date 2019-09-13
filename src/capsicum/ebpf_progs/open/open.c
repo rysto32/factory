@@ -67,6 +67,8 @@ static inline int * lookup_fd(const char * userPath, char **path, int *action)
 		return 0;
 	}
 
+	memset(pathBuf, 0, MAXPATHLEN);
+
 	size_t len;
 	int error = copyinstr(userPath, pathBuf, MAXPATHLEN, &len);
 	if (error != 0) {
