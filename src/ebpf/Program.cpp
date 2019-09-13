@@ -28,6 +28,8 @@
 
 #include "ebpf/Program.h"
 
+#include <err.h>
+
 namespace Ebpf
 {
 
@@ -39,11 +41,14 @@ Program::Program(Program &&p)
 	p.fd = -1;
 }
 
-Program::Program(GBPFDriver *ebpf, std::string && name, int type, struct ebpf_inst *prog, uint32_t prog_len)
+Program::Program(GBPFDriver *ebpf, std::string && n, int type, struct ebpf_inst *prog, uint32_t prog_len)
   : ebpf(ebpf),
-    name(std::move(name))
+    name(std::move(n))
 {
 	fd = gbpf_load_prog(ebpf, type, prog, prog_len);
+	if (fd < 0) {
+		err(1, "Could not load program '%s'", name.c_str());
+	}
 }
 
 Program::~Program()
