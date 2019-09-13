@@ -78,7 +78,7 @@ CapsicumSandbox::FindInterpreter(Path exe)
 	const char *s, *interp;
 
 	fd = FileDesc::Open(exe.c_str(), O_RDONLY);
-	if (fd < 0) {
+	if (!fd) {
 		err(1, "Could not open executable '%s'", exe.c_str());
 	}
 
@@ -110,11 +110,11 @@ CapsicumSandbox::FindInterpreter(Path exe)
 			interp = s + phdr.p_offset;
 
 			fexec_fd = FileDesc::Open(interp, O_RDONLY | O_EXEC);
-			if (fexec_fd < 0) {
+			if (!fexec_fd) {
 				err(1, "Failed to open rtld '%s'", interp);
 			}
 
-			interp_fd_str = std::to_string(fd);
+			interp_fd_str = std::to_string(int(fd));
 			interp_fd = std::move(fd);
 			goto out;
 		}
@@ -154,7 +154,7 @@ CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 		}
 
 		fd = FileDesc::Open(path.c_str(), mode, 0600);
-		if (fd < 0) {
+		if (!fd) {
 			err(1, "Could not open '%s'", path.c_str());
 		}
 
@@ -260,7 +260,7 @@ void
 CapsicumSandbox::ArgvPrepend(std::vector<char*> & argp)
 {
 
-	if (interp_fd >= 0) {
+	if (interp_fd) {
 		// Blame POSIX for the const_cast :()
 		argp.push_back(const_cast<char*>("rtld"));
 		argp.push_back(const_cast<char*>("-f"));
