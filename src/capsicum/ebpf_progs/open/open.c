@@ -261,3 +261,40 @@ int execve_syscall_probe(struct execve_args *uap)
 	int error = fexecve(fd, uap->argv, uap->envv, 0);
 	return EBPF_ACTION_RETURN;
 }
+
+static inline int do_readlink(const char *path, char * buf, size_t len) __force_inline;
+
+static inline int do_readlink(const char *userPath, char * buf, size_t len)
+{
+	int action = EBPF_ACTION_CONTINUE;
+	char *path;
+
+	int *fd = lookup_fd(userPath, &path, &action);
+	if (fd) {
+		int index = 1;
+		char * scratchBuf = ebpf_map_lookup_elem(&scratch, &index);
+		memset(scratchBuf, 0, MAXPATHLEN);
+
+		size_t arglen = len < MAXPATHLEN ? len : MAXPATHLEN;
+		int error = readlinkat(*fd, path, scratchBuf, arglen);
+		if (error == 0) {
+			copyout(scratchBuf, buf, arglen);
+		}
+		return EBPF_ACTION_RETURN;
+	}
+
+	return action;
+}
+
+int readlink_syscall_probe(struct readlink_args *args)
+{
+	return do_readlink(args->path, args->buf, args->count);
+}
+
+int readlinkat_syscall_probe(struct readlinkat_args *args)
+{
+	if (args->fd >= 0)
+		return EBPF_ACTION_CONTINUE;
+
+	return do_readlink(args->path, args->buf, args->bufsize);
+}
