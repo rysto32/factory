@@ -9,6 +9,9 @@ typedef int mcontext_t;
 #include <sys/ebpf.h>
 #include <sys/ebpf_probe_syscalls.h>
 
+#define	EXEC_INTERP_NONE	1
+#define EXEC_INTERP_STANDARD	2
+
 struct stat {
 	dev_t     st_dev;		/* inode's device */
 	ino_t	  st_ino;		/* inode's number */
@@ -257,11 +260,58 @@ int execve_syscall_probe(struct execve_args *uap)
 	int fd;
 
 	do_open(uap->fname, O_RDONLY | O_EXEC | O_CLOEXEC, 0, &fd);
-	if (fd < 0) {
+	if (unlikely(fd < 0)) {
+		goto done;
+	}
+
+	int index = 1;
+	char * interp = ebpf_map_lookup_elem(&scratch, &index);
+	if (!interp) {
+		set_errno(ENOMEM);
+		return EBPF_ACTION_RETURN;
+	}
+	memset(interp, 0, MAXPATHLEN);
+
+	int type;
+	int error = exec_get_interp(fd, interp, MAXPATHLEN, &type);
+	if (error != 0) {
 		return EBPF_ACTION_RETURN;
 	}
 
-	int error = fexecve(fd, uap->argv, uap->envv, 0);
+	if (type == EXEC_INTERP_NONE) {
+		fexecve(fd, uap->argv, uap->envv, 0);
+	} else if (type == EXEC_INTERP_STANDARD) {
+		void *interp_ptr = interp;
+		int *dir_fd = ebpf_map_lookup_path(&fd_map, &interp_ptr);
+		if (!dir_fd) {
+			return EBPF_ACTION_CONTINUE;
+		}
+
+		interp = interp_ptr;
+
+		int interp_fd;
+		if (interp[0] == '\0') {
+			interp_fd = *dir_fd;
+		} else {
+			interp_fd = openat(*dir_fd, interp, O_RDONLY | O_EXEC, 0);
+			if (interp_fd < 0) {
+				return EBPF_ACTION_RETURN;
+			}
+		}
+
+		char rtld[] = "rtld";
+		char dashdash[] = "--";
+
+		char * argv_prepend[] = {
+			rtld,
+			dashdash,
+			NULL
+		};
+
+		fexecve(interp_fd, uap->argv, uap->envv, argv_prepend);
+	}
+
+done:
 	return EBPF_ACTION_RETURN;
 }
 
