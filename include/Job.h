@@ -29,9 +29,7 @@
 #ifndef JOB_H
 #define JOB_H
 
-#include <sys/types.h>
-#include <sys/nv.h>
-
+#include <stdint.h>
 #include <memory>
 #include <vector>
 
