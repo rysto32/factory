@@ -43,7 +43,8 @@
 #include <unistd.h>
 
 CapsicumSandbox::CapsicumSandbox(const Command & c)
-  : ebpf(ebpf_dev_driver_create())
+  : ebpf(ebpf_dev_driver_create()),
+    is_rtld(false)
 {
 	if (!ebpf) {
 		err(1, "Could not create ebpf instance.");
@@ -114,8 +115,7 @@ CapsicumSandbox::FindInterpreter(Path exe)
 				err(1, "Failed to open rtld '%s'", interp);
 			}
 
-			interp_fd_str = std::to_string(int(fd));
-			interp_fd = std::move(fd);
+			is_rtld = true;
 			goto out;
 		}
 	}
@@ -269,11 +269,9 @@ void
 CapsicumSandbox::ArgvPrepend(std::vector<char*> & argp)
 {
 
-	if (interp_fd) {
-		// Blame POSIX for the const_cast :()
+	if (is_rtld) {
+		// Blame POSIX for the const_cast :(
 		argp.push_back(const_cast<char*>("rtld"));
-		argp.push_back(const_cast<char*>("-f"));
-		argp.push_back(const_cast<char*>(interp_fd_str.c_str()));
 		argp.push_back(const_cast<char*>("--"));
 	}
 }

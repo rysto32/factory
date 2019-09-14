@@ -75,8 +75,7 @@ class CapsicumSandbox : public Sandbox
 	std::vector<Ebpf::Map> maps;
 
 	FileDesc fexec_fd;
-	FileDesc interp_fd;
-	std::string interp_fd_str;
+	bool is_rtld;
 
 	void FindInterpreter(Path exe);
 	void PreopenDescriptors(const PermissionList &);
