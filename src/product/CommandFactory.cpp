@@ -113,7 +113,7 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 			path = workdir / path;
 		}
 		Product * input = productManager.GetProduct(path);
-		permList.AddPermission(input->GetPath(), Permission::READ);
+		permList.AddPermission(input->GetPath(), Permission::READ | Permission::EXEC);
 		inputs.push_back(input);
 	}
 
