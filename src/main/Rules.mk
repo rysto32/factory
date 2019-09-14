@@ -13,7 +13,8 @@ PROG_LIBS := \
 	job \
 	perm \
 	product \
-	preload_sb \
+	capsicum_sb \
+	ebpf \
 	msgsocket \
 	eventloop \
 	config \
@@ -22,6 +23,7 @@ PROG_LIBS := \
 
 PROG_STDLIBS := \
 	event_core \
-	nv \
+	elf \
+	gbpf \
 	ucl \
 	lua-5.3 \

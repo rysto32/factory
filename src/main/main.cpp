@@ -26,6 +26,7 @@
  * SUCH DAMAGE.
  */
 
+#include "CapsicumSandboxFactory.h"
 #include "CommandFactory.h"
 #include "ConfigNode.h"
 #include "ConfigParser.h"
@@ -34,13 +35,13 @@
 #include "Job.h"
 #include "JobManager.h"
 #include "JobQueue.h"
-#include "PreloadSandboxerFactory.h"
 #include "Product.h"
 #include "ProductManager.h"
 #include "TempFileManager.h"
 #include "TempFile.h"
 
 #include <err.h>
+#include <libelf.h>
 #include <unistd.h>
 
 #include <limits>
@@ -51,7 +52,7 @@
 std::unique_ptr<SandboxFactory>
 GetSandboxerFactory(TempFileManager & tmpMgr, EventLoop &loop, int maxJobs)
 {
-	return std::make_unique<PreloadSandboxerFactory>(tmpMgr, loop, maxJobs);
+	return std::make_unique<CapsicumSandboxFactory>();
 }
 
 class Main
@@ -156,6 +157,10 @@ int main(int argc, char **argv)
 	char *endp;
 	u_long maxJobs = 1;
 	int ch;
+
+	if (elf_version(EV_CURRENT) == EV_NONE)
+		errx(1, "ELF library initialization failed: %s",
+		    elf_errmsg(-1));
 
 	while ((ch = getopt(argc, argv, "j:")) != -1) {
 		switch (ch) {
