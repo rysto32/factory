@@ -88,6 +88,8 @@ struct stat {
 
 #define O_CLOEXEC       0x00100000
 
+#define	AT_SYMLINK_NOFOLLOW     0x0200  /* Do not follow symbolic links */
+
 EBPF_DEFINE_MAP(file_lookup_map,  "hashtable", MAXPATHLEN, sizeof(int), 256, 0);
 EBPF_DEFINE_MAP(fd_filename_map,  "array", sizeof(int), NAME_MAX, 256, 0);
 EBPF_DEFINE_MAP(fd_map,  "array", sizeof(int), sizeof(int), 256, 0);
@@ -128,22 +130,27 @@ ScratchMgr::GetScratch()
 		return nullptr;
 	}
 
+	memset(buf, 0, MAXPATHLEN);
+
 	next++;
 	return reinterpret_cast<T*>(buf);
 }
 
-static inline int do_open(ScratchMgr &alloc, const char * path, int flags, int mode, int*) __force_inline;
-static inline int * lookup_fd(void *pathBuf, char **path) __force_inline;
-static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, char **path) __force_inline;
+#define LOOKUP_SYMLINK 0x01
 
-static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, char **path)
+static inline int do_open(ScratchMgr &alloc, const char * path, int flags, int mode, int*) __force_inline;
+template <int ITERS=3>
+static inline int * lookup_fd(ScratchMgr &alloc, void *pathBuf, char **path, int flags = 0) __force_inline;
+static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, char **path, int flags = 0) __force_inline;
+
+static int resolve_symlink(ScratchMgr &alloc, void *pathBuf, int fd, char *fileName) __force_inline;
+
+static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, char **path, int flags)
 {
 	void *pathBuf = alloc.GetScratch<void>();
 	if (!pathBuf) {
 		return 0;
 	}
-
-	memset(pathBuf, 0, MAXPATHLEN);
 
 	size_t len;
 	int error = copyinstr(userPath, pathBuf, MAXPATHLEN, &len);
@@ -151,53 +158,108 @@ static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, cha
 		return 0;
 	}
 
-	return lookup_fd(pathBuf, path);
+	return lookup_fd(alloc, pathBuf, path, flags);
 }
 
-static inline int * lookup_fd(void *pathBuf, char **path)
+template <int ITERS>
+static inline int * lookup_fd(ScratchMgr &alloc, void *pathBuf, char **path, int flags)
 {
-	void *result = ebpf_map_lookup_path(&file_lookup_map, &pathBuf);
-	if (!result) {
-		set_errno(EPERM);
-		return (0);
-	}
-
-	char *lookupName = reinterpret_cast<char*>(pathBuf);
-	int index = *reinterpret_cast<int*>(result);
-
-	result = ebpf_map_lookup_elem(&fd_filename_map, &index);
-
-	char *filename = reinterpret_cast<char*>(result);
-	if (*filename != '\0' && *lookupName != '\0') {
-		set_errno(EISDIR);
-		return 0;
-	}
-
-	result = ebpf_map_lookup_elem(&fd_map, &index);
-	if (!result) {
-		set_errno(EDOOFUS);
-	}
-
-	if (*lookupName != '\0') {
-		*path = lookupName;
+	if constexpr (ITERS <= 0) {
+		return nullptr;
 	} else {
-		*path = filename;
+		void *origPath = pathBuf;
+		void *result = ebpf_map_lookup_path(&file_lookup_map, &pathBuf);
+		if (!result) {
+			set_errno(EPERM);
+			return (0);
+		}
+
+		char *lookupName = reinterpret_cast<char*>(pathBuf);
+		int index = *reinterpret_cast<int*>(result);
+
+		result = ebpf_map_lookup_elem(&fd_filename_map, &index);
+
+		char *filename = reinterpret_cast<char*>(result);
+		if (*filename != '\0' && *lookupName != '\0') {
+			// User looked up /a/b/c, but we have an entry for a
+			// file (not dir) call /a/b
+			set_errno(EISDIR);
+			return 0;
+		}
+
+		result = ebpf_map_lookup_elem(&fd_map, &index);
+		if (!result) {
+			set_errno(EDOOFUS);
+		}
+
+		if (*lookupName != '\0') {
+			*path = lookupName;
+		} else {
+			*path = filename;
+		}
+		int *fd = reinterpret_cast<int*>(result);
+
+		if (flags & LOOKUP_SYMLINK) {
+			return fd;
+		}
+
+		/*
+		 * If the result of the lookup is a symlink, we need to resolve
+		 * it in case the symlink points outside of the directory tree
+		 * covered by fd.
+		 */
+		int error = resolve_symlink(alloc, origPath, *fd, *path);
+		if (error == ENODEV) {
+			// Not a symlink.
+			set_errno(0);
+			set_syscall_retval(0, 0);
+			return fd;
+		} else if (error != 0) {
+			return nullptr;
+		}
+
+		/* Redo the lookup using the symlink target. */
+		return lookup_fd<ITERS - 1>(alloc, origPath, path);
 	}
-	return reinterpret_cast<int*>(result);
+}
+
+static int resolve_symlink(ScratchMgr &alloc, void *pathBuf, int fd, char *fileName)
+{
+
+	if (*fileName == '\0') {
+		// We opened the directory directly; we can't handle
+		// symlinks here.
+		return ENODEV;
+	}
+
+	char * target = alloc.GetScratch<char>();
+	if (!target) {
+		return ENOMEM;
+	}
+
+	int error = readlinkat(fd, fileName, target, MAXPATHLEN);
+	if (error != 0) {
+		// Probably not a symlink.  Return what we already have.
+		return ENODEV;
+	}
+
+	char * basePath = reinterpret_cast<char*>(pathBuf);
+	return canonical_path(basePath, target, MAXPATHLEN);
+
 }
 
 template <typename F>
 static inline int
-fd_op(const char *userPath, const F & func) __force_inline;
+fd_op(const char *userPath, int flags, const F & func) __force_inline;
 
 template <typename F>
 static inline int
-fd_op(ScratchMgr &alloc, const char *userPath, const F & func)
+fd_op(ScratchMgr &alloc, const char *userPath, int flags, const F & func)
 {
 	int ret;
 	char *path;
 
-	int *dir_fd = lookup_fd_user(alloc, userPath, &path);
+	int *dir_fd = lookup_fd_user(alloc, userPath, &path, flags);
 	if (dir_fd) {
 		ret = func(*dir_fd, path);
 	} else {
@@ -212,7 +274,7 @@ static inline int do_open(ScratchMgr &alloc, const char * userPath, int flags, i
 {
 	int error;
 
-	error = fd_op(alloc, userPath,
+	error = fd_op(alloc, userPath, 0,
 		[flags, mode, fd_out](int dir_fd, const char *path)
 		{
 			int fd = openat(dir_fd, path, flags, mode);
@@ -232,11 +294,10 @@ static inline int do_readlink(ScratchMgr &alloc, const char *path, char * buf, s
 static inline int do_readlink(ScratchMgr &alloc, const char *userPath, char * buf, size_t len)
 {
 
-	fd_op(alloc, userPath,
+	fd_op(alloc, userPath, 0,
 		[&alloc, buf, len](int dir_fd, const char *path)
 		{
 			char * scratchBuf = alloc.GetScratch<char>();
-			memset(scratchBuf, 0, MAXPATHLEN);
 
 			size_t arglen = len < MAXPATHLEN ? len : MAXPATHLEN;
 
@@ -288,8 +349,10 @@ int fstatat_syscall_probe(struct fstatat_args *args)
 		return EBPF_ACTION_CONTINUE;
 	}
 
+	int flags = args->flag & AT_SYMLINK_NOFOLLOW ? LOOKUP_SYMLINK : 0;
+
 	ScratchMgr alloc;
-	fd_op(alloc, args->path,
+	fd_op(alloc, args->path, flags,
 		[&alloc, args](int dir_fd, const char *path)
 		{
 			struct stat *sb = alloc.GetScratch<struct stat>();
@@ -321,7 +384,7 @@ int access_syscall_probe(struct access_args *args)
 {
 
 	ScratchMgr alloc;
-	fd_op(alloc, args->path,
+	fd_op(alloc, args->path, 0,
 		[args](int dir_fd, const char *path)
 		{
 			return faccessat(dir_fd, path, args->amode, 0);
@@ -407,7 +470,7 @@ int execve_syscall_probe(struct execve_args *uap)
 	if (type == EXEC_INTERP_NONE) {
 		fexecve(fd, uap->argv, uap->envv, 0);
 	} else if (type == EXEC_INTERP_STANDARD) {
-		int *dir_fd = lookup_fd(interp, &interp);
+		int *dir_fd = lookup_fd(alloc, interp, &interp);
 		if (!dir_fd) {
 			return EBPF_ACTION_RETURN;
 		}
