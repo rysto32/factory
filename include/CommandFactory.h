@@ -48,6 +48,7 @@ struct CommandOptions
 	std::optional<Path> workdir;
 	std::optional<Path> stdin;
 	std::optional<Path> stdout;
+	std::vector<std::string> statdirs;
 };
 
 class CommandFactory

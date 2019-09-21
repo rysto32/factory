@@ -124,6 +124,13 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 		permList.AddPermission(path, Permission::READ | Permission::WRITE);
 	}
 
+	for (Path path : options.statdirs) {
+		if (path.is_relative()) {
+			path = workdir / path;
+		}
+		permList.AddPermission(path, Permission::STAT);
+	}
+
 	for (Path path : productList) {
 		if (path.is_relative()) {
 			path = workdir / path;

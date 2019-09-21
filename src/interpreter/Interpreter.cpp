@@ -375,7 +375,8 @@ Interpreter::GetCommandOptions(Lua::Table &table)
 		Lua::FieldSpec("tmpdirs", StringListField(opt.tmpdirs)).Optional(true),
 		Lua::FieldSpec("workdir", StringField(opt.workdir)).Optional(true),
 		Lua::FieldSpec("stdin", StringField(opt.stdin)).Optional(true),
-		Lua::FieldSpec("stdout", StringField(opt.stdout)).Optional(true)
+		Lua::FieldSpec("stdout", StringField(opt.stdout)).Optional(true),
+		Lua::FieldSpec("statdirs", StringListField(opt.statdirs)).Optional(true)
 	};
 
 	table.ParseMap(parser);
