@@ -98,16 +98,48 @@ EBPF_DEFINE_MAP(defer_map, "progarray", sizeof(int), sizeof(int), 4, 0);
 #define unlikely(x) (__builtin_expect(!!(x), 0))
 #define __force_inline __attribute((always_inline))
 
-static inline int do_open(const char * path, int flags, int mode, int*) __force_inline;
-static inline int * lookup_fd(void *pathBuf, char **path) __force_inline;
-static inline int * lookup_fd_user(const char * userPath, char **path) __force_inline;
-
-static inline int * lookup_fd_user(const char * userPath, char **path)
+class ScratchMgr
 {
-	int index = 0;
-	void *pathBuf = ebpf_map_lookup_elem(&scratch, &index);
-	if (!pathBuf) {
+	int next;
+
+public:
+	ScratchMgr()
+	  : next(0)
+	{
+	}
+
+	ScratchMgr(const ScratchMgr &) = delete;
+	ScratchMgr(ScratchMgr &&) = delete;
+
+	ScratchMgr & operator=(const ScratchMgr&) = delete;
+	ScratchMgr & operator=(ScratchMgr &&) = delete;
+
+	template <typename T>
+	T * GetScratch() __force_inline;
+};
+
+template <typename T>
+T*
+ScratchMgr::GetScratch()
+{
+	void *buf = ebpf_map_lookup_elem(&scratch, &next);
+	if (!buf) {
 		set_errno(ENOMEM);
+		return nullptr;
+	}
+
+	next++;
+	return reinterpret_cast<T*>(buf);
+}
+
+static inline int do_open(ScratchMgr &alloc, const char * path, int flags, int mode, int*) __force_inline;
+static inline int * lookup_fd(void *pathBuf, char **path) __force_inline;
+static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, char **path) __force_inline;
+
+static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, char **path)
+{
+	void *pathBuf = alloc.GetScratch<void>();
+	if (!pathBuf) {
 		return 0;
 	}
 
@@ -160,12 +192,12 @@ fd_op(const char *userPath, const F & func) __force_inline;
 
 template <typename F>
 static inline int
-fd_op(const char *userPath, const F & func)
+fd_op(ScratchMgr &alloc, const char *userPath, const F & func)
 {
 	int ret;
 	char *path;
 
-	int *dir_fd = lookup_fd_user(userPath, &path);
+	int *dir_fd = lookup_fd_user(alloc, userPath, &path);
 	if (dir_fd) {
 		ret = func(*dir_fd, path);
 	} else {
@@ -176,11 +208,11 @@ fd_op(const char *userPath, const F & func)
 
 }
 
-static inline int do_open(const char * userPath, int flags, int mode, int *fd_out)
+static inline int do_open(ScratchMgr &alloc, const char * userPath, int flags, int mode, int *fd_out)
 {
 	int error;
 
-	error = fd_op(userPath,
+	error = fd_op(alloc, userPath,
 		[flags, mode, fd_out](int dir_fd, const char *path)
 		{
 			int fd = openat(dir_fd, path, flags, mode);
@@ -196,16 +228,14 @@ static inline int do_open(const char * userPath, int flags, int mode, int *fd_ou
 	return EBPF_ACTION_RETURN;
 }
 
-static inline int do_readlink(const char *path, char * buf, size_t len) __force_inline;
-static inline int do_readlink(const char *userPath, char * buf, size_t len)
+static inline int do_readlink(ScratchMgr &alloc, const char *path, char * buf, size_t len) __force_inline;
+static inline int do_readlink(ScratchMgr &alloc, const char *userPath, char * buf, size_t len)
 {
 
-	fd_op(userPath,
-		[buf, len](int dir_fd, const char *path)
+	fd_op(alloc, userPath,
+		[&alloc, buf, len](int dir_fd, const char *path)
 		{
-			int index = 1;
-			void * result = ebpf_map_lookup_elem(&scratch, &index);
-			char * scratchBuf = reinterpret_cast<char*>(result);
+			char * scratchBuf = alloc.GetScratch<char>();
 			memset(scratchBuf, 0, MAXPATHLEN);
 
 			size_t arglen = len < MAXPATHLEN ? len : MAXPATHLEN;
@@ -238,7 +268,8 @@ static inline int do_fork(void)
 extern "C" {
 int open_syscall_probe(struct open_args *args)
 {
-	return do_open(args->path, args->flags, args->mode, NULL);
+	ScratchMgr alloc;
+	return do_open(alloc, args->path, args->flags, args->mode, NULL);
 }
 
 int openat_syscall_probe(struct openat_args *args)
@@ -247,7 +278,8 @@ int openat_syscall_probe(struct openat_args *args)
 		return EBPF_ACTION_CONTINUE;
 	}
 
-	return do_open(args->path, args->flag, args->mode, NULL);
+	ScratchMgr alloc;
+	return do_open(alloc, args->path, args->flag, args->mode, NULL);
 }
 
 int fstatat_syscall_probe(struct fstatat_args *args)
@@ -256,18 +288,17 @@ int fstatat_syscall_probe(struct fstatat_args *args)
 		return EBPF_ACTION_CONTINUE;
 	}
 
-	fd_op(args->path,
-		[args](int dir_fd, const char *path)
+	ScratchMgr alloc;
+	fd_op(alloc, args->path,
+		[&alloc, args](int dir_fd, const char *path)
 		{
-			int index = 1;
-			void *statBuf = ebpf_map_lookup_elem(&scratch, &index);
-			if (!statBuf) {
+			struct stat *sb = alloc.GetScratch<struct stat>();
+			if (!sb) {
 				set_errno(ENOMEM);
 				return (-1);
 			}
 
 			int error;
-			struct stat *sb = reinterpret_cast<struct stat*>(statBuf);
 			if (path[0] == '\0') {
 				error = fstat(dir_fd, sb);
 			} else {
@@ -278,7 +309,7 @@ int fstatat_syscall_probe(struct fstatat_args *args)
 				return -1;
 			}
 
-			copyout(statBuf, args->buf, sizeof(*args->buf));
+			copyout(sb, args->buf, sizeof(*args->buf));
 			return (0);
 
 		});
@@ -289,7 +320,8 @@ int fstatat_syscall_probe(struct fstatat_args *args)
 int access_syscall_probe(struct access_args *args)
 {
 
-	fd_op(args->path,
+	ScratchMgr alloc;
+	fd_op(alloc, args->path,
 		[args](int dir_fd, const char *path)
 		{
 			return faccessat(dir_fd, path, args->amode, 0);
@@ -353,22 +385,19 @@ int execve_syscall_probe(struct execve_args *uap)
 	char *interp;
 	int type, error, index;
 	int fd;
-	void *buf;
 
-	do_open(uap->fname, O_RDONLY | O_EXEC | O_CLOEXEC, 0, &fd);
+	ScratchMgr alloc;
+	do_open(alloc, uap->fname, O_RDONLY | O_EXEC | O_CLOEXEC, 0, &fd);
 	if (unlikely(fd < 0)) {
 		goto done;
 	}
 
 	index = 1;
-	buf = ebpf_map_lookup_elem(&scratch, &index);
-	if (!buf) {
-		set_errno(ENOMEM);
+	interp = alloc.GetScratch<char>();
+	if (!interp) {
 		return EBPF_ACTION_RETURN;
 	}
-	memset(buf, 0, MAXPATHLEN);
-
-	interp = reinterpret_cast<char*>(buf);
+	memset(interp, 0, MAXPATHLEN);
 
 	error = exec_get_interp(fd, interp, MAXPATHLEN, &type);
 	if (error != 0) {
@@ -406,7 +435,8 @@ done:
 
 int readlink_syscall_probe(struct readlink_args *args)
 {
-	return do_readlink(args->path, args->buf, args->count);
+	ScratchMgr alloc;
+	return do_readlink(alloc, args->path, args->buf, args->count);
 }
 
 int readlinkat_syscall_probe(struct readlinkat_args *args)
@@ -414,6 +444,7 @@ int readlinkat_syscall_probe(struct readlinkat_args *args)
 	if (args->fd >= 0)
 		return EBPF_ACTION_CONTINUE;
 
-	return do_readlink(args->path, args->buf, args->bufsize);
+	ScratchMgr alloc;
+	return do_readlink(alloc, args->path, args->buf, args->bufsize);
 }
 }
