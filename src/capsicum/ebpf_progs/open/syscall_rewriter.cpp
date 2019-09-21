@@ -380,7 +380,7 @@ int execve_syscall_probe(struct execve_args *uap)
 	} else if (type == EXEC_INTERP_STANDARD) {
 		int *dir_fd = lookup_fd(interp, &interp);
 		if (!dir_fd) {
-			return EBPF_ACTION_CONTINUE;
+			return EBPF_ACTION_RETURN;
 		}
 
 		int interp_fd = openat(*dir_fd, interp, O_RDONLY | O_EXEC, 0);
