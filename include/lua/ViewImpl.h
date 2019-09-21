@@ -74,7 +74,7 @@ View::InvokeFunctionCallback(const F & func, const NamedValue & subvalue, IndexT
 	if constexpr (takes_func_value<F, IndexType>()) {
 		func(index, Function(lua, stackPos));
 	} else {
-		throw InterpreterException("Did not expect a table in %s", subvalue.ToString().c_str());
+		throw InterpreterException("Did not expect a function in %s", subvalue.ToString().c_str());
 	}
 }
 
