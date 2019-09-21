@@ -50,8 +50,10 @@ class CapsicumSandbox : public Sandbox
 {
 	struct PreopenDesc
 	{
-		PreopenDesc(Path p, FileDesc && f)
-		  : path(std::move(p)), fd(std::move(f))
+		PreopenDesc(Path &&lookup, Path && filename, FileDesc && f)
+		  : lookup(std::move(lookup)),
+		    filename(std::move(filename)),
+		    fd(std::move(f))
 		{
 		}
 
@@ -61,7 +63,8 @@ class CapsicumSandbox : public Sandbox
 		PreopenDesc & operator=(const PreopenDesc &) = delete;
 		PreopenDesc & operator=(PreopenDesc &&) = delete;
 
-		Path path;
+		Path lookup;
+		Path filename;
 		FileDesc fd;
 	};
 
@@ -71,6 +74,8 @@ class CapsicumSandbox : public Sandbox
 	std::vector<Ebpf::Program> probe_programs;
 	std::vector<Ebpf::Program> defer_programs;
 	Ebpf::Map fd_map;
+	Ebpf::Map fd_filename_map;
+	Ebpf::Map file_lookup_map;
 	Ebpf::Map defer_map;
 	std::vector<Ebpf::Map> maps;
 

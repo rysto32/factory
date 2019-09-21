@@ -112,6 +112,11 @@ public:
 		return std::filesystem::canonical(path, code);
 	}
 
+	Path filename() const
+	{
+		return path.filename();
+	}
+
 	bool is_relative() const
 	{
 		return path.is_relative();

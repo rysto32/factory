@@ -40,6 +40,7 @@
 #include <gelf.h>
 #include <libelf.h>
 #include <string.h>
+#include <sys/syslimits.h>
 #include <unistd.h>
 
 CapsicumSandbox::CapsicumSandbox(const Command & c)
@@ -136,17 +137,21 @@ CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 
 	for (const auto & [path, perm] : permList.GetPermMap()) {
 		cap_rights_init(&rights, CAP_LOOKUP, CAP_FSTAT);
-		mode = 0;
+
+		/*
+		 * Even if we're giving write permission to a file, we actually
+		 * wind up opening its parent directory and you must open a
+		 * directory with O_RDONLY.
+		 */
+		mode = O_RDONLY;
 
 		if (perm & Permission::READ) {
 			cap_rights_set(&rights, CAP_READ, CAP_SEEK, CAP_MMAP_R);
-			mode = O_RDONLY;
 		}
 
 		if (perm & Permission::WRITE) {
 			cap_rights_set(&rights, CAP_WRITE, CAP_SEEK, CAP_MMAP_W,
 			    CAP_CREATE, CAP_FTRUNCATE);
-			mode = O_RDWR | O_CREAT;
 		}
 
 		if (perm & Permission::EXEC) {
@@ -154,24 +159,25 @@ CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 			mode |= O_EXEC;
 		}
 
-		fd = FileDesc::Open(path.c_str(), mode, 0600);
-		if (!fd) {
-			if (errno == EISDIR) {
-				mode &= ~O_ACCMODE;
-				mode |= O_RDONLY;
+		std::error_code code;
+		Path openPath, filename;
+		if (std::filesystem::is_directory(path)) {
+			openPath = path;
+		} else {
+			openPath = path.parent_path();
+			filename = path.filename();
+		}
 
-				fd = FileDesc::Open(path.c_str(), mode, 0600);
-			}
-			if (!fd) {
-				err(1, "Could not open '%s'", path.c_str());
-			}
+		fd = FileDesc::Open(openPath.c_str(), mode, 0600);
+		if (!fd) {
+			err(1, "Could not open '%s'", path.c_str());
 		}
 
 		if (cap_rights_limit(fd, &rights) < 0 && errno != ENOSYS) {
 			err(1, "cap_rights_limit() failed");
 		}
 
-		descriptors.emplace_back(path, std::move(fd));
+		descriptors.emplace_back(std::move(openPath), std::move(filename), std::move(fd));
 	}
 }
 
@@ -218,6 +224,10 @@ CapsicumSandbox::DefineMap(GBPFElfWalker *walker, const char *n, int desc,
 
 	if (name == "fd_map") {
 		sandbox->fd_map = Ebpf::Map(walker->driver, std::move(name), desc);
+	} else if (name == "fd_filename_map") {
+		sandbox->fd_filename_map = Ebpf::Map(walker->driver, std::move(name), desc);
+	} else if (name == "file_lookup_map") {
+		sandbox->file_lookup_map = Ebpf::Map(walker->driver, std::move(name), desc);
 	} else if (name == "defer_map") {
 		sandbox->defer_map = Ebpf::Map(walker->driver, std::move(name), desc);
 	} else {
@@ -244,14 +254,23 @@ CapsicumSandbox::CreateEbpfRules()
 		errx(1, "EBPF object did not define fd map");
 	}
 
+	int nextIndex = 0;
 	for (const auto & desc : descriptors) {
 		char path[MAXPATHLEN];
 
 		bzero(path, sizeof(path));
-		strlcpy(path, desc.path.c_str(), sizeof(path));
+		strlcpy(path, desc.lookup.c_str(), sizeof(path));
+
+		file_lookup_map.UpdateElem(path, &nextIndex, EBPF_NOEXIST);
 
 		int fd = desc.fd;
-		fd_map.UpdateElem(path, &fd, EBPF_NOEXIST);
+		fd_map.UpdateElem(&nextIndex, &fd, 0);
+
+		bzero(path, NAME_MAX);
+		strlcpy(path, desc.filename.c_str(), NAME_MAX);
+		fd_filename_map.UpdateElem(&nextIndex, path, 0);
+
+		nextIndex++;
 	}
 
 	for (const auto & prog : defer_programs) {
