@@ -177,7 +177,7 @@ CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 			err(1, "cap_rights_limit() failed");
 		}
 
-		descriptors.emplace_back(std::move(openPath), std::move(filename), std::move(fd));
+		descriptors.emplace_back(path, std::move(filename), std::move(fd));
 	}
 }
 

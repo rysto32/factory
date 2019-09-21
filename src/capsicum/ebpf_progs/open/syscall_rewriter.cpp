@@ -136,8 +136,8 @@ static inline int * lookup_fd(void *pathBuf, char **path)
 	result = ebpf_map_lookup_elem(&fd_filename_map, &index);
 
 	char *filename = reinterpret_cast<char*>(result);
-	if (*filename != '\0' && strncmp(lookupName, filename, NAME_MAX) != 0) {
-		set_errno(EPERM);
+	if (*filename != '\0' && *lookupName != '\0') {
+		set_errno(EISDIR);
 		return 0;
 	}
 
@@ -146,7 +146,11 @@ static inline int * lookup_fd(void *pathBuf, char **path)
 		set_errno(EDOOFUS);
 	}
 
-	*path = lookupName;
+	if (*lookupName != '\0') {
+		*path = lookupName;
+	} else {
+		*path = filename;
+	}
 	return reinterpret_cast<int*>(result);
 }
 

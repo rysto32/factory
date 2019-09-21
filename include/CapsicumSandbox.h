@@ -50,7 +50,7 @@ class CapsicumSandbox : public Sandbox
 {
 	struct PreopenDesc
 	{
-		PreopenDesc(Path &&lookup, Path && filename, FileDesc && f)
+		PreopenDesc(Path lookup, Path && filename, FileDesc && f)
 		  : lookup(std::move(lookup)),
 		    filename(std::move(filename)),
 		    fd(std::move(f))
