@@ -66,15 +66,18 @@ Map::operator=(Map &&map)
 	fd = map.fd;
 
 	map.ebpf = nullptr;
+	map.fd = -1;
+
 	return *this;
 }
 
 void
 Map::Close()
 {
-	if (ebpf != nullptr) {
+	if (fd >= 0) {
 		gbpf_close_map_desc(ebpf, fd);
 		ebpf = nullptr;
+		fd = -1;
 	}
 }
 

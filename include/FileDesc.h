@@ -82,7 +82,7 @@ public:
 
 	void Close()
 	{
-		if (fd > 0) {
+		if (fd >= 0) {
 			close(fd);
 			fd = -1;
 		}
