@@ -139,11 +139,12 @@ ScratchMgr::GetScratch()
 #define LOOKUP_SYMLINK 0x01
 
 static inline int do_open(ScratchMgr &alloc, const char * path, int flags, int mode, int*) __force_inline;
-template <int ITERS=3>
 static inline int * lookup_fd(ScratchMgr &alloc, void *pathBuf, char **path, int flags = 0) __force_inline;
+template <int ITERS=3>
+static inline int * do_lookup_fd(void *pathBuf, void *scratchBuf, char **path, int flags) __force_inline;
 static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, char **path, int flags = 0) __force_inline;
 
-static int resolve_symlink(ScratchMgr &alloc, void *pathBuf, int fd, char *fileName) __force_inline;
+static int resolve_symlink(void *pathBuf, void *scratchBuf, int fd, char *fileName) __force_inline;
 
 static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, char **path, int flags)
 {
@@ -161,55 +162,62 @@ static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, cha
 	return lookup_fd(alloc, pathBuf, path, flags);
 }
 
-template <int ITERS>
 static inline int * lookup_fd(ScratchMgr &alloc, void *pathBuf, char **path, int flags)
 {
-	if constexpr (ITERS <= 0) {
+	return do_lookup_fd(pathBuf, alloc.GetScratch<void>(), path, flags);
+}
+
+template <int ITERS>
+static inline int * do_lookup_fd(void *pathBuf, void *scratchBuf, char **path, int flags)
+{
+	void *origPath = pathBuf;
+	void *result = ebpf_map_lookup_path(&file_lookup_map, &pathBuf);
+	if (!result) {
+		set_errno(EPERM);
+		return (0);
+	}
+
+	char *lookupName = reinterpret_cast<char*>(pathBuf);
+	int index = *reinterpret_cast<int*>(result);
+
+	result = ebpf_map_lookup_elem(&fd_filename_map, &index);
+
+	char *filename = reinterpret_cast<char*>(result);
+	if (*filename != '\0' && *lookupName != '\0') {
+		/*
+		 * User looked up /a/b/c, but we have an entry for a
+		 * file (not dir) called /a/b.
+		 */
+		set_errno(EISDIR);
+		return 0;
+	}
+
+	result = ebpf_map_lookup_elem(&fd_map, &index);
+	if (!result) {
+		set_errno(EDOOFUS);
 		return nullptr;
+	}
+
+	if (*lookupName != '\0') {
+		*path = lookupName;
 	} else {
-		void *origPath = pathBuf;
-		void *result = ebpf_map_lookup_path(&file_lookup_map, &pathBuf);
-		if (!result) {
-			set_errno(EPERM);
-			return (0);
-		}
+		*path = filename;
+	}
+	int *fd = reinterpret_cast<int*>(result);
 
-		char *lookupName = reinterpret_cast<char*>(pathBuf);
-		int index = *reinterpret_cast<int*>(result);
+	if (flags & LOOKUP_SYMLINK) {
+		return fd;
+	}
 
-		result = ebpf_map_lookup_elem(&fd_filename_map, &index);
-
-		char *filename = reinterpret_cast<char*>(result);
-		if (*filename != '\0' && *lookupName != '\0') {
-			// User looked up /a/b/c, but we have an entry for a
-			// file (not dir) call /a/b
-			set_errno(EISDIR);
-			return 0;
-		}
-
-		result = ebpf_map_lookup_elem(&fd_map, &index);
-		if (!result) {
-			set_errno(EDOOFUS);
-			return nullptr;
-		}
-
-		if (*lookupName != '\0') {
-			*path = lookupName;
-		} else {
-			*path = filename;
-		}
-		int *fd = reinterpret_cast<int*>(result);
-
-		if (flags & LOOKUP_SYMLINK) {
-			return fd;
-		}
-
+	if constexpr (ITERS <= 1) {
+		return fd;
+	} else {
 		/*
 		 * If the result of the lookup is a symlink, we need to resolve
 		 * it in case the symlink points outside of the directory tree
 		 * covered by fd.
 		 */
-		int error = resolve_symlink(alloc, origPath, *fd, *path);
+		int error = resolve_symlink(origPath, scratchBuf, *fd, *path);
 		if (error == ENODEV) {
 			// Not a symlink.
 			set_errno(0);
@@ -220,11 +228,11 @@ static inline int * lookup_fd(ScratchMgr &alloc, void *pathBuf, char **path, int
 		}
 
 		/* Redo the lookup using the symlink target. */
-		return lookup_fd<ITERS - 1>(alloc, origPath, path);
+		return do_lookup_fd<ITERS - 1>(origPath, scratchBuf, path, flags);
 	}
 }
 
-static int resolve_symlink(ScratchMgr &alloc, void *pathBuf, int fd, char *fileName)
+static int resolve_symlink(void *pathBuf, void *scratchBuf, int fd, char *fileName)
 {
 
 	if (*fileName == '\0') {
@@ -233,10 +241,8 @@ static int resolve_symlink(ScratchMgr &alloc, void *pathBuf, int fd, char *fileN
 		return ENODEV;
 	}
 
-	char * target = alloc.GetScratch<char>();
-	if (!target) {
-		return ENOMEM;
-	}
+	char * target = reinterpret_cast<char*>(scratchBuf);
+	memset(target, 0, MAXPATHLEN);
 
 	int error = readlinkat(fd, fileName, target, MAXPATHLEN);
 	if (error != 0) {
