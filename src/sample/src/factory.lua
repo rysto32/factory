@@ -1,5 +1,5 @@
 
-objdirprefix = "/usr/home/rstone/obj/tcplat"
+objdirprefix = "/tmp/obj/tcplat"
 libdir = objdirprefix .. "/lib"
 bindir = objdirprefix .. "/bin"
 
@@ -8,14 +8,14 @@ function make_lib_path(lib)
 end
 
 function define_obj_create(dir)
-	factory.define_command(dir, {}, {"/bin/mkdir", "-p", dir})
+	factory.define_command(dir, {"/lib"}, {"/bin/mkdir", dir})
 end
 
 define_obj_create(objdirprefix)
 define_obj_create(libdir)
 define_obj_create(bindir)
 
-include_path = "include"
+include_path = factory.build_path('.', "include")
 
 definitions = {
 	{
@@ -49,18 +49,19 @@ definitions = {
 					srcpath)
 
 				inputs = {
-					"/usr/local/llvm80",
 					"/usr/local/bin",
 					"/usr/include/",
 					"/usr/share",
+					"/usr/bin",
 					"/etc",
+					"/lib",
 					srcdir,
 					srcpath,
 					include_path
 				}
 
 				options = {
-					tmpdirs = objdir
+					statdirs = "/"
 				}
 				factory.define_command({objpath}, inputs, arglist, options)
 
@@ -88,7 +89,7 @@ definitions = {
 			)
 
 			inputs = factory.flat_list(
-				"/usr/local/llvm80",
+				"/libexec",
 				"/usr/local/bin",
 				"/lib",
 				"/usr/lib",
@@ -100,7 +101,8 @@ definitions = {
 			)
 
 			options = {
-				tmpdirs = bindir
+				tmpdirs = bindir,
+				statdirs = "/"
 			}
 			factory.define_command(prog_path, inputs, arglist, options)
 		end
@@ -121,8 +123,8 @@ definitions = {
 
 top_config = {
 	AR = "/usr/bin/ar",
-	CXX = "/usr/local/bin/clang++80",
-	LD = "/usr/local/bin/clang++80",
+	CXX = "/usr/bin/c++",
+	LD = "/usr/bin/c++",
 	srcdir = "",
 }
 
