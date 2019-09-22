@@ -510,4 +510,31 @@ int readlinkat_syscall_probe(struct readlinkat_args *args)
 	ScratchMgr alloc;
 	return do_readlink(alloc, args->path, args->buf, args->bufsize);
 }
+
+int rename_syscall_probe(struct rename_args *args)
+{
+	ScratchMgr alloc;
+	int tofd, error;
+	const char *to;
+
+	error = fd_op(alloc, args->to, 0,
+	    [&tofd,&to](int fd, const char *path)
+		{
+			tofd = fd;
+			to = path;
+			return (0);
+		});
+	if (error != 0) {
+		return (EBPF_ACTION_RETURN);
+	}
+
+	fd_op(alloc, args->from, 0,
+		[tofd,to](int fromfd, const char *from)
+		{
+			return (renameat(fromfd, from, tofd, to));
+		});
+
+	return (EBPF_ACTION_RETURN);
+}
+
 }
