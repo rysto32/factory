@@ -190,6 +190,7 @@ static inline int * lookup_fd(ScratchMgr &alloc, void *pathBuf, char **path, int
 		result = ebpf_map_lookup_elem(&fd_map, &index);
 		if (!result) {
 			set_errno(EDOOFUS);
+			return nullptr;
 		}
 
 		if (*lookupName != '\0') {
