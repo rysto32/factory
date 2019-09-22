@@ -148,18 +148,25 @@ static int resolve_symlink(void *pathBuf, void *scratchBuf, int fd, char *fileNa
 
 static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, char **path, int flags)
 {
-	void *pathBuf = alloc.GetScratch<void>();
-	if (!pathBuf) {
-		return 0;
+	char * inBuf = alloc.GetScratch<char>();
+	if (!inBuf) {
+		return nullptr;
 	}
 
 	size_t len;
-	int error = copyinstr(userPath, pathBuf, MAXPATHLEN, &len);
+	int error = copyinstr(userPath, inBuf, MAXPATHLEN, &len);
 	if (error != 0) {
-		return 0;
+		return nullptr;
 	}
 
-	return lookup_fd(alloc, pathBuf, path, flags);
+	char *pathBuf = alloc.GetScratch<char>();
+	if (!pathBuf) {
+		return nullptr;
+	}
+
+	error = canonical_path(pathBuf, inBuf, MAXPATHLEN);
+
+	return do_lookup_fd(pathBuf, inBuf, path, flags);
 }
 
 static inline int * lookup_fd(ScratchMgr &alloc, void *pathBuf, char **path, int flags)
