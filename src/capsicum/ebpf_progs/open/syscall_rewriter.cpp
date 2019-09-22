@@ -139,6 +139,7 @@ ScratchMgr::GetScratch()
 #define LOOKUP_SYMLINK 0x01
 
 static inline int do_open(ScratchMgr &alloc, const char * path, int flags, int mode, int*) __force_inline;
+template <int ITERS=3>
 static inline int * lookup_fd(ScratchMgr &alloc, void *pathBuf, char **path, int flags = 0) __force_inline;
 template <int ITERS=3>
 static inline int * do_lookup_fd(void *pathBuf, void *scratchBuf, char **path, int flags) __force_inline;
@@ -169,9 +170,10 @@ static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, cha
 	return do_lookup_fd(pathBuf, inBuf, path, flags);
 }
 
+template <int ITERS>
 static inline int * lookup_fd(ScratchMgr &alloc, void *pathBuf, char **path, int flags)
 {
-	return do_lookup_fd(pathBuf, alloc.GetScratch<void>(), path, flags);
+	return do_lookup_fd<ITERS>(pathBuf, alloc.GetScratch<void>(), path, flags);
 }
 
 template <int ITERS>
@@ -484,7 +486,11 @@ int execve_syscall_probe(struct execve_args *uap)
 	if (type == EXEC_INTERP_NONE) {
 		fexecve(fd, uap->argv, uap->envv, 0);
 	} else if (type == EXEC_INTERP_STANDARD) {
-		int *dir_fd = lookup_fd(alloc, interp, &interp);
+		/*
+		 * Have to reduce to reduce to 2 lookup iterations to keep
+		 * the EBPF program size below the limit.
+		 */
+		int *dir_fd = lookup_fd<2>(alloc, interp, &interp);
 		if (!dir_fd) {
 			return EBPF_ACTION_RETURN;
 		}
