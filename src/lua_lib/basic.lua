@@ -35,7 +35,8 @@ function factory.file_ext(file)
 end
 
 function factory.replace_ext(file, old, new)
-	return string.gsub(file, "%." .. old .. "$", "." .. new)
+	newfile = string.gsub(file, "%." .. old .. "$", "." .. new)
+	return newfile
 end
 
 function factory.list_concat(t1, t2)
