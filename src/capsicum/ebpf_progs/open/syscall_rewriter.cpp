@@ -362,7 +362,7 @@ int open_syscall_probe(struct open_args *args)
 
 int openat_syscall_probe(struct openat_args *args)
 {
-	if (args->fd >= 0) {
+	if (args->fd != AT_FDCWD) {
 		return EBPF_ACTION_CONTINUE;
 	}
 
@@ -372,7 +372,7 @@ int openat_syscall_probe(struct openat_args *args)
 
 int fstatat_syscall_probe(struct fstatat_args *args)
 {
-	if (args->fd >= 0) {
+	if (args->fd != AT_FDCWD) {
 		return EBPF_ACTION_CONTINUE;
 	}
 
@@ -535,7 +535,7 @@ int readlink_syscall_probe(struct readlink_args *args)
 
 int readlinkat_syscall_probe(struct readlinkat_args *args)
 {
-	if (args->fd >= 0)
+	if (args->fd != AT_FDCWD)
 		return EBPF_ACTION_CONTINUE;
 
 	ScratchMgr alloc;
