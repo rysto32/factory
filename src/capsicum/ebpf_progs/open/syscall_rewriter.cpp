@@ -361,6 +361,10 @@ static inline int do_open(ScratchMgr &alloc, const char * userPath, int flags, i
 			return (0);
 		});
 
+	if (error != 0 && fd_out) {
+		*fd_out = -1;
+	}
+
 	return EBPF_ACTION_RETURN;
 }
 
