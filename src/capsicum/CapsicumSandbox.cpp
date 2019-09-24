@@ -212,12 +212,12 @@ CapsicumSandbox::DefineProgram(GBPFElfWalker *walker, const char *n,
 		sandbox->defer_programs.emplace_back(walker->driver, std::move(name),
 		    EBPF_PROG_TYPE_VFS, prog, prog_len);
 
-		fprintf(stderr, "Map prog '%s' to FD %d\n", n, sandbox->defer_programs.back().GetFD());
+// 		fprintf(stderr, "Map prog '%s' to FD %d\n", n, sandbox->defer_programs.back().GetFD());
 	} else {
 		sandbox->probe_programs.emplace_back(walker->driver, std::move(name),
 		    EBPF_PROG_TYPE_VFS, prog, prog_len);
 
-		fprintf(stderr, "Map prog '%s' to FD %d\n", n, sandbox->probe_programs.back().GetFD());
+// 		fprintf(stderr, "Map prog '%s' to FD %d\n", n, sandbox->probe_programs.back().GetFD());
 	}
 }
 
