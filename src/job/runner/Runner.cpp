@@ -136,8 +136,9 @@ int main(int argc, char **argv)
 	int ch;
 
 	Path cwd(std::filesystem::current_path());
+	Path work_dir(cwd);
 
-	while ((ch = getopt(argc, argv, "a:")) != -1) {
+	while ((ch = getopt(argc, argv, "a:C:")) != -1) {
 		Path permPath;
 		Permission p;
 
@@ -148,6 +149,9 @@ int main(int argc, char **argv)
 				permPath = cwd / permPath;
 			}
 			perms.AddPermission(permPath, p);
+			break;
+		case 'C':
+			work_dir = optarg;
 			break;
 		}
 	}
@@ -172,7 +176,7 @@ int main(int argc, char **argv)
 	JobManager jobManager(loop, jobQueue,
 	    std::make_unique<CapsicumSandboxFactory>(), 1);
 	SimpleCompletion completer(loop);
-	Command pending({}, std::move(list), std::move(perms), std::move(cwd), {}, {});
+	Command pending({}, std::move(list), std::move(perms), std::move(work_dir), {}, {});
 
 	Job * job = jobManager.StartJob(pending, completer);
 	if (job == NULL)
