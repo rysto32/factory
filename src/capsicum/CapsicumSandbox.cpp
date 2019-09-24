@@ -152,7 +152,7 @@ CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 		if (perm & Permission::WRITE) {
 			cap_rights_set(&rights, CAP_WRITE, CAP_SEEK, CAP_MMAP_W,
 			    CAP_CREATE, CAP_FTRUNCATE, CAP_RENAMEAT_SOURCE,
-			    CAP_RENAMEAT_TARGET, CAP_UNLINKAT);
+			    CAP_RENAMEAT_TARGET, CAP_UNLINKAT | CAP_MKDIRAT);
 		}
 
 		if (perm & Permission::EXEC) {

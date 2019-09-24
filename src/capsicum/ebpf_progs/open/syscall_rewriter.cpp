@@ -90,6 +90,13 @@ struct stat {
 
 #define	AT_SYMLINK_NOFOLLOW     0x0200  /* Do not follow symbolic links */
 
+/*
+ * Magic value that specify the use of the current working directory
+ * to determine the target of relative file paths in the openat() and
+ * similar syscalls.
+ */
+#define	AT_FDCWD		-100
+
 EBPF_DEFINE_MAP(file_lookup_map,  "hashtable", MAXPATHLEN, sizeof(int), 256, 0);
 EBPF_DEFINE_MAP(fd_filename_map,  "array", sizeof(int), NAME_MAX, 256, 0);
 EBPF_DEFINE_MAP(fd_map,  "array", sizeof(int), sizeof(int), 256, 0);
@@ -144,6 +151,7 @@ static inline int * lookup_fd(ScratchMgr &alloc, void *pathBuf, char **path, int
 template <int ITERS=3>
 static inline int * do_lookup_fd(void *pathBuf, void *scratchBuf, char **path, int flags) __force_inline;
 static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, char **path, int flags = 0) __force_inline;
+static inline int do_mkdir(const char *path, mode_t mode) __force_inline;
 
 static int resolve_symlink(void *pathBuf, void *scratchBuf, int fd, char *fileName) __force_inline;
 
@@ -555,6 +563,37 @@ int rename_syscall_probe(struct rename_args *args)
 		});
 
 	return (EBPF_ACTION_RETURN);
+}
+
+static inline int
+do_mkdir(const char *path, mode_t mode)
+{
+	ScratchMgr alloc;
+
+	fd_op(alloc, path, 0,
+		[mode](int fd, const char *path)
+		{
+			return (mkdirat(fd, path, mode));
+		});
+
+	return (EBPF_ACTION_RETURN);
+}
+
+int
+mkdir_syscall_probe(struct mkdir_args *args)
+{
+
+	return (do_mkdir(args->path, args->mode));
+}
+
+int
+mkdirat_syscall_probe(struct mkdirat_args *args)
+{
+	if (args->fd != AT_FDCWD) {
+		return EBPF_ACTION_CONTINUE;
+	}
+
+	return (do_mkdir(args->path, args->mode));
 }
 
 }
