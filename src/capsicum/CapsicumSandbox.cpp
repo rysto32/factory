@@ -316,10 +316,12 @@ CapsicumSandbox::Enable()
 	int error;
 	pid_t pid;
 
-	pid = getpid();
-	error = cwd_map.UpdateElem(&pid, &work_dir_fd, EBPF_NOEXIST);
-	if (error != 0) {
-		err(1, "Failed to update cwd_map");
+	if (work_dir_fd != -1) {
+		pid = getpid();
+		error = cwd_map.UpdateElem(&pid, &work_dir_fd, EBPF_NOEXIST);
+		if (error != 0) {
+			err(1, "Failed to update cwd_map");
+		}
 	}
 
 	for (Ebpf::Program & prog : probe_programs) {
