@@ -97,11 +97,14 @@ struct stat {
  */
 #define	AT_FDCWD		-100
 
-EBPF_DEFINE_MAP(file_lookup_map,  "hashtable", MAXPATHLEN, sizeof(int), 256, 0);
-EBPF_DEFINE_MAP(fd_filename_map,  "array", sizeof(int), NAME_MAX, 256, 0);
-EBPF_DEFINE_MAP(fd_map,  "array", sizeof(int), sizeof(int), 256, 0);
+#define MAX_PIDS	10
+#define MAX_PREOPEN_FDS	256
+
+EBPF_DEFINE_MAP(file_lookup_map,  "hashtable", MAXPATHLEN, sizeof(int), MAX_PREOPEN_FDS, 0);
+EBPF_DEFINE_MAP(fd_filename_map,  "array", sizeof(int), NAME_MAX, MAX_PREOPEN_FDS, 0);
+EBPF_DEFINE_MAP(fd_map,  "array", sizeof(int), sizeof(int), MAX_PREOPEN_FDS, 0);
 EBPF_DEFINE_MAP(scratch, "percpu_array", sizeof(int), MAXPATHLEN, 8, 0);
-EBPF_DEFINE_MAP(pid_map, "hashtable", sizeof(pid_t), sizeof(int), 10, 0);
+EBPF_DEFINE_MAP(pid_map, "hashtable", sizeof(pid_t), sizeof(int), MAX_PIDS, 0);
 EBPF_DEFINE_MAP(defer_map, "progarray", sizeof(int), sizeof(int), 4, 0);
 
 #define unlikely(x) (__builtin_expect(!!(x), 0))
