@@ -106,6 +106,7 @@ EBPF_DEFINE_MAP(fd_map,  "array", sizeof(int), sizeof(int), MAX_PREOPEN_FDS, 0);
 EBPF_DEFINE_MAP(scratch, "percpu_array", sizeof(int), MAXPATHLEN, 8, 0);
 EBPF_DEFINE_MAP(pid_map, "hashtable", sizeof(pid_t), sizeof(int), MAX_PIDS, 0);
 EBPF_DEFINE_MAP(defer_map, "progarray", sizeof(int), sizeof(int), 4, 0);
+EBPF_DEFINE_MAP(cwd_map, "hashtable", sizeof(pid_t), sizeof(int), MAX_PIDS, 0);
 
 #define unlikely(x) (__builtin_expect(!!(x), 0))
 #define __force_inline __attribute((always_inline))
@@ -153,6 +154,9 @@ template <int ITERS=3>
 static inline int * lookup_fd(ScratchMgr &alloc, void *pathBuf, char **path, int flags = 0) __force_inline;
 template <int ITERS=3>
 static inline int * do_lookup_fd(void *pathBuf, void *scratchBuf, char **path, int flags) __force_inline;
+template <int ITERS=3>
+static inline int * do_symlink_lookup(int *fd, void *origPath, void *scratchBuf, char **path, int flags) __force_inline;
+static inline void * do_single_lookup(void *pathBuf, void *scratchBuf, char **path, int flags) __force_inline;
 static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, char **path, int flags = 0) __force_inline;
 static inline int do_mkdir(const char *path, mode_t mode) __force_inline;
 
@@ -160,6 +164,10 @@ static int resolve_symlink(void *pathBuf, void *scratchBuf, int fd, char *fileNa
 
 static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, char **path, int flags)
 {
+	void *result;
+	char *tmp;
+	int *fd;
+
 	char * inBuf = alloc.GetScratch<char>();
 	if (!inBuf) {
 		return nullptr;
@@ -176,9 +184,35 @@ static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, cha
 		return nullptr;
 	}
 
-	error = canonical_path(pathBuf, inBuf, MAXPATHLEN);
+	if (inBuf[0] != '/') {
+		pid_t pid = getpid();
+		result = ebpf_map_lookup_elem(&cwd_map, &pid);
+		if (!result) {
+			set_errno(ENXIO);
+			return nullptr;
+		}
 
-	return do_lookup_fd(pathBuf, inBuf, path, flags);
+		tmp = inBuf;
+		inBuf = pathBuf;
+		pathBuf = tmp;
+
+		*path = pathBuf;
+	} else {
+		error = canonical_path(pathBuf, inBuf, MAXPATHLEN);
+		if (error != 0) {
+			set_errno(error);
+			return nullptr;
+		}
+
+		result = do_single_lookup(pathBuf, inBuf, path, flags);
+
+		if (!result) {
+			return nullptr;
+		}
+	}
+
+	fd = reinterpret_cast<int*>(result);
+	return do_symlink_lookup(fd, pathBuf, inBuf, path, flags);
 }
 
 template <int ITERS>
@@ -187,10 +221,8 @@ static inline int * lookup_fd(ScratchMgr &alloc, void *pathBuf, char **path, int
 	return do_lookup_fd<ITERS>(pathBuf, alloc.GetScratch<void>(), path, flags);
 }
 
-template <int ITERS>
-static inline int * do_lookup_fd(void *pathBuf, void *scratchBuf, char **path, int flags)
+static inline void * do_single_lookup(void *pathBuf, void *scratchBuf, char **path, int flags)
 {
-	void *origPath = pathBuf;
 	void *result = ebpf_map_lookup_path(&file_lookup_map, &pathBuf);
 	if (!result) {
 		set_errno(EPERM);
@@ -223,7 +255,22 @@ static inline int * do_lookup_fd(void *pathBuf, void *scratchBuf, char **path, i
 	} else {
 		*path = filename;
 	}
+
+	return result;
+}
+
+template <int ITERS>
+static inline int * do_lookup_fd(void *pathBuf, void *scratchBuf, char **path, int flags)
+{
+	void * result = do_single_lookup(pathBuf, scratchBuf, path, flags);
 	int *fd = reinterpret_cast<int*>(result);
+
+	return do_symlink_lookup<ITERS>(fd, pathBuf, scratchBuf, path, flags);
+}
+
+template <int ITERS>
+static inline int * do_symlink_lookup(int * fd, void *origPath, void *scratchBuf, char **path, int flags)
+{
 
 	if (flags & LOOKUP_SYMLINK) {
 		return fd;
@@ -343,11 +390,16 @@ static inline int do_fork(void) __force_inline;
 static inline int do_fork(void)
 {
 	int fd;
-	pid_t pid;
+	pid_t pid, ppid;
 
 	pid = pdfork(&fd, 0);
 	if (pid > 0) {
+		ppid = getpid();
 		ebpf_map_update_elem(&pid_map, &pid, &fd, 0);
+		void *cwd = ebpf_map_lookup_elem(&cwd_map, &ppid);
+		if (cwd) {
+			ebpf_map_update_elem(&cwd_map, &pid, cwd, 0);
+		}
 		set_syscall_retval(pid, 0);
 	}
 	return EBPF_ACTION_RETURN;

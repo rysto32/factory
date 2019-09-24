@@ -70,6 +70,7 @@ class CapsicumSandbox : public Sandbox
 
 	std::vector<PreopenDesc> descriptors;
 	EBPFDevDriver *ebpf;
+	const Path & work_dir;
 
 	std::vector<Ebpf::Program> probe_programs;
 	std::vector<Ebpf::Program> defer_programs;
@@ -77,9 +78,11 @@ class CapsicumSandbox : public Sandbox
 	Ebpf::Map fd_filename_map;
 	Ebpf::Map file_lookup_map;
 	Ebpf::Map defer_map;
+	Ebpf::Map cwd_map;
 	std::vector<Ebpf::Map> maps;
 
 	FileDesc fexec_fd;
+	int work_dir_fd;
 	bool is_rtld;
 
 	void FindInterpreter(Path exe);

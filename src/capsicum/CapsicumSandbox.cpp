@@ -45,6 +45,8 @@
 
 CapsicumSandbox::CapsicumSandbox(const Command & c)
   : ebpf(ebpf_dev_driver_create()),
+    work_dir(c.GetWorkDir()),
+    work_dir_fd(-1),
     is_rtld(false)
 {
 	if (!ebpf) {
@@ -178,6 +180,10 @@ CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 			err(1, "cap_rights_limit() failed");
 		}
 
+		if (path == work_dir) {
+			work_dir_fd = fd;
+		}
+
 		descriptors.emplace_back(path, std::move(filename), std::move(fd));
 	}
 }
@@ -231,6 +237,8 @@ CapsicumSandbox::DefineMap(GBPFElfWalker *walker, const char *n, int desc,
 		sandbox->file_lookup_map = Ebpf::Map(walker->driver, std::move(name), desc);
 	} else if (name == "defer_map") {
 		sandbox->defer_map = Ebpf::Map(walker->driver, std::move(name), desc);
+	} else if (name == "cwd_map") {
+		sandbox->cwd_map = Ebpf::Map(walker->driver, std::move(name), desc);
 	} else {
 		sandbox->maps.emplace_back(walker->driver, std::move(name), desc);
 	}
@@ -306,6 +314,13 @@ void
 CapsicumSandbox::Enable()
 {
 	int error;
+	pid_t pid;
+
+	pid = getpid();
+	error = cwd_map.UpdateElem(&pid, &work_dir_fd, EBPF_NOEXIST);
+	if (error != 0) {
+		err(1, "Failed to update cwd_map");
+	}
 
 	for (Ebpf::Program & prog : probe_programs) {
 		error = prog.AttachProbe();
