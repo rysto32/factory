@@ -133,6 +133,7 @@ int main(int argc, char **argv)
 {
 	PermissionList perms;
 	ArgList list;
+	std::error_code code;
 	int ch;
 
 	Path cwd(std::filesystem::current_path());
@@ -151,7 +152,7 @@ int main(int argc, char **argv)
 			perms.AddPermission(permPath, p);
 			break;
 		case 'C':
-			work_dir = optarg;
+			work_dir = Path(optarg).canonical(code);
 			break;
 		}
 	}
