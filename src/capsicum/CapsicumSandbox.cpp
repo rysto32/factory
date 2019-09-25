@@ -240,6 +240,8 @@ CapsicumSandbox::DefineMap(GBPFElfWalker *walker, const char *n, int desc,
 		sandbox->defer_map = Ebpf::Map(walker->driver, std::move(name), desc);
 	} else if (name == "cwd_map") {
 		sandbox->cwd_map = Ebpf::Map(walker->driver, std::move(name), desc);
+	} else if(name == "cwd_name_map") {
+		sandbox->cwd_name_map = Ebpf::Map(walker->driver, std::move(name), desc);
 	} else {
 		sandbox->maps.emplace_back(walker->driver, std::move(name), desc);
 	}
@@ -316,13 +318,18 @@ CapsicumSandbox::Enable()
 {
 	int error;
 	pid_t pid;
+	char path[MAXPATHLEN];
 
+	pid = getpid();
 	if (work_dir_fd != -1) {
-		pid = getpid();
 		error = cwd_map.UpdateElem(&pid, &work_dir_fd, EBPF_NOEXIST);
 		if (error != 0) {
 			err(1, "Failed to update cwd_map");
 		}
+	} else {
+		bzero(path, sizeof(path));
+		strlcpy(path, work_dir.c_str(), sizeof(path));
+		error = cwd_name_map.UpdateElem(&pid, path, EBPF_NOEXIST);
 	}
 
 	for (Ebpf::Program & prog : probe_programs) {

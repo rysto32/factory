@@ -107,6 +107,7 @@ EBPF_DEFINE_MAP(scratch, "percpu_array", sizeof(int), MAXPATHLEN, 8, 0);
 EBPF_DEFINE_MAP(pid_map, "hashtable", sizeof(pid_t), sizeof(int), MAX_PIDS, 0);
 EBPF_DEFINE_MAP(defer_map, "progarray", sizeof(int), sizeof(int), 4, 0);
 EBPF_DEFINE_MAP(cwd_map, "hashtable", sizeof(pid_t), sizeof(int), MAX_PIDS, 0);
+EBPF_DEFINE_MAP(cwd_name_map, "hashtable", sizeof(pid_t), MAXPATHLEN, MAX_PIDS, 0);
 
 #define unlikely(x) (__builtin_expect(!!(x), 0))
 #define __force_inline __attribute((always_inline))
@@ -167,6 +168,7 @@ static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, cha
 {
 	void *result;
 	char *tmp;
+	pid_t pid;
 	int *fd;
 
 	char * inBuf = alloc.GetScratch<char>();
@@ -188,10 +190,15 @@ static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, cha
 	}
 
 	if (inBuf[0] != '/') {
-		pid_t pid = getpid();
+		pid = getpid();
 		result = ebpf_map_lookup_elem(&cwd_map, &pid);
 		if (!result) {
-			set_errno(ENXIO);
+			result = ebpf_map_lookup_elem(&cwd_name_map, &pid);
+			if (result) {
+				strlcpy(pathBuf, (char*)result, MAXPATHLEN);
+				goto path_lookup;
+			}
+			set_errno(EPERM);
 			return nullptr;
 		}
 
@@ -206,6 +213,7 @@ static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, cha
 
 		*path = pathBuf;
 	} else {
+path_lookup:
 		error = canonical_path(pathBuf, inBuf, MAXPATHLEN);
 		if (error != 0) {
 			set_errno(error);
@@ -326,7 +334,7 @@ static int resolve_symlink(void *pathBuf, void *scratchBuf, int fd, char *fileNa
 	}
 
 	char * basePath = reinterpret_cast<char*>(pathBuf);
-	return canonical_path(basePath, target, MAXPATHLEN);
+	return symlink_path(basePath, target, MAXPATHLEN);
 
 }
 
@@ -423,6 +431,11 @@ static inline int do_fork(void)
 		void *cwd = ebpf_map_lookup_elem(&cwd_map, &ppid);
 		if (cwd) {
 			ebpf_map_update_elem(&cwd_map, &pid, cwd, 0);
+		} else {
+			cwd = ebpf_map_lookup_elem(&cwd_name_map, &ppid);
+			if (cwd) {
+				ebpf_map_update_elem(&cwd_name_map, &pid, cwd, 0);
+			}
 		}
 		set_syscall_retval(pid, 0);
 	}

@@ -79,6 +79,7 @@ class CapsicumSandbox : public Sandbox
 	Ebpf::Map file_lookup_map;
 	Ebpf::Map defer_map;
 	Ebpf::Map cwd_map;
+	Ebpf::Map cwd_name_map;
 	std::vector<Ebpf::Map> maps;
 
 	FileDesc fexec_fd;
