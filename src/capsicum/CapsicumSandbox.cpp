@@ -181,6 +181,7 @@ CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 			err(1, "cap_rights_limit() failed");
 		}
 
+// 		fprintf(stderr, "path: %s work_dir: %s\n", path.c_str(), work_dir.c_str());
 		if (path == work_dir) {
 			work_dir_fd = fd;
 		}
@@ -275,12 +276,16 @@ CapsicumSandbox::CreateEbpfRules()
 
 		file_lookup_map.UpdateElem(path, &nextIndex, EBPF_NOEXIST);
 
+// 		fprintf(stderr, "Insert %s -> %d\n", path, nextIndex);
+
 		int fd = desc.fd;
 		fd_map.UpdateElem(&nextIndex, &fd, 0);
+// 		fprintf(stderr, "Insert %d -> %d\n", nextIndex, fd);
 
 		bzero(path, NAME_MAX);
 		strlcpy(path, desc.filename.c_str(), NAME_MAX);
 		fd_filename_map.UpdateElem(&nextIndex, path, 0);
+// 		fprintf(stderr, "Insert %d -> %s\n", nextIndex, path);
 
 		nextIndex++;
 	}
