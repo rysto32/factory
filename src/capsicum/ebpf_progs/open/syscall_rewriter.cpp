@@ -159,6 +159,7 @@ static inline int * do_symlink_lookup(int *fd, void *origPath, void *scratchBuf,
 static inline void * do_single_lookup(void *pathBuf, void *scratchBuf, char **path, int flags) __force_inline;
 static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, char **path, int flags = 0) __force_inline;
 static inline int do_mkdir(const char *path, mode_t mode) __force_inline;
+static inline int do_fchdir(int fd) __force_inline;
 
 static int resolve_symlink(void *pathBuf, void *scratchBuf, int fd, char *fileName) __force_inline;
 
@@ -653,6 +654,52 @@ mkdirat_syscall_probe(struct mkdirat_args *args)
 	}
 
 	return (do_mkdir(args->path, args->mode));
+}
+
+static inline int
+do_fchdir(int fd)
+{
+	pid_t pid;
+	int error;
+
+	pid = getpid();
+	error = fchdir(fd);
+	if (error != 0) {
+		return (error);
+	}
+
+	ebpf_map_update_elem(&cwd_map, &pid, &fd, 0);
+
+	/*
+	 * We no longer know (or need to know) the path of cwd, so just delete
+	 * the element from the map.
+	 */
+	ebpf_map_delete_elem(&cwd_name_map, &pid);
+	return (0);
+}
+
+int
+chdir_syscall_probe(struct chdir_args *args)
+{
+	ScratchMgr alloc;
+	int fd;
+
+	do_open(alloc, args->path, O_RDONLY, 0, &fd);
+	if (fd < 0) {
+		return (EBPF_ACTION_RETURN);
+	}
+
+
+	do_fchdir(fd);
+	return (EBPF_ACTION_RETURN);
+}
+
+int
+fchdir_syscall_probe(struct fchdir_args *args)
+{
+
+	do_fchdir(args->fd);
+	return (EBPF_ACTION_RETURN);
 }
 
 }
