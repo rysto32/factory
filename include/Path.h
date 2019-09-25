@@ -77,8 +77,8 @@ public:
 	{
 	}
 
-	Path(std::filesystem::path && p)
-	  : path(std::move(p))
+	Path(const std::filesystem::path & p)
+	  : path(StripTrailingSlashes(p.c_str()))
 	{
 	}
 
@@ -100,6 +100,11 @@ public:
 	Path lexically_normal() const
 	{
 		return path.lexically_normal();
+	}
+
+	Path absolute(std::error_code & code) const
+	{
+		return std::filesystem::absolute(path, code);
 	}
 
 	Path weakly_canonical(std::error_code & code) const
