@@ -180,6 +180,8 @@ static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, cha
 		return nullptr;
 	}
 
+	ktrnamei(inBuf);
+
 	char *pathBuf = alloc.GetScratch<char>();
 	if (!pathBuf) {
 		return nullptr;
