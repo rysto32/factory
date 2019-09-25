@@ -193,6 +193,11 @@ static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, cha
 			return nullptr;
 		}
 
+		if (inBuf[0] == '.' && inBuf[1] == '\0') {
+			*path = pathBuf; /* Empty String */
+			return (reinterpret_cast<int*>(result));
+		}
+
 		tmp = inBuf;
 		inBuf = pathBuf;
 		pathBuf = tmp;
@@ -352,7 +357,19 @@ static inline int do_open(ScratchMgr &alloc, const char * userPath, int flags, i
 	error = fd_op(alloc, userPath, 0,
 		[flags, mode, fd_out](int dir_fd, const char *path)
 		{
-			int fd = openat(dir_fd, path, flags, mode);
+			int fd;
+
+			if (path[0] == '\0') {
+				/* We only get here with open(".") */
+				if (flags != O_RDONLY) {
+					set_errno(EPERM);
+					return (-1);
+				}
+				fd = dup(dir_fd);
+			} else {
+				fd = openat(dir_fd, path, flags, mode);
+			}
+
 			if (fd < 0) {
 				return -1;
 			}
