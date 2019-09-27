@@ -728,7 +728,7 @@ int defer_wait4(struct wait4_args *args, int error, int status, struct rusage *r
 
 int execve_syscall_probe(struct execve_args *uap)
 {
-	char *interp;
+	char *interp, *exec;
 	int type, error, index;
 	int fd;
 
@@ -767,16 +767,23 @@ int execve_syscall_probe(struct execve_args *uap)
 			return EBPF_ACTION_RETURN;
 		}
 
+		exec = alloc.GetScratch<char>();
+		error = copyinstr(uap->fname, exec, MAXPATHLEN, NULL);
+		if (error != 0) {
+			return (EBPF_ACTION_RETURN);
+		}
+
 		char rtld[] = "rtld";
 		char dashdash[] = "--";
 
 		char * argv_prepend[] = {
 			rtld,
 			dashdash,
+			exec,
 			NULL
 		};
 
-		fexecve(interp_fd, uap->argv, uap->envv, argv_prepend);
+		fexecve(interp_fd, uap->argv + 1, uap->envv, argv_prepend);
 	}
 
 done:
