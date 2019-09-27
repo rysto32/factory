@@ -403,7 +403,7 @@ static inline int do_readlink(ScratchMgr &alloc, const char *path, char * buf, s
 static inline int do_readlink(ScratchMgr &alloc, const char *userPath, char * buf, size_t len)
 {
 
-	fd_op(alloc, userPath, 0,
+	fd_op(alloc, userPath, LOOKUP_SYMLINK,
 		[&alloc, buf, len](int dir_fd, const char *path)
 		{
 			char * scratchBuf = alloc.GetScratch<char>();
