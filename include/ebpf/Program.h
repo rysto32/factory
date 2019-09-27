@@ -49,10 +49,10 @@ public:
 	Program(GBPFDriver *ebpf, std::string && name, int type, struct ebpf_inst *prog, uint32_t prog_len);
 	~Program();
 
-	Program() = delete;
+	Program();
 	Program(const Program &) = delete;
 	Program & operator=(const Program &) = delete;
-	Program & operator=(Program &&) = delete;
+	Program & operator=(Program &&);
 
 	const std::string & GetName() const
 	{
@@ -70,6 +70,7 @@ public:
 	}
 
 	int AttachProbe();
+	void Close();
 };
 }
 

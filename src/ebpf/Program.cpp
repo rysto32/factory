@@ -33,6 +33,13 @@
 namespace Ebpf
 {
 
+Program::Program()
+  : ebpf(NULL),
+    fd(-1)
+{
+
+}
+
 Program::Program(Program &&p)
   : ebpf(p.ebpf),
     name(std::move(p.name)),
@@ -49,13 +56,38 @@ Program::Program(GBPFDriver *ebpf, std::string && n, int type, struct ebpf_inst 
 	if (fd < 0) {
 		err(1, "Could not load program '%s'", name.c_str());
 	}
+
+// 	fprintf(stderr, "Map prog '%s' to FD %d\n", name.c_str(), fd);
 }
 
-Program::~Program()
+Program &
+Program::operator=(Program &&other)
+{
+	if (this == &other) {
+		return *this;
+	}
+
+	Close();
+
+	ebpf = other.ebpf;
+	name = std::move(other.name);
+	fd = other.fd;
+	other.fd = -1;
+
+	return *this;
+}
+
+void
+Program::Close()
 {
 	if (*this) {
 		gbpf_close_prog_desc(ebpf, fd);
 	}
+}
+
+Program::~Program()
+{
+	Close();
 }
 
 int
