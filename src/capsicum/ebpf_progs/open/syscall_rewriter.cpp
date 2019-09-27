@@ -224,6 +224,7 @@ static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, cha
 static inline int do_mkdir(const char *path, mode_t mode) __force_inline;
 static inline int do_fchdir(int fd) __force_inline;
 static inline int get_exit_kq(pid_t pid) __force_inline;
+static __inline int do_symlink(const char *target, const char *source) __force_inline;
 
 static int resolve_symlink(void *pathBuf, void *scratchBuf, int fd, char *fileName) __force_inline;
 
@@ -923,6 +924,49 @@ exit_syscall_probe(struct exit_args *args)
 	ebpf_map_delete_elem(&cwd_name_map, &pid);
 	ebpf_map_delete_elem(&exit_kq_map, &pid);
 	return (EBPF_ACTION_CONTINUE);
+}
+
+static __inline int
+do_symlink(const char *target_user, const char *source)
+{
+	ScratchMgr alloc;
+	char *target;
+	int error;
+
+	target = alloc.GetScratch<char>();
+	if (!target) {
+		return (EBPF_ACTION_RETURN);
+	}
+
+	error = copyinstr(target_user, target, MAXPATHLEN, nullptr);
+	if (error != 0) {
+		return (EBPF_ACTION_RETURN);
+	}
+
+	fd_op(alloc, source, 0,
+		[target](int fd, const char *path)
+		{
+			return (symlinkat(target, fd, path));
+		});
+
+	return (EBPF_ACTION_RETURN);
+}
+
+int
+symlink_syscall_probe(struct symlink_args *args)
+{
+
+	return do_symlink(args->path, args->link);
+}
+
+int
+symlinkat_syscall_probe(struct symlinkat_args *args)
+{
+	if (args->fd != AT_FDCWD) {
+		return EBPF_ACTION_CONTINUE;
+	}
+
+	return do_symlink(args->path1, args->path2);
 }
 
 }
