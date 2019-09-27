@@ -326,10 +326,13 @@ CapsicumSandbox::Enable()
 		if (error != 0) {
 			err(1, "Failed to update cwd_map");
 		}
-	} else {
-		bzero(path, sizeof(path));
-		strlcpy(path, work_dir.c_str(), sizeof(path));
-		error = cwd_name_map.UpdateElem(&pid, path, EBPF_NOEXIST);
+	}
+
+	bzero(path, sizeof(path));
+	strlcpy(path, work_dir.c_str(), sizeof(path));
+	error = cwd_name_map.UpdateElem(&pid, path, EBPF_NOEXIST);
+	if (error != 0) {
+		err(1, "Failed to update cwd_name_map");
 	}
 
 	for (Ebpf::Program & prog : probe_programs) {

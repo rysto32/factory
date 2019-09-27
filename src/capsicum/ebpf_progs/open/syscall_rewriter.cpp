@@ -255,13 +255,14 @@ static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, cha
 
 	if (inBuf[0] != '/') {
 		pid = getpid();
+		result = ebpf_map_lookup_elem(&cwd_name_map, &pid);
+		if (result) {
+			strlcpy(pathBuf, (char*)result, MAXPATHLEN);
+			goto path_lookup;
+		}
+
 		result = ebpf_map_lookup_elem(&cwd_map, &pid);
 		if (!result) {
-			result = ebpf_map_lookup_elem(&cwd_name_map, &pid);
-			if (result) {
-				strlcpy(pathBuf, (char*)result, MAXPATHLEN);
-				goto path_lookup;
-			}
 			set_errno(EPERM);
 			return nullptr;
 		}
@@ -506,18 +507,20 @@ static inline int do_fork(void)
 {
 	int fd, kq;
 	pid_t pid, ppid;
+	void *cwd;
 
 	pid = pdfork(&fd, 0);
 	if (pid > 0) {
 		ppid = getpid();
 		ebpf_map_update_elem(&pid_map, &pid, &fd, 0);
-		void *cwd = ebpf_map_lookup_elem(&cwd_map, &ppid);
+
+		cwd = ebpf_map_lookup_elem(&cwd_name_map, &ppid);
 		if (cwd) {
-			ebpf_map_update_elem(&cwd_map, &pid, cwd, 0);
+			ebpf_map_update_elem(&cwd_name_map, &pid, cwd, 0);
 		} else {
-			cwd = ebpf_map_lookup_elem(&cwd_name_map, &ppid);
+			cwd = ebpf_map_lookup_elem(&cwd_map, &ppid);
 			if (cwd) {
-				ebpf_map_update_elem(&cwd_name_map, &pid, cwd, 0);
+				ebpf_map_update_elem(&cwd_map, &pid, cwd, 0);
 			}
 		}
 
