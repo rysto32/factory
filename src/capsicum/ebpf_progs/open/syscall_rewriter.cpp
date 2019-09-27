@@ -280,6 +280,9 @@ static inline int * do_lookup_fd(void *pathBuf, void *scratchBuf, char **path, i
 {
 	void * result = do_single_lookup(pathBuf, scratchBuf, path, flags);
 	int *fd = reinterpret_cast<int*>(result);
+	if (!fd) {
+		return nullptr;
+	}
 
 	return do_symlink_lookup<ITERS>(fd, pathBuf, scratchBuf, path, flags);
 }
