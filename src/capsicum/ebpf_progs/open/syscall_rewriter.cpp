@@ -75,6 +75,64 @@ struct stat {
 	__uint64_t st_spare[10];
 };
 
+#define	KQ_ERR_EMPTY		0x0001	/* Error on kevent on empty kqueue */
+
+#define EVFILT_READ		(-1)
+#define EVFILT_WRITE		(-2)
+#define EVFILT_AIO		(-3)	/* attached to aio requests */
+#define EVFILT_VNODE		(-4)	/* attached to vnodes */
+#define EVFILT_PROC		(-5)	/* attached to struct proc */
+#define EVFILT_SIGNAL		(-6)	/* attached to struct proc */
+#define EVFILT_TIMER		(-7)	/* timers */
+#define EVFILT_PROCDESC		(-8)	/* attached to process descriptors */
+#define EVFILT_FS		(-9)	/* filesystem events */
+#define EVFILT_LIO		(-10)	/* attached to lio requests */
+#define EVFILT_USER		(-11)	/* User events */
+#define EVFILT_SENDFILE		(-12)	/* attached to sendfile requests */
+#define EVFILT_EMPTY		(-13)	/* empty send socket buf */
+#define EVFILT_SYSCOUNT		13
+
+/* actions */
+#define EV_ADD		0x0001		/* add event to kq (implies enable) */
+#define EV_DELETE	0x0002		/* delete event from kq */
+#define EV_ENABLE	0x0004		/* enable event */
+#define EV_DISABLE	0x0008		/* disable event (not reported) */
+#define EV_FORCEONESHOT	0x0100		/* enable _ONESHOT and force trigger */
+
+/* flags */
+#define EV_ONESHOT	0x0010		/* only report one occurrence */
+#define EV_CLEAR	0x0020		/* clear event state after reporting */
+#define EV_RECEIPT	0x0040		/* force EV_ERROR on success, data=0 */
+#define EV_DISPATCH	0x0080		/* disable event after reporting */
+
+#define EV_SYSFLAGS	0xF000		/* reserved by system */
+#define	EV_DROP		0x1000		/* note should be dropped */
+#define EV_FLAG1	0x2000		/* filter-specific flag */
+#define EV_FLAG2	0x4000		/* filter-specific flag */
+
+/* returned values */
+#define EV_EOF		0x8000		/* EOF detected */
+#define EV_ERROR	0x4000		/* error, data contains errno */
+
+/*
+ * data/hint flags for EVFILT_PROC and EVFILT_PROCDESC, shared with userspace
+ */
+#define	NOTE_EXIT	0x80000000		/* process exited */
+#define	NOTE_FORK	0x40000000		/* process forked */
+#define	NOTE_EXEC	0x20000000		/* process exec'd */
+#define	NOTE_PCTRLMASK	0xf0000000		/* mask for hint bits */
+#define	NOTE_PDATAMASK	0x000fffff		/* mask for pid */
+
+struct kevent {
+	__uintptr_t	ident;		/* identifier for this event */
+	short		filter;		/* filter for event */
+	unsigned short	flags;		/* action flags for kqueue */
+	unsigned int	fflags;		/* filter flag value */
+	__int64_t	data;		/* filter data value */
+	void		*udata;		/* opaque user data identifier */
+	__uint64_t	ext[4];		/* extensions */
+};
+
 #define	EBPF_ACTION_CONTINUE	0
 #define EBPF_ACTION_RETURN	1
 
@@ -105,9 +163,13 @@ EBPF_DEFINE_MAP(fd_filename_map,  "array", sizeof(int), NAME_MAX, MAX_PREOPEN_FD
 EBPF_DEFINE_MAP(fd_map,  "array", sizeof(int), sizeof(int), MAX_PREOPEN_FDS, 0);
 EBPF_DEFINE_MAP(scratch, "percpu_array", sizeof(int), MAXPATHLEN, 8, 0);
 EBPF_DEFINE_MAP(pid_map, "hashtable", sizeof(pid_t), sizeof(int), MAX_PIDS, 0);
-EBPF_DEFINE_MAP(defer_map, "progarray", sizeof(int), sizeof(int), 4, 0);
 EBPF_DEFINE_MAP(cwd_map, "hashtable", sizeof(pid_t), sizeof(int), MAX_PIDS, 0);
 EBPF_DEFINE_MAP(cwd_name_map, "hashtable", sizeof(pid_t), MAXPATHLEN, MAX_PIDS, 0);
+
+EBPF_DEFINE_MAP(exit_kq_map, "hashtable", sizeof(pid_t), sizeof(int), MAX_PIDS, 0);
+
+EBPF_DEFINE_MAP(pdwait_prog, "progarray", sizeof(int), sizeof(int), 1, 0);
+EBPF_DEFINE_MAP(kevent_prog, "progarray", sizeof(int), sizeof(int), 1, 0);
 
 #define unlikely(x) (__builtin_expect(!!(x), 0))
 #define __force_inline __attribute((always_inline))
@@ -161,6 +223,7 @@ static inline void * do_single_lookup(void *pathBuf, void *scratchBuf, char **pa
 static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, char **path, int flags = 0) __force_inline;
 static inline int do_mkdir(const char *path, mode_t mode) __force_inline;
 static inline int do_fchdir(int fd) __force_inline;
+static inline int get_exit_kq(pid_t pid) __force_inline;
 
 static int resolve_symlink(void *pathBuf, void *scratchBuf, int fd, char *fileName) __force_inline;
 
@@ -422,9 +485,25 @@ static inline int do_readlink(ScratchMgr &alloc, const char *userPath, char * bu
 
 static inline int do_fork(void) __force_inline;
 
+static inline int
+get_exit_kq(pid_t pid)
+{
+	int kq;
+	void *result;
+
+	result = ebpf_map_lookup_elem(&exit_kq_map, &pid);
+	if (result) {
+		return *reinterpret_cast<int*>(result);
+	}
+
+	kq = kqueue(KQ_ERR_EMPTY);
+	ebpf_map_update_elem(&exit_kq_map, &pid, &kq, 0);
+	return (kq);
+}
+
 static inline int do_fork(void)
 {
-	int fd;
+	int fd, kq;
 	pid_t pid, ppid;
 
 	pid = pdfork(&fd, 0);
@@ -440,6 +519,17 @@ static inline int do_fork(void)
 				ebpf_map_update_elem(&cwd_name_map, &pid, cwd, 0);
 			}
 		}
+
+		kq = get_exit_kq(ppid);
+		struct kevent ev = {
+			.ident = uintptr_t(fd),
+			.filter = EVFILT_PROCDESC,
+			.flags = EV_ADD,
+			.fflags = NOTE_EXIT,
+		};
+
+		kevent_install(kq, &ev, 1);
+
 		set_syscall_retval(pid, 0);
 	}
 	return EBPF_ACTION_RETURN;
@@ -524,40 +614,114 @@ int fork_syscall_probe(struct fork_args *args)
 
 int wait4_syscall_probe(struct wait4_args *args)
 {
-	if (args->pid < 0)
-		return EBPF_ACTION_CONTINUE;
+	void *next;
+	void *buf;
+	int fd, error, kq;
+	pid_t pid;
 
-	pid_t pid = args->pid;
-	void *buf = ebpf_map_lookup_elem(&pid_map, &pid);
-	if (!buf) {
-		set_errno(ENOENT);
+	if (args->pid < 0) {
+		const int SUPPORTED_FLAGS = WNOHANG | WEXITED | WNOWAIT;
+
+		/* This option is implicit for wait4. */
+		args->options |= WEXITED;
+
+		if ((args->options & ~SUPPORTED_FLAGS) != 0) {
+			set_errno(EPERM);
+			return (EBPF_ACTION_RETURN);
+		}
+
+		kq = get_exit_kq(getpid());
+
+		if (args->options & (WNOHANG | WNOWAIT)) {
+			struct kevent ev;
+			error = kevent_poll(kq, &ev, 1);
+			if (error != 0) {
+				return EBPF_ACTION_RETURN;
+			}
+
+			fd = ev.ident;
+			goto dowait4;
+		}
+
+		int next_index = 0;
+		next = ebpf_map_lookup_elem(&kevent_prog, &next_index);
+
+		kevent_block(kq, NULL, next);
+
+		/* If we got here we failed to jump to the next program */
+		return EBPF_ACTION_RETURN;
+	} else {
+		pid = args->pid;
+		buf = ebpf_map_lookup_elem(&pid_map, &pid);
+		if (!buf) {
+			set_errno(ENOENT);
+			return EBPF_ACTION_RETURN;
+		}
+		fd = *reinterpret_cast<int*>(buf);
+
+dowait4:
+		int next_index = 0;
+		next = ebpf_map_lookup_elem(&pdwait_prog, &next_index);
+
+		pdwait4_defer(fd, args->options, args, next);
+
+		/* If we got here we failed to jump to the next program */
 		return EBPF_ACTION_RETURN;
 	}
-	int *fd = reinterpret_cast<int*>(buf);
+}
 
-	int next_index = 0;
-	void * next = ebpf_map_lookup_elem(&defer_map, &next_index);
+int defer_kevent(struct wait4_args *args, int error, struct kevent *ev)
+{
+	int prog_index;
+	void *next;
 
-	pdwait4_defer(*fd, args->options, args, next);
+	if (error != 0) {
+		set_errno(error);
+		return (EBPF_ACTION_RETURN);
+	}
+
+	prog_index = 0;
+	next = ebpf_map_lookup_elem(&pdwait_prog, &prog_index);
+
+	pdwait4_defer(ev->ident, args->options, args, next);
 
 	/* If we got here we failed to jump to the next program */
 	return EBPF_ACTION_RETURN;
 }
 
-int defer_wait4(struct wait4_args *args, int error, int status, struct rusage *ru)
+int defer_wait4(struct wait4_args *args, int error, int status, struct rusage *ru, int fd)
 {
+	pid_t pid;
+
 	if (unlikely(error != 0)) {
 		set_errno(error);
+		set_syscall_retval(-1, 0);
 		return EBPF_ACTION_RETURN;
 	}
 
+	pid = get_syscall_retval();
+
 	if (args->status) {
 		error = copyout(&status, args->status, sizeof(status));
-		if (unlikely(error != 0))
+		if (unlikely(error != 0)) {
+			set_syscall_retval(-1, 0);
 			return EBPF_ACTION_RETURN;
+		}
 	}
 	if (args->rusage) {
 		error = copyout(ru, args->rusage, sizeof(*ru));
+	}
+
+	if (!(args->options & WNOWAIT)) {
+		close(fd);
+		ebpf_map_delete_elem(&pid_map, &pid);
+	}
+
+	if (error == 0) {
+		set_syscall_retval(pid, 0);
+	} else {
+		set_syscall_retval(-1, 0);
+		set_errno(error);
 	}
 	return EBPF_ACTION_RETURN;
 }
@@ -735,6 +899,23 @@ fchdir_syscall_probe(struct fchdir_args *args)
 
 	do_fchdir(args->fd);
 	return (EBPF_ACTION_RETURN);
+}
+
+int
+exit_syscall_probe(struct exit_args *args)
+{
+	pid_t pid;
+
+	pid = getpid();
+
+	/*
+	 * XXX this must also happen if the process dies in another way, like
+	 * due to a signal.
+	 */
+	ebpf_map_delete_elem(&cwd_map, &pid);
+	ebpf_map_delete_elem(&cwd_name_map, &pid);
+	ebpf_map_delete_elem(&exit_kq_map, &pid);
+	return (EBPF_ACTION_CONTINUE);
 }
 
 }

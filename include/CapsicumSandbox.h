@@ -73,11 +73,14 @@ class CapsicumSandbox : public Sandbox
 	const Path & work_dir;
 
 	std::vector<Ebpf::Program> probe_programs;
-	std::vector<Ebpf::Program> defer_programs;
+	Ebpf::Program defer_wait4_prog;
+	Ebpf::Program defer_kevent_prog;
+
 	Ebpf::Map fd_map;
 	Ebpf::Map fd_filename_map;
 	Ebpf::Map file_lookup_map;
-	Ebpf::Map defer_map;
+	Ebpf::Map pdwait_prog_map;
+	Ebpf::Map kevent_prog_map;
 	Ebpf::Map cwd_map;
 	Ebpf::Map cwd_name_map;
 	std::vector<Ebpf::Map> maps;
@@ -95,7 +98,7 @@ class CapsicumSandbox : public Sandbox
 	static void DefineMap(GBPFElfWalker *walker, const char *name, int desc,
 		       struct ebpf_map_def *map);
 
-	static int GetDeferredIndex(const std::string & name);
+	static void UpdateProgMap(Ebpf::Map & map, const Ebpf::Program & prog);
 
 public:
 	CapsicumSandbox(const Command & c);
