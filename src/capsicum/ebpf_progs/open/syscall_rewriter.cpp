@@ -351,7 +351,7 @@ static inline int * do_lookup_fd(struct ebpf_symlink_res_bufs *bufs, char **path
 		return nullptr;
 	}
 
-	return do_symlink_lookup<ITERS, FOUND>(fd, bufs, path, flags);
+	return do_symlink_lookup<ITERS, true>(fd, bufs, path, flags);
 }
 
 template <int ITERS, bool FOUND>
