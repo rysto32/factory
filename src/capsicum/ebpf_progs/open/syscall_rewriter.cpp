@@ -362,6 +362,10 @@ static inline int * do_symlink_lookup(int * fd, void *origPath, void *scratchBuf
 		return fd;
 	}
 
+	if (**path == '\0') {
+		return fd;
+	}
+
 	if constexpr (ITERS <= 1) {
 		return fd;
 	} else {
