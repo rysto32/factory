@@ -382,7 +382,7 @@ static inline int * do_symlink_lookup(int * fd, struct ebpf_symlink_res_bufs *bu
 		}
 
 		/* Redo the lookup using the symlink target. */
-		return do_lookup_fd<ITERS - 1, true>(bufs, path, flags);
+		return do_lookup_fd<ITERS - 1, FOUND>(bufs, path, flags);
 	}
 }
 
