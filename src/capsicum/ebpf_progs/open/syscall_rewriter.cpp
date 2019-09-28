@@ -226,7 +226,8 @@ static inline int * lookup_fd_user(const char * userPath, char *pathBuf, char *i
 static inline int do_mkdir(const char *path, mode_t mode) __force_inline;
 static inline int do_fchdir(int fd) __force_inline;
 static inline int get_exit_kq(pid_t pid) __force_inline;
-static __inline int do_symlink(const char *target, const char *source) __force_inline;
+static inline int do_symlink(const char *target, const char *source) __force_inline;
+static inline int do_unlink(const char *path, int flag) __force_inline;
 
 static inline int * lookup_fd_user(const char * userPath, char *pathBuf, char *inBuf, char **path)
 {
@@ -1042,6 +1043,38 @@ utimensat_syscall_probe(struct utimensat_args *args)
 		});
 
 	return (EBPF_ACTION_RETURN);
+}
+
+static inline int
+do_unlink(const char *path, int flags)
+{
+	ScratchMgr alloc;
+
+	fd_op(alloc, path, AT_SYMLINK_NOFOLLOW,
+		[flags](int fd, const char *file)
+		{
+			return (unlinkat(fd, file, flags));
+		});
+
+	return (EBPF_ACTION_RETURN);
+}
+
+int
+unlink_syscall_probe(struct unlink_args *args)
+{
+
+	return (do_unlink(args->path, 0));
+}
+
+int
+unlinkat_syscall_probe(struct unlinkat_args *args)
+{
+
+	if (args->fd != AT_FDCWD) {
+		return (EBPF_ACTION_CONTINUE);
+	}
+
+	return (do_unlink(args->path, args->flag));
 }
 
 }
