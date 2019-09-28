@@ -117,6 +117,14 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 		inputs.push_back(input);
 	}
 
+	for (Path path : options.orderDeps) {
+		if (path.is_relative()) {
+			path = workdir / path;
+		}
+		Product * input = productManager.GetProduct(path);
+		inputs.push_back(input);
+	}
+
 	for (Path path : options.tmpdirs) {
 		if (path.is_relative()) {
 			path = workdir / path;
