@@ -948,4 +948,32 @@ symlinkat_syscall_probe(struct symlinkat_args *args)
 	return do_symlink(args->path1, args->path2);
 }
 
+int
+utimensat_syscall_probe(struct utimensat_args *args)
+{
+	ScratchMgr alloc;
+	struct timespec *times;
+	int flag, error;
+
+	if (args->fd != AT_FDCWD) {
+		return EBPF_ACTION_CONTINUE;
+	}
+
+	flag = args->flag & AT_SYMLINK_NOFOLLOW ? LOOKUP_SYMLINK : 0;
+
+	times = alloc.GetScratch<struct timespec>();
+	error = copyin(args->times, times, 2 * sizeof(times));
+	if (error != 0) {
+		return (EBPF_ACTION_RETURN);
+	}
+
+	fd_op(alloc, args->path, flag,
+		[args,times](int fd, const char *path)
+		{
+			return (utimensat(fd, path, times, args->flag));
+		});
+
+	return (EBPF_ACTION_RETURN);
+}
+
 }
