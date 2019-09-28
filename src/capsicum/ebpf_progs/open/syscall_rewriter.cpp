@@ -890,7 +890,9 @@ int
 chdir_syscall_probe(struct chdir_args *args)
 {
 	ScratchMgr alloc;
-	int fd;
+	char *path, *canonical;
+	int fd, error;
+	pid_t pid;
 
 	do_open(alloc, args->path, O_RDONLY, 0, &fd);
 	if (fd < 0) {
@@ -898,7 +900,31 @@ chdir_syscall_probe(struct chdir_args *args)
 	}
 
 
-	do_fchdir(fd);
+	error = do_fchdir(fd);
+	if (error == 0) {
+		path = alloc.GetScratch<char>();
+		if (!path) {
+			set_errno(0);
+			return (EBPF_ACTION_RETURN);
+		}
+
+		canonical = alloc.GetScratch<char>();
+		if (!canonical) {
+			set_errno(0);
+			return (EBPF_ACTION_RETURN);
+		}
+
+		error = copyin(args->path, path, MAXPATHLEN);
+		if (error != 0) {
+			set_errno(0);
+			return (EBPF_ACTION_RETURN);
+		}
+
+		error = canonical_path(canonical, path, MAXPATHLEN);
+
+		pid = getpid();
+		ebpf_map_update_elem(&cwd_name_map, &pid, canonical, 0);
+	}
 	return (EBPF_ACTION_RETURN);
 }
 
