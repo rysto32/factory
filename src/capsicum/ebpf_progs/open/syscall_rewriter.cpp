@@ -148,6 +148,10 @@ struct kevent {
 
 #define	AT_SYMLINK_NOFOLLOW     0x0200  /* Do not follow symbolic links */
 
+#define F_SETFD         2               /* set file descriptor flags */
+
+#define FD_CLOEXEC      1               /* close-on-exec flag */
+
 /*
  * Magic value that specify the use of the current working directory
  * to determine the target of relative file paths in the openat() and
@@ -411,22 +415,36 @@ static inline int do_open(ScratchMgr &alloc, const char * userPath, int flags, i
 	error = fd_op(alloc, userPath, 0,
 		[flags, mode, fd_out](int dir_fd, const char *path)
 		{
-			int fd;
+			int fd, error, allowed;
 
 			if (path[0] == '\0') {
 				/* We only get here with open(".") */
-				if (flags != O_RDONLY) {
+				allowed = O_RDONLY | O_CLOEXEC;
+				if ((flags & ~allowed) != 0) {
 					set_errno(EPERM);
 					return (-1);
 				}
+
 				fd = dup(dir_fd);
+				if (fd < 0) {
+					return (-1);
+				}
+
+				if (flags & O_CLOEXEC) {
+					error = fcntl(fd, F_SETFD, FD_CLOEXEC);
+					if (error != 0) {
+						close(fd);
+						return (-1);
+					}
+				}
 			} else {
 				fd = openat(dir_fd, path, flags, mode);
+
+				if (fd < 0) {
+					return -1;
+				}
 			}
 
-			if (fd < 0) {
-				return -1;
-			}
 
 			if (fd_out)
 				*fd_out = fd;
