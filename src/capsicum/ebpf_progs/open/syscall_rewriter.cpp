@@ -226,8 +226,6 @@ static inline int do_fchdir(int fd) __force_inline;
 static inline int get_exit_kq(pid_t pid) __force_inline;
 static __inline int do_symlink(const char *target, const char *source) __force_inline;
 
-static int resolve_symlink(void *pathBuf, void *scratchBuf, int fd, char *fileName) __force_inline;
-
 static inline int * lookup_fd_user(ScratchMgr &alloc, const char * userPath, char **path, int flags)
 {
 	void *result;
@@ -368,8 +366,9 @@ static inline int * do_symlink_lookup(int * fd, void *origPath, void *scratchBuf
 		 * it in case the symlink points outside of the directory tree
 		 * covered by fd.
 		 */
-		int error = resolve_symlink(origPath, scratchBuf, *fd, *path);
-		if (error == ENODEV) {
+		memset(scratchBuf, 0, MAXPATHLEN);
+		int error = resolve_one_symlink(origPath, scratchBuf, *fd, *path, MAXPATHLEN);
+		if (error == ENODEV || error == ENOENT) {
 			// Not a symlink.
 			set_errno(0);
 			set_syscall_retval(0, 0);
@@ -381,29 +380,6 @@ static inline int * do_symlink_lookup(int * fd, void *origPath, void *scratchBuf
 		/* Redo the lookup using the symlink target. */
 		return do_lookup_fd<ITERS - 1>(origPath, scratchBuf, path, flags);
 	}
-}
-
-static int resolve_symlink(void *pathBuf, void *scratchBuf, int fd, char *fileName)
-{
-
-	if (*fileName == '\0') {
-		// We opened the directory directly; we can't handle
-		// symlinks here.
-		return ENODEV;
-	}
-
-	char * target = reinterpret_cast<char*>(scratchBuf);
-	memset(target, 0, MAXPATHLEN);
-
-	int error = readlinkat(fd, fileName, target, MAXPATHLEN);
-	if (error != 0) {
-		// Probably not a symlink.  Return what we already have.
-		return ENODEV;
-	}
-
-	char * basePath = reinterpret_cast<char*>(pathBuf);
-	return symlink_path(basePath, target, MAXPATHLEN);
-
 }
 
 template <typename F>
