@@ -180,6 +180,8 @@ CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 			err(1, "cap_rights_limit() failed");
 		}
 
+// 		fprintf(stderr, "Open '%s' as FD %d (filename '%s')\n", openPath.c_str(), int(fd), filename.c_str());
+
 // 		fprintf(stderr, "path: %s work_dir: %s\n", path.c_str(), work_dir.c_str());
 		if (path == work_dir) {
 			work_dir_fd = fd;
@@ -276,17 +278,26 @@ CapsicumSandbox::CreateEbpfRules()
 		bzero(path, sizeof(path));
 		strlcpy(path, desc.lookup.c_str(), sizeof(path));
 
-		file_lookup_map.UpdateElem(path, &nextIndex, EBPF_NOEXIST);
+		error = file_lookup_map.UpdateElem(path, &nextIndex, EBPF_NOEXIST);
+		if (error != 0) {
+			err(1, "Could not insert '%s' at index %d in file_lookup_map", path, nextIndex);
+		}
 
 // 		fprintf(stderr, "Insert %s -> %d\n", path, nextIndex);
 
 		int fd = desc.fd;
-		fd_map.UpdateElem(&nextIndex, &fd, 0);
+		error = fd_map.UpdateElem(&nextIndex, &fd, 0);
+		if (error != 0) {
+			err(1, "Could not insert '%s' at index %d in fd_map", path, nextIndex);
+		}
 // 		fprintf(stderr, "Insert %d -> %d\n", nextIndex, fd);
 
 		bzero(path, NAME_MAX);
 		strlcpy(path, desc.filename.c_str(), NAME_MAX);
-		fd_filename_map.UpdateElem(&nextIndex, path, 0);
+		error = fd_filename_map.UpdateElem(&nextIndex, path, 0);
+		if (error != 0) {
+			err(1, "Could not insert '%s' at index %d in fd_filename_map", path, nextIndex);
+		}
 // 		fprintf(stderr, "Insert %d -> %s\n", nextIndex, path);
 
 		nextIndex++;
