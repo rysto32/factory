@@ -34,7 +34,10 @@
 void
 PermissionList::AddPermission(const Path &path, Permission p)
 {
-	filePerm.emplace(path.lexically_normal(), p);
+	auto [it, success] = filePerm.emplace(path.lexically_normal(), p);
+	if (!success) {
+		it->second |= p;
+	}
 }
 
 Permission
