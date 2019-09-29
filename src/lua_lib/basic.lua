@@ -20,6 +20,12 @@ function factory.define_command(products, inputs, arglist, options)
 	    factory.listify(options))
 end
 
+function factory.define_mkdir(...)
+	for _, d in ipairs{...} do
+		factory.define_command(d, {"/bin", "/lib"}, {"mkdir", d}, {})
+	end
+end
+
 function factory.include_config(paths, config)
 	factory.internal.include_config(factory.listify(paths), config)
 end
