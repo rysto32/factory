@@ -1031,7 +1031,7 @@ utimensat_syscall_probe(struct utimensat_args *args)
 	}
 
 	times = alloc.GetScratch<struct timespec>();
-	error = copyin(args->times, times, 2 * sizeof(times));
+	error = copyin(args->times, times, 2 * sizeof(*times));
 	if (error != 0) {
 		return (EBPF_ACTION_RETURN);
 	}
