@@ -32,6 +32,7 @@
 
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <err.h>
 
 Product::Product(const Path & p, ProductManager & mgr)
   : path(p),
@@ -63,7 +64,9 @@ Product::AddDependency(Product *d)
 void
 Product::DependencyComplete(Product * d)
 {
-	assert (command);
+	if (!command) {
+		errx(1, "Internal error: product '%s' has no defined command", path.c_str());
+	}
 
 	dependencies.erase(d);
 	if (dependencies.empty())
