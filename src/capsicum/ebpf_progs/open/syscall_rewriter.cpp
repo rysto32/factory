@@ -253,7 +253,7 @@ static inline int * lookup_fd_user(const char * userPath, char *pathBuf, char *i
 
 		result = ebpf_map_lookup_elem(&cwd_map, &pid);
 		if (!result) {
-			set_errno(EPERM);
+			set_errno(ECAPMODE);
 			return nullptr;
 		}
 
@@ -308,7 +308,7 @@ static inline void * do_single_lookup(void *pathBuf, char **path)
 {
 	void *result = ebpf_map_lookup_path(&file_lookup_map, &pathBuf);
 	if (!result) {
-		set_errno(EPERM);
+		set_errno(ECAPMODE);
 		return (0);
 	}
 
@@ -450,8 +450,8 @@ static inline int do_open(ScratchMgr &alloc, const char * userPath, int flags, i
 				/* We only get here with open(".") */
 				allowed = O_RDONLY | O_CLOEXEC;
 				if ((flags & ~allowed) != 0) {
-					set_errno(EPERM);
-					return (EPERM);
+					set_errno(ECAPMODE);
+					return (ECAPMODE);
 				}
 
 				fd = dup(dir_fd);
@@ -651,7 +651,7 @@ int wait4_syscall_probe(struct wait4_args *args)
 		args->options |= WEXITED;
 
 		if ((args->options & ~SUPPORTED_FLAGS) != 0) {
-			set_errno(EPERM);
+			set_errno(ECAPMODE);
 			return (EBPF_ACTION_RETURN);
 		}
 
