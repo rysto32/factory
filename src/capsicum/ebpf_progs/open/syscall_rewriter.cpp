@@ -370,9 +370,6 @@ static inline int * do_symlink_lookup(int * fd, struct ebpf_symlink_res_bufs *bu
 		if (error == ENODEV || error == ENOENT) {
 			// Not a symlink.
 			if constexpr (FOUND) {
-				set_errno(0);
-				set_syscall_retval(0, 0);
-
 				return fd;
 			} else {
 				return nullptr;
@@ -426,6 +423,7 @@ fd_op(ScratchMgr &alloc, const char *userPath, int flags, const F & func)
 
 			if (dir_fd) {
 				set_errno(0);
+				set_syscall_retval(0, 0);
 				ret = func(*dir_fd, path);
 			}
 		}
