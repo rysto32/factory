@@ -41,8 +41,16 @@ class Product;
 
 class ProductManager
 {
+private:
+	typedef std::unordered_map<Product*, std::vector<Product*>> DepMap;
+
 	std::unordered_map<Path, std::unique_ptr<Product>> products;
 	JobQueue & jobQueue;
+
+	DepMap inputMap;
+	DepMap dependeeMap;
+	DepMap dirContentsMap;
+	std::vector<Product*> directories;
 
 	static bool FileExists(const Path & path);
 
@@ -59,6 +67,9 @@ class ProductManager
 	bool IsBlocked(Product *product);
 	void ReportCycle(Product * product);
 
+	void CalcDeps();
+	void AddDirProducts(Product *dir, std::unordered_set<Product*> & dirContents);
+
 public:
 	ProductManager(JobQueue &);
 
@@ -67,8 +78,8 @@ public:
 	ProductManager &operator=(const ProductManager &) = delete;
 	ProductManager &operator=(ProductManager &&) = delete;
 
-	Product * GetProduct(const Path &);
-	void SetInputs(Product * product, const std::vector<Product*> & inputs);
+	Product * GetProduct(const Path &, bool makeParent = true);
+	void SetInputs(Product * product, std::vector<Product*> inputs);
 
 	void CheckBlockedCommands();
 	void SubmitLeafJobs();

@@ -112,7 +112,7 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 		if (path.is_relative()) {
 			path = workdir / path;
 		}
-		Product * input = productManager.GetProduct(path);
+		Product * input = productManager.GetProduct(path, false);
 		permList.AddPermission(input->GetPath(), Permission::READ | Permission::EXEC);
 		inputs.push_back(input);
 	}
@@ -121,7 +121,7 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 		if (path.is_relative()) {
 			path = workdir / path;
 		}
-		Product * input = productManager.GetProduct(path);
+		Product * input = productManager.GetProduct(path, false);
 		inputs.push_back(input);
 	}
 

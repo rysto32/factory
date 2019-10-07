@@ -46,6 +46,7 @@ private:
 	Command *command;
 	ProductManager & productManager;
 	bool needsBuild;
+	bool isDirectory;
 
 	std::unordered_set<Product*> dependencies;
 	std::vector<Product*> dependees;
@@ -94,6 +95,28 @@ public:
 	}
 
 	bool IsReady();
+	bool IsBuildable() const
+	{
+		return command != nullptr;
+	}
+
+	bool IsDirectory() const
+	{
+		return isDirectory;
+	}
+
+	/*
+	 * Returns true if this was the first time the product was set as
+	 * a directory.
+	 */
+	bool SetDirectory()
+	{
+		bool wasDir = isDirectory;
+
+		isDirectory = true;
+
+		return !wasDir;
+	}
 };
 
 #endif

@@ -59,14 +59,26 @@ ProductManager::MakeProduct(const Path & path)
 }
 
 Product *
-ProductManager::GetProduct(const Path & path)
+ProductManager::GetProduct(const Path & path, bool makeParent)
 {
+	bool madeProduct = false;
+
 	Product * product = FindProduct(path);
-	if (product != nullptr) {
-		return product;
+	if (product == nullptr) {
+		product = MakeProduct(path);
+		madeProduct = true;
 	}
 
-	product = MakeProduct(path);
+	if (makeParent) {
+		Product * parent = GetProduct(path.parent_path(), false);
+		if (parent->SetDirectory()) {
+			directories.push_back(parent);
+		}
+
+		if (madeProduct) {
+			dirContentsMap[parent].push_back(product);
+		}
+	}
 
 	return product;
 }
@@ -165,13 +177,19 @@ ProductManager::FileExists(const Path & path)
 }
 
 void
-ProductManager::SetInputs(Product * product, const std::vector<Product*> & inputs)
+ProductManager::SetInputs(Product * product, std::vector<Product*> inputs)
 {
-	for (Product * input : inputs) {
-		if (product == input) {
-			continue;
+	for (Product *input : inputs) {
+		dependeeMap[input].push_back(product);
+	}
+
+	std::vector<Product*> & mapInputs = inputMap[product];
+	if (mapInputs.empty()) {
+		mapInputs = std::move(inputs);
+	} else {
+		for (Product * p : inputs) {
+			mapInputs.push_back(p);
 		}
-		AddDependency(product, input);
 	}
 }
 
@@ -188,8 +206,70 @@ ProductManager::CheckNeedsBuild(Product * product)
 }
 
 void
+ProductManager::AddDirProducts(Product *dir, std::unordered_set<Product*> & dirContents)
+{
+
+	for (Product *p : dirContentsMap[dir]) {
+		if (p->IsDirectory()) {
+			AddDirProducts(p, dirContents);
+		} else {
+			dirContents.insert(p);
+		}
+	}
+}
+
+void
+ProductManager::CalcDeps()
+{
+	for (Product *dir : directories) {
+		if (dependeeMap[dir].empty()) {
+			continue;
+		}
+
+// 		fprintf(stderr, "Enumerate '%s' for '%s'\n", dir->GetPath().c_str(),
+// 		     dependeeMap[dir].front()->GetPath().c_str());
+		std::unordered_set<Product*> dirContents;
+
+		using opt = fs::directory_options;
+		std::error_code error;
+		auto dirIt = fs::recursive_directory_iterator(dir->GetPath(),
+		    opt::skip_permission_denied | opt::follow_directory_symlink,
+		    error);
+
+		if (!error) {
+			for (auto & entry : dirIt) {
+				dirContents.insert(GetProduct(entry.path(), false));
+			}
+		}
+
+		AddDirProducts(dir, dirContents);
+
+		for (Product *dependee : dependeeMap[dir]) {
+			for (Product *input : dirContents) {
+				AddDependency(dependee, input);
+// 				fprintf(stderr, "'%s' depends on dir contents '%s'\n",
+// 				    dependee->GetPath().c_str(),
+// 				    input->GetPath().c_str());
+			}
+		}
+	}
+
+	for (auto & [product, inputs] : inputMap) {
+		for (Product *input : inputs) {
+			if (!input->IsDirectory()) {
+				AddDependency(product, input);
+// 				fprintf(stderr, "'%s' depends on dir contents '%s'\n",
+// 				    product->GetPath().c_str(),
+// 				    input->GetPath().c_str());
+			}
+		}
+	}
+}
+
+void
 ProductManager::SubmitLeafJobs()
 {
+	CalcDeps();
 
 	for (auto & [path, productPtr] : products) {
 		Product * product = productPtr.get();
@@ -254,8 +334,7 @@ ProductManager::IsBlocked(Product *product)
 	if (!product->NeedsBuild())
 		return false;
 
-	Command *command = product->GetCommand();
-	if (command == nullptr) {
+	if (!product->IsBuildable()) {
 		/*
 		 * Could happen if we have a dependency cycle and are
 		 * also lacking a build rule.
@@ -266,6 +345,7 @@ ProductManager::IsBlocked(Product *product)
 	}
 
 	// If the command was queued then it wasn't blocked
+	Command *command = product->GetCommand();
 	if (command->WasQueued())
 		return false;
 

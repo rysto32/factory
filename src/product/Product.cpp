@@ -38,7 +38,8 @@ Product::Product(const Path & p, ProductManager & mgr)
   : path(p),
     command(nullptr),
     productManager(mgr),
-    needsBuild(false)
+    needsBuild(false),
+    isDirectory(false)
 {
 
 }
