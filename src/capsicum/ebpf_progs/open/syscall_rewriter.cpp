@@ -604,9 +604,7 @@ int fstatat_syscall_probe(struct fstatat_args *args)
 				return (error);
 			}
 
-			copyout(sb, args->buf, sizeof(*args->buf));
-			return (0);
-
+			return (copyout(sb, args->buf, sizeof(*args->buf)));
 		});
 
 	return EBPF_ACTION_RETURN;
