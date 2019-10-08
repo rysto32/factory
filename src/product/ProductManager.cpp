@@ -51,8 +51,13 @@ ProductManager::MakeProduct(const Path & path)
 	Product * ptr = product.get();
 	products.insert(std::make_pair(path, std::move(product)));
 
-	if (!FileExists(path)) {
+	auto productStatus = fs::status(path);
+
+	if (!fs::exists(productStatus)) {
 		ptr->SetNeedsBuild();
+	} else if (fs::is_directory(productStatus)) {
+		ptr->SetDirectory();
+		directories.push_back(ptr);
 	}
 
 	return ptr;
@@ -238,7 +243,9 @@ ProductManager::CalcDeps()
 
 		if (!error) {
 			for (auto & entry : dirIt) {
-				dirContents.insert(GetProduct(entry.path(), false));
+				if (!fs::is_directory(entry.path())) {
+					dirContents.insert(GetProduct(entry.path(), false));
+				}
 			}
 		}
 
