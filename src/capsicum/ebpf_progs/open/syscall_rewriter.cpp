@@ -142,6 +142,7 @@ struct kevent {
 #define O_RDWR          0x0002          /* open for reading and writing */
 #define O_ACCMODE       0x0003          /* mask for above modes */
 
+#define O_DIRECTORY     0x00020000      /* Fail if not directory */
 #define O_EXEC          0x00040000      /* Open for execute only */
 
 #define O_CLOEXEC       0x00100000
@@ -446,7 +447,7 @@ static inline int do_open(ScratchMgr &alloc, const char * userPath, int flags, i
 
 			if (path[0] == '\0') {
 				/* We only get here with open(".") */
-				allowed = O_RDONLY | O_CLOEXEC;
+				allowed = O_RDONLY | O_EXEC | O_DIRECTORY | O_CLOEXEC;
 				if ((flags & ~allowed) != 0) {
 					set_errno(ECAPMODE);
 					return (ECAPMODE);
