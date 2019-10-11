@@ -28,7 +28,6 @@
 
 #include "CapsicumSandbox.h"
 
-#include "Command.h"
 #include "Permission.h"
 #include "PermissionList.h"
 
@@ -43,9 +42,9 @@
 #include <sys/syslimits.h>
 #include <unistd.h>
 
-CapsicumSandbox::CapsicumSandbox(const Command & c)
+CapsicumSandbox::CapsicumSandbox(const Path & exec, const PermissionList &perms, const Path &work_dir)
   : ebpf(ebpf_dev_driver_create()),
-    work_dir(c.GetWorkDir()),
+    work_dir(work_dir),
     work_dir_fd(-1),
     is_rtld(false)
 {
@@ -53,8 +52,8 @@ CapsicumSandbox::CapsicumSandbox(const Command & c)
 		err(1, "Could not create ebpf instance.");
 	}
 
-	FindInterpreter(c.GetExecutable());
-	PreopenDescriptors(c.GetPermissions());
+	FindInterpreter(exec);
+	PreopenDescriptors(perms);
 	CreateEbpfRules();
 }
 

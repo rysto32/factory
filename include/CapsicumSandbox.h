@@ -43,7 +43,6 @@ extern "C" {
 #include <string>
 #include <vector>
 
-class Command;
 class PermissionList;
 
 class CapsicumSandbox : public Sandbox
@@ -101,7 +100,7 @@ class CapsicumSandbox : public Sandbox
 	static void UpdateProgMap(Ebpf::Map & map, const Ebpf::Program & prog);
 
 public:
-	CapsicumSandbox(const Command & c);
+	CapsicumSandbox(const Path & exec, const PermissionList &, const Path &work_dir);
 	~CapsicumSandbox();
 
 	CapsicumSandbox(CapsicumSandbox &&) = delete;

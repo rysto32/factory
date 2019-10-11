@@ -29,6 +29,7 @@
 #include "CapsicumSandboxFactory.h"
 
 #include "CapsicumSandbox.h"
+#include "Command.h"
 
 CapsicumSandboxFactory::CapsicumSandboxFactory()
 {
@@ -39,10 +40,11 @@ CapsicumSandboxFactory::~CapsicumSandboxFactory()
 }
 
 Sandbox&
-CapsicumSandboxFactory::MakeSandbox(uint64_t jid, const Command &command)
+CapsicumSandboxFactory::MakeSandbox(uint64_t jid, const Command &c)
 {
 
-	auto [it, success] = sandboxMap.emplace(jid, std::make_unique<CapsicumSandbox>(command));
+	auto [it, success] = sandboxMap.emplace(jid, std::make_unique<CapsicumSandbox>(
+	    c.GetExecutable(), c.GetPermissions(), c.GetWorkDir()));
 	assert(success);
 
 	return *it->second;
