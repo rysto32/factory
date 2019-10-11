@@ -15,4 +15,6 @@ SUBDIRS := \
 	product \
 	temp_files \
 	util \
+	wrapper \
+
 
