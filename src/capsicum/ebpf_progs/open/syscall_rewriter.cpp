@@ -1055,7 +1055,11 @@ utimensat_syscall_probe(struct utimensat_args *args)
 	fd_op(alloc, args->path, args->flag,
 		[args,times](int fd, const char *path)
 		{
-			return (utimensat(fd, path, times, args->flag));
+			if (path[0] == '\0') {
+				return (futimens(fd, times));
+			} else {
+				return (utimensat(fd, path, times, args->flag));
+			}
 		});
 
 	return (EBPF_ACTION_RETURN);
