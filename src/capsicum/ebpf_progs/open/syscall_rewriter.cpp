@@ -229,6 +229,8 @@ static inline int do_fchdir(int fd) __force_inline;
 static inline int get_exit_kq(pid_t pid) __force_inline;
 static inline int do_symlink(const char *target, const char *source) __force_inline;
 static inline int do_unlink(const char *path, int flag) __force_inline;
+static inline int do_chown(const char *path, uid_t uid, gid_t gid, int flag) __force_inline;
+static inline int do_chmod(const char *path, mode_t mode, int flag) __force_inline;
 
 static inline int * lookup_fd_user(const char * userPath, char *pathBuf, char *inBuf, char **path)
 {
@@ -1072,6 +1074,91 @@ unlinkat_syscall_probe(struct unlinkat_args *args)
 	}
 
 	return (do_unlink(args->path, args->flag));
+}
+
+static inline int
+do_chown(const char *path, uid_t uid, gid_t gid, int flag)
+{
+	ScratchMgr alloc;
+
+	fd_op(alloc, path, flag,
+		[uid,gid,flag](int fd, const char *file)
+		{
+			if (*file == '\0') {
+				return (fchown(fd, uid, gid));
+			} else {
+				return (fchownat(fd, file, uid, gid, flag));
+			}
+		});
+
+	return (EBPF_ACTION_RETURN);
+}
+
+int
+chown_syscall_probe(struct chown_args *args)
+{
+
+	return (do_chown(args->path, args->uid, args->gid, 0));
+}
+
+int
+lchown_syscall_probe(struct lchown_args *args)
+{
+
+	return (do_chown(args->path, args->uid, args->gid, AT_SYMLINK_NOFOLLOW));
+}
+
+int
+fchownat_syscall_probe(struct fchownat_args *args)
+{
+	if (args->fd != AT_FDCWD) {
+		return (EBPF_ACTION_CONTINUE);
+	}
+
+	return (do_chown(args->path, args->uid, args->gid, args->flag));
+}
+
+static inline int
+do_chmod(const char *path, mode_t mode, int flag)
+{
+	ScratchMgr alloc;
+
+	fd_op(alloc, path, flag,
+		[mode,flag](int fd, const char *file)
+		{
+			if (*file == '\0') {
+				return (fchmod(fd, mode));
+			} else {
+				return (fchmodat(fd, file, mode, flag));
+			}
+		});
+
+	return (EBPF_ACTION_RETURN);
+
+}
+
+int
+chmod_syscall_probe(struct chmod_args *args)
+{
+
+	return (do_chmod(args->path, args->mode, 0));
+}
+
+int
+lchmod_syscall_probe(struct lchmod_args *args)
+{
+
+	return (do_chmod(args->path, args->mode, AT_SYMLINK_NOFOLLOW));
+}
+
+int
+fchmodat_syscall_probe(struct fchmodat_args *args)
+{
+	if (args->fd != AT_FDCWD) {
+		return (EBPF_ACTION_CONTINUE);
+	}
+
+	return (do_chmod(args->path, args->mode, args->flag));
 }
 
 }
