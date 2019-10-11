@@ -863,7 +863,13 @@ do_mkdir(const char *path, mode_t mode)
 	fd_op(alloc, path, 0,
 		[mode](int fd, const char *path)
 		{
-			return (mkdirat(fd, path, mode));
+			if (path[0] == '\0') {
+				// mkdir(".");  Why?
+				set_errno(EEXIST);
+				return (EEXIST);
+			} else {
+				return (mkdirat(fd, path, mode));
+			}
 		});
 
 	return (EBPF_ACTION_RETURN);
