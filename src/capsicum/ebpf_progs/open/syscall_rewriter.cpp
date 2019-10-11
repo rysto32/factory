@@ -231,6 +231,7 @@ static inline int do_symlink(const char *target, const char *source) __force_inl
 static inline int do_unlink(const char *path, int flag) __force_inline;
 static inline int do_chown(const char *path, uid_t uid, gid_t gid, int flag) __force_inline;
 static inline int do_chmod(const char *path, mode_t mode, int flag) __force_inline;
+static inline int do_link(const char *file, const char *link) __force_inline;
 
 static inline int * lookup_fd_user(const char * userPath, char *pathBuf, char *inBuf, char **path)
 {
@@ -1175,6 +1176,50 @@ fchmodat_syscall_probe(struct fchmodat_args *args)
 	}
 
 	return (do_chmod(args->path, args->mode, args->flag));
+}
+
+static inline int
+do_link(const char *file, const char *link)
+{
+	ScratchMgr alloc;
+	int fromfd, error;
+	const char *from;
+
+	error = fd_op(alloc, file, 0,
+	    [&fromfd,&from](int fd, const char *path)
+		{
+			if (path[0] == '\0') {
+				set_errno(EINVAL);
+				return (EINVAL);
+			} else {
+				fromfd = fd;
+				from = path;
+				return (0);
+			}
+		});
+	if (error != 0) {
+		return (EBPF_ACTION_RETURN);
+	}
+
+	fd_op(alloc, link, 0,
+		[fromfd,from](int tofd, const char *to)
+		{
+			if (to[0] == '\0') {
+				set_errno(EINVAL);
+				return (EINVAL);
+			} else {
+				return (linkat(fromfd, from, tofd, to, 0));
+			}
+		});
+
+	return (EBPF_ACTION_RETURN);
+}
+
+int
+link_syscall_probe(struct link_args *args)
+{
+
+	return (do_link(args->path, args->link));
 }
 
 }
