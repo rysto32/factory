@@ -89,7 +89,6 @@ int main(int argc, char **argv)
 	bool writeTar = false;
 	bool extract = false;
 	bool preservePaths = false;
-	std::vector<char*> argp;
 	const char *real_tar = "/usr/bin/tar";
 	int i;
 
@@ -99,13 +98,6 @@ int main(int argc, char **argv)
 
 	std::optional<Path> work_dir(std::filesystem::current_path());
 
-	argp.reserve(argc + 3);
-
-	// Thanks, POSIX
-	argp.push_back(const_cast<char*>("rtld"));
-	argp.push_back(const_cast<char*>("--"));
-	argp.push_back(const_cast<char*>(real_tar));
-
 	if (argc > 1) {
 		if (argv[1][0] == '-') {
 			/* Standard arguments */
@@ -113,8 +105,6 @@ int main(int argc, char **argv)
 				if (argv[i][0] != '-') {
 					break;
 				}
-
-				argp.push_back(argv[i]);
 
 				std::string_view flag;
 				std::string_view rest;
@@ -165,9 +155,6 @@ int main(int argc, char **argv)
 					if (accepts_param(flag)) {
 						if (rest.empty()) {
 							// "-X arg"
-							if ((i + 1) < argc) {
-								argp.push_back(argv[i + 1]);
-							}
 							i += 2;
 							break;
 						} else {
@@ -189,7 +176,6 @@ int main(int argc, char **argv)
 			}
 
 			for (; i < argc; ++i) {
-				argp.push_back(argv[i]);
 				if (argv[i][0] == '@') {
 					perms.AddPermission(argv[i] + 1, Permission::READ);
 				}
@@ -200,8 +186,6 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 	}
-
-	argp.push_back(nullptr);
 
 	if (tarfile) {
 		Permission p = Permission::READ;
@@ -226,12 +210,13 @@ int main(int argc, char **argv)
 	perms.AddPermission("/usr/share/nls", Permission::READ);
 	perms.AddPermission("/usr/share/locale", Permission::READ);
 	perms.AddPermission("/etc", Permission::READ);
+	perms.AddPermission("/libexec", Permission::READ | Permission::EXEC);
 
 	CapsicumSandbox sandbox(real_tar, perms, std::filesystem::current_path());
 
 	sandbox.Enable();
 
-	fexecve(sandbox.GetExecFd(), &argp[0], environ);
+	execve(real_tar, argv, environ);
 	err(1, "execve %s failed", real_tar);
 	_exit(1);
 }
