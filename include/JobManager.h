@@ -54,14 +54,14 @@ private:
 	EventLoop &loop;
 	JobQueue & jobQueue;
 	std::unique_ptr<SandboxFactory> sandboxFactory;
-	const int maxRunning;
+	const size_t maxRunning;
 
 	uint64_t next_job_id;
 
 	uint64_t AllocJobId();
 
 public:
-	JobManager(EventLoop &, JobQueue &, std::unique_ptr<SandboxFactory> &&, int max);
+	JobManager(EventLoop &, JobQueue &, std::unique_ptr<SandboxFactory> &&, size_t max);
 	~JobManager();
 
 	JobManager(const JobManager &) = delete;

@@ -116,7 +116,7 @@ StartChild(const std::vector<char *> & argp, const std::vector<char *> & envp,
 	_exit(1);
 }
 
-JobManager::JobManager(EventLoop & loop, JobQueue &q, std::unique_ptr<SandboxFactory> &&f, int max)
+JobManager::JobManager(EventLoop & loop, JobQueue &q, std::unique_ptr<SandboxFactory> &&f, size_t max)
   : loop(loop),
     jobQueue(q),
     sandboxFactory(std::move(f)),
