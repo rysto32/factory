@@ -36,6 +36,7 @@
 #include <err.h>
 #include <stdio.h>
 
+#include <cassert>
 #include <list>
 #include <memory>
 #include <sstream>

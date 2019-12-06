@@ -45,6 +45,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <cassert>
 #include <string>
 #include <vector>
 

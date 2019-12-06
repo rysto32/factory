@@ -30,6 +30,7 @@
 
 #include "lua/Parameter.h"
 
+#include <cassert>
 #include <sstream>
 
 namespace Lua
