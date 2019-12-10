@@ -163,18 +163,18 @@ struct kevent {
 #define MAX_PIDS	10
 #define MAX_PREOPEN_FDS	256
 
-EBPF_DEFINE_MAP(file_lookup_map,  "hashtable", MAXPATHLEN, sizeof(int), MAX_PREOPEN_FDS, 0);
-EBPF_DEFINE_MAP(fd_filename_map,  "array", sizeof(int), NAME_MAX, MAX_PREOPEN_FDS, 0);
-EBPF_DEFINE_MAP(fd_map,  "array", sizeof(int), sizeof(int), MAX_PREOPEN_FDS, 0);
-EBPF_DEFINE_MAP(scratch, "percpu_array", sizeof(int), MAXPATHLEN, 8, 0);
-EBPF_DEFINE_MAP(pid_map, "hashtable", sizeof(pid_t), sizeof(int), MAX_PIDS, 0);
-EBPF_DEFINE_MAP(cwd_map, "hashtable", sizeof(pid_t), sizeof(int), MAX_PIDS, 0);
-EBPF_DEFINE_MAP(cwd_name_map, "hashtable", sizeof(pid_t), MAXPATHLEN, MAX_PIDS, 0);
+EBPF_DEFINE_MAP(file_lookup_map,  EBPF_MAP_TYPE_HASHTABLE, MAXPATHLEN, sizeof(int), MAX_PREOPEN_FDS, 0);
+EBPF_DEFINE_MAP(fd_filename_map,  EBPF_MAP_TYPE_ARRAY, sizeof(int), NAME_MAX, MAX_PREOPEN_FDS, 0);
+EBPF_DEFINE_MAP(fd_map,  EBPF_MAP_TYPE_ARRAY, sizeof(int), sizeof(int), MAX_PREOPEN_FDS, 0);
+EBPF_DEFINE_MAP(scratch, EBPF_MAP_TYPE_PERCPU_ARRAY, sizeof(int), MAXPATHLEN, 8, 0);
+EBPF_DEFINE_MAP(pid_map, EBPF_MAP_TYPE_HASHTABLE, sizeof(pid_t), sizeof(int), MAX_PIDS, 0);
+EBPF_DEFINE_MAP(cwd_map, EBPF_MAP_TYPE_HASHTABLE, sizeof(pid_t), sizeof(int), MAX_PIDS, 0);
+EBPF_DEFINE_MAP(cwd_name_map, EBPF_MAP_TYPE_HASHTABLE, sizeof(pid_t), MAXPATHLEN, MAX_PIDS, 0);
 
-EBPF_DEFINE_MAP(exit_kq_map, "hashtable", sizeof(pid_t), sizeof(int), MAX_PIDS, 0);
+EBPF_DEFINE_MAP(exit_kq_map, EBPF_MAP_TYPE_HASHTABLE, sizeof(pid_t), sizeof(int), MAX_PIDS, 0);
 
-EBPF_DEFINE_MAP(pdwait_prog, "progarray", sizeof(int), sizeof(int), 1, 0);
-EBPF_DEFINE_MAP(kevent_prog, "progarray", sizeof(int), sizeof(int), 1, 0);
+EBPF_DEFINE_MAP(pdwait_prog, EBPF_MAP_TYPE_PROGARRAY, sizeof(int), sizeof(int), 1, 0);
+EBPF_DEFINE_MAP(kevent_prog, EBPF_MAP_TYPE_PROGARRAY, sizeof(int), sizeof(int), 1, 0);
 
 #define unlikely(x) (__builtin_expect(!!(x), 0))
 #define __force_inline __attribute((always_inline))

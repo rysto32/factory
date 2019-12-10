@@ -41,6 +41,7 @@ extern "C" {
 }
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 class PermissionList;
@@ -71,18 +72,8 @@ class CapsicumSandbox : public Sandbox
 	EBPFDevDriver *ebpf;
 	const Path & work_dir;
 
-	std::vector<Ebpf::Program> probe_programs;
-	Ebpf::Program defer_wait4_prog;
-	Ebpf::Program defer_kevent_prog;
-
-	Ebpf::Map fd_map;
-	Ebpf::Map fd_filename_map;
-	Ebpf::Map file_lookup_map;
-	Ebpf::Map pdwait_prog_map;
-	Ebpf::Map kevent_prog_map;
-	Ebpf::Map cwd_map;
-	Ebpf::Map cwd_name_map;
-	std::vector<Ebpf::Map> maps;
+	std::unordered_map<std::string, Ebpf::Program> probe_programs;
+	std::unordered_map<std::string, Ebpf::Map> maps;
 
 	FileDesc fexec_fd;
 	int work_dir_fd;
@@ -97,7 +88,7 @@ class CapsicumSandbox : public Sandbox
 	static void DefineMap(GBPFElfWalker *walker, const char *name, int desc,
 		       struct ebpf_map_def *map);
 
-	static void UpdateProgMap(Ebpf::Map & map, const Ebpf::Program & prog);
+	void UpdateProgMap(const std::string & mapName, const std::string & progName);
 
 public:
 	CapsicumSandbox(const Path & exec, const PermissionList &, const Path &work_dir);

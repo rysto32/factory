@@ -55,11 +55,16 @@ public:
 
 	operator bool() const
 	{
-		return ebpf != nullptr;
+		return fd >= 0;
 	}
 
 	void Close();
 	int UpdateElem(const void * key, const void * value, int flags);
+
+	int GetFD() const
+	{
+		return fd;
+	}
 };
 
 };

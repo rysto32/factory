@@ -62,8 +62,6 @@ CapsicumSandbox::~CapsicumSandbox()
 	probe_programs.clear();
 	maps.clear();
 
-	fd_map.Close();
-
 	if (ebpf)
 		ebpf_dev_driver_destroy(ebpf);
 }
@@ -198,20 +196,10 @@ CapsicumSandbox::DefineProgram(GBPFElfWalker *walker, const char *n,
 {
 	CapsicumSandbox *sandbox = reinterpret_cast<CapsicumSandbox*>(walker->data);
 
-	std::string name(n);
-
-	if (name == "defer_wait4") {
-		sandbox->defer_wait4_prog = Ebpf::Program(walker->driver, std::move(name),
-		    EBPF_PROG_TYPE_VFS, prog, prog_len);
-	} else if (name == "defer_kevent") {
-		sandbox->defer_kevent_prog = Ebpf::Program(walker->driver, std::move(name),
-		    EBPF_PROG_TYPE_VFS, prog, prog_len);
-	} else {
-		sandbox->probe_programs.emplace_back(walker->driver, std::move(name),
-		    EBPF_PROG_TYPE_VFS, prog, prog_len);
+	sandbox->probe_programs.emplace(n, Ebpf::Program(walker->driver, n,
+	    EBPF_PROG_TYPE_VFS, prog, prog_len));
 
 // 		fprintf(stderr, "Map prog '%s' to FD %d\n", n, sandbox->probe_programs.back().GetFD());
-	}
 }
 
 void
@@ -220,30 +208,22 @@ CapsicumSandbox::DefineMap(GBPFElfWalker *walker, const char *n, int desc,
 {
 	CapsicumSandbox *sandbox = reinterpret_cast<CapsicumSandbox*>(walker->data);
 
-	std::string name(n);
-
-	if (name == "fd_map") {
-		sandbox->fd_map = Ebpf::Map(walker->driver, std::move(name), desc);
-	} else if (name == "fd_filename_map") {
-		sandbox->fd_filename_map = Ebpf::Map(walker->driver, std::move(name), desc);
-	} else if (name == "file_lookup_map") {
-		sandbox->file_lookup_map = Ebpf::Map(walker->driver, std::move(name), desc);
-	} else if (name == "pdwait_prog") {
-		sandbox->pdwait_prog_map = Ebpf::Map(walker->driver, std::move(name), desc);
-	} else if (name ==  "kevent_prog") {
-		sandbox->kevent_prog_map = Ebpf::Map(walker->driver, std::move(name), desc);
-	} else if (name == "cwd_map") {
-		sandbox->cwd_map = Ebpf::Map(walker->driver, std::move(name), desc);
-	} else if(name == "cwd_name_map") {
-		sandbox->cwd_name_map = Ebpf::Map(walker->driver, std::move(name), desc);
-	} else {
-		sandbox->maps.emplace_back(walker->driver, std::move(name), desc);
-	}
+	sandbox->maps.emplace(std::string(n), Ebpf::Map(walker->driver, n, desc));
 }
 
 void
-CapsicumSandbox::UpdateProgMap(Ebpf::Map & map, const Ebpf::Program & prog)
+CapsicumSandbox::UpdateProgMap(const std::string & mapName, const std::string & progName)
 {
+	auto & map = maps[mapName];
+	if (!map) {
+		errx(1, "Map '%s' not defined by object", mapName.c_str());
+	}
+	
+	const auto & prog = probe_programs[progName];
+	if (!prog) {
+		errx(1, "Program '%s' not defined by object", progName.c_str());
+	}
+
 	int index = 0;
 	int fd = prog.GetFD();
 
@@ -263,14 +243,26 @@ CapsicumSandbox::CreateEbpfRules()
 		.data = this,
 	};
 
-	error = gbpf_walk_elf(&walker, &ebpf->base, "/home/rstone/repos/factory/src/capsicum/ebpf_progs/open/open.o");
+	error = gbpf_walk_elf(&walker, &ebpf->base, "/home/rstone/git/factory/src/capsicum/ebpf_progs/open/open.o");
 	if (error != 0) {
 		err(1, "Could not walk EBPF object");
 	}
 
+	auto & fd_map = maps["fd_map"];
 	if (!fd_map) {
 		errx(1, "EBPF object did not define fd map");
 	}
+	
+	auto & file_lookup_map = maps["file_lookup_map"];
+	if (!file_lookup_map) {
+		errx(1, "EBPF object did not define file_lookup_map");
+	}
+	
+	auto & fd_filename_map = maps["fd_filename_map"];
+	if (!fd_filename_map) {
+		errx(1, "EBPF object did not define fd_filename_map");
+	}
+		
 
 	int nextIndex = 0;
 	for (const auto & desc : descriptors) {
@@ -304,8 +296,8 @@ CapsicumSandbox::CreateEbpfRules()
 		nextIndex++;
 	}
 
-	UpdateProgMap(pdwait_prog_map, defer_wait4_prog);
-	UpdateProgMap(kevent_prog_map, defer_kevent_prog);
+	UpdateProgMap("pdwait_prog", "defer_wait4");
+	UpdateProgMap("kevent_prog", "defer_kevent");
 }
 
 void
@@ -325,6 +317,16 @@ CapsicumSandbox::GetExecFd()
 	return fexec_fd;
 }
 
+static bool
+HasEnding(std::string const &fullString, std::string const &ending)
+{
+	if (fullString.length() >= ending.length()) {
+		return (0 == fullString.compare (fullString.length() - ending.length(), ending.length(), ending));
+	} else {
+		return false;
+	}
+}
+
 void
 CapsicumSandbox::Enable()
 {
@@ -334,7 +336,7 @@ CapsicumSandbox::Enable()
 
 	pid = getpid();
 	if (work_dir_fd != -1) {
-		error = cwd_map.UpdateElem(&pid, &work_dir_fd, EBPF_NOEXIST);
+		error = maps["cwd_map"].UpdateElem(&pid, &work_dir_fd, EBPF_NOEXIST);
 		if (error != 0) {
 			err(1, "Failed to update cwd_map");
 		}
@@ -342,16 +344,19 @@ CapsicumSandbox::Enable()
 
 	bzero(path, sizeof(path));
 	strlcpy(path, work_dir.c_str(), sizeof(path));
+	auto & cwd_name_map = maps["cwd_name_map"];
 	error = cwd_name_map.UpdateElem(&pid, path, EBPF_NOEXIST);
 	if (error != 0) {
-		err(1, "Failed to update cwd_name_map");
+		err(1, "Failed to update cwd_name_map (fd %d)", cwd_name_map.GetFD());
 	}
 
-	for (Ebpf::Program & prog : probe_programs) {
-		error = prog.AttachProbe();
-		if (error != 0) {
-			err(1, "Could not attach to '%s' ebpf probe",
-			    prog.GetName().c_str());
+	for (auto & [name, prog] : probe_programs) {
+		if (HasEnding(name, "_probe")) {
+			error = prog.AttachProbe();
+			if (error != 0) {
+				err(1, "Could not attach to '%s' ebpf probe",
+				    name.c_str());
+			}
 		}
 	}
 
