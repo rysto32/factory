@@ -49,7 +49,7 @@
 struct OptionValue
 {
 	std::string name;
-	std::variant<int, std::string> value;
+	std::variant<int64_t, std::string> value;
 
 	template <typename T>
 	OptionValue(std::string && n, const T && v)
