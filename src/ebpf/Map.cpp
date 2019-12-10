@@ -28,6 +28,8 @@
 
 #include "ebpf/Map.h"
 
+#include <errno.h>
+
 namespace Ebpf {
 
 Map::Map()
@@ -85,7 +87,10 @@ int
 Map::UpdateElem(const void * key, const void * value, int flags)
 {
 
-	assert (ebpf);
+	if (!*this) {
+		return (EBADF);
+	}
+
 	return gbpf_map_update_elem(ebpf, fd, const_cast<void*>(key),
 	    const_cast<void*>(value), flags);
 }
