@@ -61,9 +61,9 @@ private:
 	EventLoop loop;
 	TempFileManager tmpMgr;
 	JobQueue jq;
-	JobManager jobManager;
 	ProductManager productMgr;
 	CommandFactory commandFactory;
+	JobManager jobManager;
 	Interpreter interp;
 
 	void IncludeScript(Interpreter & interp, const IncludeFile & file);
@@ -71,9 +71,9 @@ private:
 
 public:
 	Main(int maxJobs)
-	  : jobManager(loop, jq, GetSandboxerFactory(tmpMgr, loop, maxJobs), maxJobs),
-	    productMgr(jq),
+	  : productMgr(jq),
 	    commandFactory(productMgr),
+	    jobManager(loop, jq, GetSandboxerFactory(tmpMgr, loop, maxJobs), maxJobs),
 	    interp(commandFactory)
 	{
 	}
