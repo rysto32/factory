@@ -163,6 +163,32 @@ struct kevent {
 #define MAX_PIDS	10
 #define MAX_PREOPEN_FDS	256
 
+#define RFNAMEG         (1<<0)  /* UNIMPL new plan9 `name space' */
+#define RFENVG          (1<<1)  /* UNIMPL copy plan9 `env space' */
+#define RFFDG           (1<<2)  /* copy fd table */
+#define RFNOTEG         (1<<3)  /* UNIMPL create new plan9 `note group' */
+#define RFPROC          (1<<4)  /* change child (else changes curproc) */
+#define RFMEM           (1<<5)  /* share `address space' */
+#define RFNOWAIT        (1<<6)  /* give child to init */
+#define RFCNAMEG        (1<<10) /* UNIMPL zero plan9 `name space' */
+#define RFCENVG         (1<<11) /* UNIMPL zero plan9 `env space' */
+#define RFCFDG          (1<<12) /* close all fds, zero fd table */
+#define RFTHREAD        (1<<13) /* enable kernel thread support */
+#define RFSIGSHARE      (1<<14) /* share signal handlers */
+#define RFLINUXTHPN     (1<<16) /* do linux clone exit parent notification */
+#define RFSTOPPED       (1<<17) /* leave child in a stopped state */
+#define RFHIGHPID       (1<<18) /* use a pid higher than 10 (idleproc) */
+#define RFTSIGZMB       (1<<19) /* select signal for exit parent notification */
+#define RFTSIGSHIFT     20      /* selected signal number is in bits 20-27  */
+#define RFTSIGMASK      0xFF
+#define RFTSIGNUM(flags)        (((flags) >> RFTSIGSHIFT) & RFTSIGMASK)
+#define RFTSIGFLAGS(signum)     ((signum) << RFTSIGSHIFT)
+#define RFPROCDESC      (1<<28) /* return a process descriptor */
+/* kernel: parent sleeps until child exits (vfork) */
+#define RFPPWAIT        (1<<31)
+/* user: vfork(2) semantics, clear signals */
+#define RFSPAWN         (1U<<31)
+
 EBPF_DEFINE_MAP(file_lookup_map,  EBPF_MAP_TYPE_HASHTABLE, MAXPATHLEN, sizeof(int), MAX_PREOPEN_FDS, 0);
 EBPF_DEFINE_MAP(fd_filename_map,  EBPF_MAP_TYPE_ARRAY, sizeof(int), NAME_MAX, MAX_PREOPEN_FDS, 0);
 EBPF_DEFINE_MAP(fd_map,  EBPF_MAP_TYPE_ARRAY, sizeof(int), sizeof(int), MAX_PREOPEN_FDS, 0);
@@ -635,6 +661,15 @@ int vfork_syscall_probe(struct vfork_args *args)
 int fork_syscall_probe(struct fork_args *args)
 {
 	return do_fork();
+}
+
+int rfork_syscall_probe(struct rfork_args *args)
+{
+	if (args->flags == RFSPAWN) {
+		return do_fork();
+	} else {
+		return EBPF_ACTION_CONTINUE;
+	}
 }
 
 int wait4_syscall_probe(struct wait4_args *args)
