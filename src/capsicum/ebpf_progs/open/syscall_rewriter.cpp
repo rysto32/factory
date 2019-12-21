@@ -647,7 +647,17 @@ int access_syscall_probe(struct access_args *args)
 	fd_op(alloc, args->path, 0,
 		[args](int dir_fd, const char *path)
 		{
-			return faccessat(dir_fd, path, args->amode, 0);
+			/* XXX need an faccess() function. */
+			if (path[0] == '\0') {
+				if (args->amode == 0) {
+					return (0);
+				} else {
+					set_errno(ECAPMODE);
+					return (ECAPMODE);
+				}
+			} else {
+				return faccessat(dir_fd, path, args->amode, 0);
+			}
 		});
 
 	return EBPF_ACTION_RETURN;
