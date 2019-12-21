@@ -124,8 +124,11 @@ class Interpreter
 	int AddDefinitions();
 	int DefineCommand();
 	int EvaluateVars();
-	int Include(const char * funcName, IncludeFile::Type);
+	template <IncludeFile::Type type>
+	int Include();
 	int Realpath();
+
+	std::string_view GetIncludeFuncName(IncludeFile::Type type);
 
 	void PushConfig(const ConfigNode & node);
 
@@ -149,8 +152,10 @@ class Interpreter
 	template <typename T>
 	auto StringField(T &);
 
-	template <typename F>
-	static int FuncImplementationWrapper(lua_State *lua, const F & implementation);
+	typedef int (Interpreter::*LuaFuncImpl)();
+
+	template <LuaFuncImpl F>
+	static int FuncImplWrapper(lua_State *lua);
 
 public:
 	Interpreter(CommandFactory &);

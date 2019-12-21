@@ -53,12 +53,12 @@
 const char Interpreter::INTERPRETER_REGISTRY_ENTRY = 0;
 
 const struct luaL_Reg Interpreter::factoryModule [] = {
-	{"add_definitions", AddDefinitionsWrapper},
-	{"define_command", DefineCommandWrapper},
-	{ "evaluate_vars", EvaluateVarsWrapper},
-	{"include_script", IncludeScriptWrapper},
-	{"include_config", IncludeConfigWrapper},
-	{      "realpath", RealpathWrapper},
+	{"add_definitions", FuncImplWrapper<&Interpreter::AddDefinitions>},
+	{ "define_command", FuncImplWrapper<&Interpreter::DefineCommand>},
+	{  "evaluate_vars", FuncImplWrapper<&Interpreter::EvaluateVars>},
+	{ "include_script", FuncImplWrapper<&Interpreter::Include<IncludeFile::Type::SCRIPT>>},
+	{ "include_config", FuncImplWrapper<&Interpreter::Include<IncludeFile::Type::CONFIG>>},
+	{       "realpath", FuncImplWrapper<&Interpreter::Realpath>},
 	{nullptr, nullptr}
 };
 
@@ -206,77 +206,18 @@ Interpreter::GetInterpreter(lua_State *lua)
 	return interp;
 }
 
-template <typename F>
+
+template <Interpreter::LuaFuncImpl Impl>
 int
-Interpreter::FuncImplementationWrapper(lua_State *lua, const F & implementation)
+Interpreter::FuncImplWrapper(lua_State *lua)
 {
 	try {
-		return implementation(GetInterpreter(lua));
+		return (GetInterpreter(lua)->*Impl)();
 	} catch (InterpreterException & e)
 	{
 		luaL_traceback(lua, lua, e.what(), 1);
 		errx(1, "error in lua script: %s", lua_tostring(lua, -1));
 	}
-}
-
-int
-Interpreter::AddDefinitionsWrapper(lua_State *lua)
-{
-	return FuncImplementationWrapper(lua,
-	    [](Interpreter *interp)
-	    {
-		return interp->AddDefinitions();
-	    });
-}
-
-int
-Interpreter::DefineCommandWrapper(lua_State *lua)
-{
-	return FuncImplementationWrapper(lua,
-	    [](Interpreter *interp)
-	    {
-		return interp->DefineCommand();
-	    });
-}
-
-int
-Interpreter::EvaluateVarsWrapper(lua_State *lua)
-{
-	return FuncImplementationWrapper(lua,
-	    [](Interpreter *interp)
-	    {
-		return interp->EvaluateVars();
-	    });
-}
-
-int
-Interpreter::IncludeConfigWrapper(lua_State *lua)
-{
-	return FuncImplementationWrapper(lua,
-	    [](Interpreter *interp)
-	    {
-		return interp->Include("factory.include_config", IncludeFile::CONFIG);
-	    });
-}
-
-int
-Interpreter::IncludeScriptWrapper(lua_State *lua)
-{
-	return FuncImplementationWrapper(lua,
-	    [](Interpreter *interp)
-	    {
-		return interp->Include("factory.include_script", IncludeFile::SCRIPT);
-	    });
-}
-
-int
-Interpreter::RealpathWrapper(lua_State *lua)
-{
-	return FuncImplementationWrapper(lua,
-	    [](Interpreter *interp)
-	    {
-		return interp->Realpath();
-	    });
 }
 
 auto
@@ -462,11 +403,28 @@ Interpreter::SerializeConfig(Lua::Table & config)
 	}
 }
 
+std::string_view
+Interpreter::GetIncludeFuncName(IncludeFile::Type t)
+{
+
+	switch (t) {
+	case IncludeFile::CONFIG:
+		return "factory.include_config";
+	case IncludeFile::SCRIPT:
+		return "factory.include_script";
+	default:
+		fprintf(stderr, "Illegal include file type %d\n", t);
+		abort();
+	}
+}
+
+template <IncludeFile::Type type>
 int
-Interpreter::Include(const char * funcName, IncludeFile::Type t)
+Interpreter::Include()
 {
 	Lua::View lua(luaState);
 
+	std::string_view funcName = GetIncludeFuncName(type);
 	Lua::Parameter files(funcName, "files", 1);
 	Lua::Parameter configArg(funcName, "config", 2);
 
@@ -475,7 +433,7 @@ Interpreter::Include(const char * funcName, IncludeFile::Type t)
 	Lua::Table configTable = lua.GetTable(configArg);
 	auto config = SerializeConfig(configTable);
 
-	includeQueue.emplace_back(std::move(fileList), t, std::move(config));
+	includeQueue.emplace_back(std::move(fileList), type, std::move(config));
 
 	return 0;
 }

@@ -37,24 +37,24 @@ namespace Lua
 class Parameter
 {
 private:
-	std::string func;
-	std::string name;
+	std::string_view func;
+	std::string_view name;
 	int index;
 
 public:
-	Parameter(const std::string & f, const std::string & n, int i)
+	Parameter(const std::string_view f, const std::string_view n, int i)
 	  : func(f),
 	    name(n),
 	    index(i)
 	{
 	}
 
-	const std::string & GetFuncName() const
+	std::string_view GetFuncName() const
 	{
 		return func;
 	}
 
-	const std::string & GetParamName() const
+	std::string_view GetParamName() const
 	{
 		return name;
 	}
