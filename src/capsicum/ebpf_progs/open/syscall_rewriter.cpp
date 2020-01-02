@@ -536,7 +536,7 @@ static inline int do_readlink(ScratchMgr &alloc, const char *userPath, char * bu
 	return EBPF_ACTION_RETURN;
 }
 
-static inline int do_fork(void) __force_inline;
+static inline int do_fork(int *fdp, int flags) __force_inline;
 
 static inline int
 get_exit_kq(pid_t pid)
@@ -554,13 +554,13 @@ get_exit_kq(pid_t pid)
 	return (kq);
 }
 
-static inline int do_fork(void)
+static inline int do_fork(int *fdp, int flags)
 {
 	int fd, kq;
 	pid_t pid, ppid;
 	void *cwd;
 
-	pid = pdfork(&fd, 0);
+	pid = pdfork(&fd, flags);
 	if (pid > 0) {
 		ppid = getpid();
 		ebpf_map_update_elem(&pid_map, &pid, &fd, 0);
@@ -584,6 +584,12 @@ static inline int do_fork(void)
 		};
 
 		kevent_install(kq, &ev, 1);
+		
+		if (fdp) {
+			// XXX ignore EFAULT?
+			copyout(&fd, fdp, sizeof(fd));
+			set_errno(0);
+		}
 
 		set_syscall_retval(pid, 0);
 	}
@@ -665,21 +671,27 @@ int access_syscall_probe(struct access_args *args)
 
 int vfork_syscall_probe(struct vfork_args *args)
 {
-	return do_fork();
+	return do_fork(nullptr, 0);
 }
 
 int fork_syscall_probe(struct fork_args *args)
 {
-	return do_fork();
+	return do_fork(nullptr, 0);
 }
 
 int rfork_syscall_probe(struct rfork_args *args)
 {
 	if (args->flags == RFSPAWN) {
-		return do_fork();
+		return do_fork(nullptr, 0);
 	} else {
 		return EBPF_ACTION_CONTINUE;
 	}
+}
+
+int pdfork_syscall_probe(struct pdfork_args *args)
+{
+
+	return do_fork(args->fdp, args->flags);
 }
 
 int wait4_syscall_probe(struct wait4_args *args)
