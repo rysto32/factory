@@ -39,7 +39,8 @@ Product::Product(const Path & p, ProductManager & mgr)
     command(nullptr),
     productManager(mgr),
     needsBuild(false),
-    isDirectory(false)
+    isDirectory(false),
+    statusValid(false)
 {
 
 }
@@ -129,4 +130,32 @@ Product::IsReady()
 	}
 
 	return dependencies.empty();
+}
+
+void
+Product::CacheStatus() const
+{
+	status = std::filesystem::status(path);
+	modTime = std::filesystem::last_write_time(path);
+	statusValid = true;
+}
+
+const std::filesystem::file_status &
+Product::GetStatus() const
+{
+	if (!statusValid) {
+		CacheStatus();
+	}
+
+	return status;
+}
+
+std::filesystem::file_time_type
+Product::GetModifyTime() const
+{
+	if (!statusValid) {
+		CacheStatus();
+	}
+
+	return modTime;
 }

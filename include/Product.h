@@ -47,10 +47,14 @@ private:
 	ProductManager & productManager;
 	bool needsBuild;
 	bool isDirectory;
+	mutable bool statusValid;
+	mutable std::filesystem::file_status status;
+	mutable std::filesystem::file_time_type modTime;
 
 	std::unordered_set<Product*> dependencies;
 	std::vector<Product*> dependees;
 
+	void CacheStatus() const;
 
 public:
 	Product(const Path & p, ProductManager & mgr);
@@ -117,6 +121,10 @@ public:
 
 		return !wasDir;
 	}
+
+	const std::filesystem::file_status & GetStatus() const;
+	std::filesystem::file_time_type GetModifyTime() const;
+
 };
 
 #endif

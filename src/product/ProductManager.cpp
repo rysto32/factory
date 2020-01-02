@@ -120,7 +120,7 @@ ProductManager::CheckNeedsBuild(Product * product, const Product * input)
 	}
 
 	try {
-		auto productStatus = fs::status(product->GetPath());
+		const auto & productStatus = product->GetStatus();
 		if (!fs::exists(productStatus)) {
 // 			fprintf(stderr, "'%s' needs build because it doesn't exist\n", product->GetPath().c_str());
 			product->SetNeedsBuild();
@@ -132,7 +132,7 @@ ProductManager::CheckNeedsBuild(Product * product, const Product * input)
 			return false;
 		}
 
-		auto inputStatus = fs::status(input->GetPath());
+		const auto & inputStatus = input->GetStatus();
 		if (!fs::exists(inputStatus)) {
 // 			fprintf(stderr, "'%s' needs build because '%s' doesn't exist\n", product->GetPath().c_str(), input->GetPath().c_str());
 			product->SetNeedsBuild();
@@ -149,8 +149,8 @@ ProductManager::CheckNeedsBuild(Product * product, const Product * input)
 			return false;
 		}
 
-		auto inputLast = fs::last_write_time(input->GetPath());
-		auto productLast = fs::last_write_time(product->GetPath());
+		auto inputLast = input->GetModifyTime();
+		auto productLast = product->GetModifyTime();
 
 		if (productLast < inputLast) {
 // 			fprintf(stderr, "'%s' needs build because it is older than '%s'\n", product->GetPath().c_str(), input->GetPath().c_str());
