@@ -76,7 +76,6 @@ class CapsicumSandbox : public Sandbox
 	std::unordered_map<std::string, Ebpf::Map> maps;
 
 	FileDesc fexec_fd;
-	int work_dir_fd;
 	bool is_rtld;
 
 	void FindInterpreter(Path exe);

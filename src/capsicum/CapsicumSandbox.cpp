@@ -45,7 +45,6 @@
 CapsicumSandbox::CapsicumSandbox(const Path & exec, const PermissionList &perms, const Path &work_dir)
   : ebpf(ebpf_dev_driver_create()),
     work_dir(work_dir),
-    work_dir_fd(-1),
     is_rtld(false)
 {
 	if (!ebpf) {
@@ -177,13 +176,6 @@ CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 
 		if (cap_rights_limit(fd, &rights) < 0 && errno != ENOSYS) {
 			err(1, "cap_rights_limit() failed");
-		}
-
-// 		fprintf(stderr, "Open '%s' as FD %d (filename '%s')\n", openPath.c_str(), int(fd), filename.c_str());
-
-// 		fprintf(stderr, "path: %s work_dir: %s\n", path.c_str(), work_dir.c_str());
-		if (path == work_dir) {
-			work_dir_fd = fd;
 		}
 
 		descriptors.emplace_back(path, std::move(filename), std::move(fd));
@@ -335,12 +327,6 @@ CapsicumSandbox::Enable()
 	char path[MAXPATHLEN];
 
 	pid = getpid();
-	if (work_dir_fd != -1) {
-		error = maps["cwd_map"].UpdateElem(&pid, &work_dir_fd, EBPF_NOEXIST);
-		if (error != 0) {
-			err(1, "Failed to update cwd_map");
-		}
-	}
 
 	bzero(path, sizeof(path));
 	strlcpy(path, work_dir.c_str(), sizeof(path));
