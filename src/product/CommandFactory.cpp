@@ -148,6 +148,10 @@ CommandFactory::AddCommand(const std::vector<std::string> & productList,
 		permList.AddPermission(product->GetPath(), Permission::READ | Permission::WRITE);
 		products.push_back(product);
 		productManager.SetInputs(product, inputs);
+
+		for (auto target : options.targetList) {
+			productManager.AddToTarget(target, product);
+		}
 	}
 
 	commandList.emplace_back(std::make_unique<Command>(std::move(products), std::move(argList),

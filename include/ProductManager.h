@@ -30,6 +30,7 @@
 #define PRODUCT_MANAGER_H
 
 #include "Path.h"
+#include "NamedTarget.h"
 
 #include <memory>
 #include <unordered_map>
@@ -43,13 +44,16 @@ class ProductManager
 {
 private:
 	typedef std::unordered_map<Product*, std::vector<Product*>> DepMap;
+	typedef std::unordered_map<Path, std::unique_ptr<Product>> ProductMap;
+	typedef std::unordered_map<std::string, NamedTarget> TargetMap;
 
-	std::unordered_map<Path, std::unique_ptr<Product>> products;
+	ProductMap products;
 	JobQueue & jobQueue;
 
 	DepMap inputMap;
 	DepMap dependeeMap;
 	DepMap dirContentsMap;
+	TargetMap targetMap;
 	std::vector<Product*> directories;
 
 	static bool FileExists(const Path & path);
@@ -68,6 +72,8 @@ private:
 	void ReportCycle(Product * product);
 
 	void CalcDeps();
+	void CollectParentInputs(Product *product);
+	void CollectInputTree(std::unordered_set<Product*> & set, Product *p);
 	void AddDirProducts(Product *dir, std::unordered_set<Product*> & dirContents);
 
 public:
@@ -81,8 +87,10 @@ public:
 	Product * GetProduct(const Path &, bool makeParent = true);
 	void SetInputs(Product * product, std::vector<Product*> inputs);
 
+	void AddToTarget(std::string_view name, Product *p);
+
 	void CheckBlockedCommands();
-	void SubmitLeafJobs();
+	void SubmitLeafJobs(const std::unordered_set<std::string_view> &targets);
 
 	void ProductReady(Product *);
 };

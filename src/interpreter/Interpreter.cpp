@@ -318,7 +318,8 @@ Interpreter::GetCommandOptions(Lua::Table &table)
 		Lua::FieldSpec("stdin", StringField(opt.stdin)).Optional(true),
 		Lua::FieldSpec("stdout", StringField(opt.stdout)).Optional(true),
 		Lua::FieldSpec("statdirs", StringListField(opt.statdirs)).Optional(true),
-		Lua::FieldSpec("order_deps", StringListField(opt.orderDeps)).Optional(true)
+		Lua::FieldSpec("order_deps", StringListField(opt.orderDeps)).Optional(true),
+		Lua::FieldSpec("targets", StringListField(opt.targetList)).Optional(true)
 	};
 
 	table.ParseMap(parser);

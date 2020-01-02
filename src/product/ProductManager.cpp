@@ -274,32 +274,61 @@ ProductManager::CalcDeps()
 }
 
 void
-ProductManager::SubmitLeafJobs()
+ProductManager::CollectParentInputs(Product *product)
+{
+	Path parentPath(product->GetPath().parent_path());
+	Product * parent = FindProduct(parentPath);
+
+	if (parent) {
+		AddDependency(product, parent);
+	} else if (!FileExists(parentPath)) {
+		errx(1, "No command to make product '%s', needed by '%s'",
+			parentPath.c_str(), product->GetPath().c_str());
+	}
+}
+
+void
+ProductManager::CollectInputTree(std::unordered_set<Product*> & set, Product *p)
+{
+	auto [it, success] = set.insert(p);
+	if (success) {
+// 		fprintf(stderr, "Added '%s' to product set\n", p->GetPath().c_str());
+		CollectParentInputs(p);
+		for (Product *input : p->GetInputs()) {
+			CollectInputTree(set, input);
+		}
+	}
+}
+
+void
+ProductManager::SubmitLeafJobs(const std::unordered_set<std::string_view> &targets)
 {
 	CalcDeps();
 
-	for (auto & [path, productPtr] : products) {
-		Product * product = productPtr.get();
+	std::unordered_set<Product*> targetProducts;
 
-		Path parentPath(product->GetPath().parent_path());
-		Product * parent = FindProduct(parentPath);
-
-		if (parent) {
-			AddDependency(product, parent);
-		} else if (!FileExists(parentPath)) {
-			errx(1, "No command to make product '%s', needed by '%s'",
-			     parentPath.c_str(), product->GetPath().c_str());
+	for (auto targetName : targets) {
+		auto it = targetMap.find(std::string(targetName));
+		if (it == targetMap.end()) {
+			errx(1, "No such target '%s'", targetName.data());
 		}
 
+		for (Product *p : it->second.GetDependees()) {
+			CollectInputTree(targetProducts, p);
+		}
+	}
+
+	for (Product *product : targetProducts) {
 		CheckNeedsBuild(product);
 	}
 
-	for (auto & [path, productPtr] : products) {
-		Product * product = productPtr.get();
+	for (Product *product : targetProducts) {
 
 		if (product->NeedsBuild() && product->IsReady()) {
 // 			fprintf(stderr, "%s is ready\n", product->GetPath().c_str());
 			SubmitProductJob(product);
+		} else if (product->NeedsBuild()) {
+// 			fprintf(stderr, "'%s' needs build but inputs are not built\n", product->GetPath().c_str());
 		}
 	}
 }
@@ -384,4 +413,20 @@ ProductManager::ReportCycle(Product *product)
 	}
 
 	errx(1, "Build terminated due to cycle");
+}
+
+void
+ProductManager::AddToTarget(std::string_view n, Product *p)
+{
+	std::string name(n);
+
+	fprintf(stderr, "Add '%s' to target '%s'\n", p->GetPath().c_str(), name.c_str());
+
+	auto it = targetMap.find(name);
+	if (it == targetMap.end()) {
+		auto [tmp, success] = targetMap.emplace(std::move(name), n);
+		it = tmp;
+	}
+
+	it->second.AddDependee(p);
 }

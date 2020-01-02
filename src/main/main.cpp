@@ -78,7 +78,7 @@ public:
 	{
 	}
 
-	int Run();
+	int Run(const std::unordered_set<std::string_view> &targets);
 };
 
 void
@@ -111,7 +111,7 @@ Main::IncludeConfig(Interpreter & interp, const IncludeFile & file)
 }
 
 int
-Main::Run()
+Main::Run(const std::unordered_set<std::string_view> &targets)
 {
 	interp.RunFile("/home/rstone/git/factory/src/lua_lib/basic.lua", ConfigNode(ConfigNodeList{}));
 	interp.RunFile("factory.lua", ConfigNode(ConfigNodeList{}));
@@ -131,7 +131,7 @@ Main::Run()
 		}
 	}
 
-	productMgr.SubmitLeafJobs();
+	productMgr.SubmitLeafJobs(targets);
 
 	if (!jobManager.ScheduleJob()) {
 		printf("No work to build target\n");
@@ -174,6 +174,18 @@ int main(int argc, char **argv)
 		}
 	}
 
+	argv += optind;
+	argc -= optind;
+
+	if (argc == 0) {
+		errx(1, "No targets specified");
+	}
+
+	std::unordered_set<std::string_view> targets;
+	for (int i = 0; i < argc; ++i) {
+		targets.insert(argv[i]);
+	}
+
 	mainObj = std::make_unique<Main>(maxJobs);
-	return mainObj->Run();
+	return mainObj->Run(targets);
 }
