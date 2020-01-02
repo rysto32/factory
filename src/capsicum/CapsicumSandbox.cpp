@@ -171,7 +171,7 @@ CapsicumSandbox::PreopenDescriptors(const PermissionList &permList)
 
 		fd = FileDesc::Open(openPath.c_str(), mode, 0600);
 		if (!fd) {
-			err(1, "Could not open '%s'", path.c_str());
+			err(1, "Could not preopen '%s'", path.c_str());
 		}
 
 		if (cap_rights_limit(fd, &rights) < 0 && errno != ENOSYS) {
@@ -283,7 +283,7 @@ CapsicumSandbox::CreateEbpfRules()
 		if (error != 0) {
 			err(1, "Could not insert '%s' at index %d in fd_filename_map", path, nextIndex);
 		}
-// 		fprintf(stderr, "Insert %d -> %s\n", nextIndex, path);
+// 		fprintf(stderr, "Insert %d -> '%s'\n", nextIndex, path);
 
 		nextIndex++;
 	}
