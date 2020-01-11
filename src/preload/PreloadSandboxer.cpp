@@ -78,10 +78,10 @@ PreloadSandboxer::Enable()
 		exit(1);
 	}
 
-	for (int i = STDERR_FILENO + 1; i < SHARED_MEM_FD; ++i) {
-		(void)close(i);
-	}
-	closefrom(SHARED_MEM_FD + 1);
+// 	for (int i = STDERR_FILENO + 1; i < SHARED_MEM_FD; ++i) {
+// 		(void)close(i);
+// 	}
+// 	closefrom(SHARED_MEM_FD + 1);
 }
 
 void
