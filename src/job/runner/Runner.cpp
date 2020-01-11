@@ -135,12 +135,17 @@ int main(int argc, char **argv)
 	PermissionList perms;
 	ArgList list;
 	std::error_code code;
+	std::unique_ptr<SandboxFactory> sandboxFactory;
 	int ch;
 
 	Path cwd(std::filesystem::current_path());
 	Path work_dir(cwd);
 
-	while ((ch = getopt(argc, argv, "a:C:")) != -1) {
+	EventLoop loop;
+	TempFileManager tmpMgr;
+	JobQueue jobQueue;
+
+	while ((ch = getopt(argc, argv, "a:C:P")) != -1) {
 		Path permPath;
 		Permission p;
 
@@ -155,6 +160,10 @@ int main(int argc, char **argv)
 		case 'C':
 			work_dir = Path(optarg).canonical(code);
 			break;
+		case 'P':
+			sandboxFactory =
+			    std::make_unique<PreloadSandboxerFactory>(tmpMgr, loop, 1);
+			    break;
 		}
 	}
 
@@ -172,11 +181,11 @@ int main(int argc, char **argv)
 	for (int i = 0; i < argc; ++i)
 		list.push_back(argv[i]);
 
-	EventLoop loop;
-	TempFileManager tmpMgr;
-	JobQueue jobQueue;
-	JobManager jobManager(loop, jobQueue,
-	    std::make_unique<CapsicumSandboxFactory>(), 1);
+	if (!sandboxFactory) {
+		sandboxFactory = std::make_unique<CapsicumSandboxFactory>();
+	}
+
+	JobManager jobManager(loop, jobQueue, std::move(sandboxFactory), 1);
 	SimpleCompletion completer(loop);
 	Command pending({}, std::move(list), std::move(perms), std::move(work_dir), {}, {});
 
