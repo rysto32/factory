@@ -37,6 +37,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#define DEBUG(msg) write(2, (msg), sizeof(msg))
+
 int
 open(const char * path, int flags, ...)
 {
@@ -44,6 +46,8 @@ open(const char * path, int flags, ...)
 	struct SandboxResp resp;
 	mode_t mode;
 	int error;
+
+	DEBUG("intercept open(2)\n");
 
 	if (msg_sock_fd < 0)
 		initialize();
@@ -82,5 +86,6 @@ open(const char * path, int flags, ...)
 int
 _open(const char * path, int flags, mode_t mode)
 {
+	DEBUG("intercept _open()\n");
 	return (open(path, flags, mode));
 }
