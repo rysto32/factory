@@ -37,7 +37,7 @@
 #include "Path.h"
 
 extern "C" {
-#include <gbpf/gbpf.h>
+#include <gbpf.h>
 }
 
 #include <string>
@@ -74,6 +74,8 @@ class CapsicumSandbox : public Sandbox
 
 	std::unordered_map<std::string, Ebpf::Program> probe_programs;
 	std::unordered_map<std::string, Ebpf::Map> maps;
+
+	std::vector<Ebpf::Program*> attach_programs;
 
 	FileDesc fexec_fd;
 	bool is_rtld;

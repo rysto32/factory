@@ -93,7 +93,8 @@ Program::~Program()
 int
 Program::AttachProbe()
 {
-	return gbpf_attach_probe(ebpf, fd, name.c_str(), 0);
+	return gbpf_attach_probe(ebpf, fd, "ebpf", "sc_rewrite", "",
+	    name.c_str(), "enter", 0);
 }
 
 }

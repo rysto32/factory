@@ -39,6 +39,10 @@
 #include <gelf.h>
 #include <libelf.h>
 #include <string.h>
+#include <sys/ebpf.h>
+#include <sys/event.h>
+#include <sys/resource.h>
+#include <sys/ebpf_param.h>
 #include <sys/syslimits.h>
 #include <unistd.h>
 
@@ -65,6 +69,15 @@ CapsicumSandbox::~CapsicumSandbox()
 		ebpf_dev_driver_destroy(ebpf);
 }
 
+static bool
+HasEnding(std::string const &fullString, std::string const &ending)
+{
+	if (fullString.length() >= ending.length()) {
+		return (0 == fullString.compare (fullString.length() - ending.length(), ending.length(), ending));
+	} else {
+		return false;
+	}
+}
 
 void
 CapsicumSandbox::FindInterpreter(Path exe)
@@ -188,8 +201,22 @@ CapsicumSandbox::DefineProgram(GBPFElfWalker *walker, const char *n,
 {
 	CapsicumSandbox *sandbox = reinterpret_cast<CapsicumSandbox*>(walker->data);
 
-	sandbox->probe_programs.emplace(n, Ebpf::Program(walker->driver, n,
+	std::string syscall_ending("_syscall_probe");
+
+	std::string name(n);
+	bool isProbe = false;
+	if (HasEnding(name, syscall_ending)) {
+		size_t len = name.size() - syscall_ending.size();
+		name.resize(len);
+		isProbe = true;
+	}
+
+	auto [it, success] = sandbox->probe_programs.emplace(n, Ebpf::Program(walker->driver, std::move(name),
 	    EBPF_PROG_TYPE_VFS, prog, prog_len));
+
+	if (isProbe) {
+		sandbox->attach_programs.push_back(&it->second);
+	}
 
 // 		fprintf(stderr, "Map prog '%s' to FD %d\n", n, sandbox->probe_programs.back().GetFD());
 }
@@ -309,16 +336,6 @@ CapsicumSandbox::GetExecFd()
 	return fexec_fd;
 }
 
-static bool
-HasEnding(std::string const &fullString, std::string const &ending)
-{
-	if (fullString.length() >= ending.length()) {
-		return (0 == fullString.compare (fullString.length() - ending.length(), ending.length(), ending));
-	} else {
-		return false;
-	}
-}
-
 void
 CapsicumSandbox::Enable()
 {
@@ -333,16 +350,15 @@ CapsicumSandbox::Enable()
 	auto & cwd_name_map = maps["cwd_name_map"];
 	error = cwd_name_map.UpdateElem(&pid, path, EBPF_NOEXIST);
 	if (error != 0) {
+		while(1);
 		err(1, "Failed to update cwd_name_map (fd %d)", cwd_name_map.GetFD());
 	}
 
-	for (auto & [name, prog] : probe_programs) {
-		if (HasEnding(name, "_probe")) {
-			error = prog.AttachProbe();
-			if (error != 0) {
-				err(1, "Could not attach to '%s' ebpf probe",
-				    name.c_str());
-			}
+	for (Ebpf::Program * prog : attach_programs) {
+		error = prog->AttachProbe();
+		if (error != 0) {
+			err(1, "Could not attach to '%s' ebpf probe",
+				prog->GetName().c_str());
 		}
 	}
 

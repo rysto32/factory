@@ -36,7 +36,6 @@ typedef int mcontext_t;
 #include <sys/syslimits.h>
 #include <sys/sysproto.h>
 #include <sys/ebpf.h>
-#include <sys/ebpf_probe_syscalls.h>
 
 #define	EXEC_INTERP_NONE	1
 #define EXEC_INTERP_STANDARD	2
@@ -189,6 +188,8 @@ struct kevent {
 /* user: vfork(2) semantics, clear signals */
 #define RFSPAWN         (1U<<31)
 
+#include <sys/ebpf_probe_syscalls.h>
+
 EBPF_DEFINE_MAP(file_lookup_map,  EBPF_MAP_TYPE_HASHTABLE, MAXPATHLEN, sizeof(int), MAX_PREOPEN_FDS, 0);
 EBPF_DEFINE_MAP(fd_filename_map,  EBPF_MAP_TYPE_ARRAY, sizeof(int), NAME_MAX, MAX_PREOPEN_FDS, 0);
 EBPF_DEFINE_MAP(fd_map,  EBPF_MAP_TYPE_ARRAY, sizeof(int), sizeof(int), MAX_PREOPEN_FDS, 0);
@@ -336,7 +337,7 @@ static inline int * lookup_fd(ScratchMgr &alloc, char *pathBuf, char **path)
 
 static inline void * do_single_lookup(void *pathBuf, char **path)
 {
-	void *result = ebpf_map_lookup_path(&file_lookup_map, &pathBuf);
+	void *result = ebpf_map_path_lookup(&file_lookup_map, &pathBuf);
 	if (!result) {
 		set_errno(ECAPMODE);
 		return (0);

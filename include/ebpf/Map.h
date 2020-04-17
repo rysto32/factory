@@ -30,7 +30,7 @@
 #define EBPF_MAP_H
 
 extern "C" {
-#include <gbpf/gbpf.h>
+#include <gbpf.h>
 }
 
 #include <string>
