@@ -130,7 +130,19 @@ ParsePermission(const std::string & opt, Path &path)
 	return p;
 }
 
-int main(int argc, char **argv)
+void
+AddPerm(PermissionList & perms, const Path & cwd, const Path & path, Permission p)
+{
+
+	if (path.is_relative()) {
+		perms.AddPermission(cwd / path, p);
+	} else {
+		perms.AddPermission(path, p);
+	}
+}
+
+int
+main(int argc, char **argv)
 {
 	PermissionList perms;
 	ArgList list;
@@ -145,7 +157,7 @@ int main(int argc, char **argv)
 	TempFileManager tmpMgr;
 	JobQueue jobQueue;
 
-	while ((ch = getopt(argc, argv, "a:C:P")) != -1) {
+	while ((ch = getopt(argc, argv, "a:C:Pr:w:x:")) != -1) {
 		Path permPath;
 		Permission p;
 
@@ -156,6 +168,15 @@ int main(int argc, char **argv)
 				permPath = cwd / permPath;
 			}
 			perms.AddPermission(permPath, p);
+			break;
+		case 'r':
+			perms.AddPermission(optarg, Permission::READ);
+			break;
+		case 'w':
+			perms.AddPermission(optarg, Permission::READ | Permission::WRITE);
+			break;
+		case 'x':
+			perms.AddPermission(optarg, Permission::READ | Permission::EXEC);
 			break;
 		case 'C':
 			work_dir = Path(optarg).canonical(code);
@@ -178,6 +199,7 @@ int main(int argc, char **argv)
 		errx(1, "Usage: %s <prog> [args...]", getprogname());
 	}
 
+	perms.AddPermission(argv[0], Permission::READ | Permission::EXEC);
 	for (int i = 0; i < argc; ++i)
 		list.push_back(argv[i]);
 
