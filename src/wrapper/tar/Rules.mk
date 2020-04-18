@@ -4,7 +4,7 @@ LIB := tar_wrapper
 SRCS := \
 	tar.cpp \
 
-PROG := bin/tar_wrapper
+PROG := bin/captar
 
 PROG_LIBS := \
 	tar_wrapper \

@@ -89,8 +89,11 @@ int main(int argc, char **argv)
 	bool writeTar = false;
 	bool extract = false;
 	bool preservePaths = false;
-	const char *real_tar = "/usr/bin/tar";
+	const char *real_tar = getenv("TAR_PATH");
 	int i;
+
+	if (real_tar == nullptr)
+		real_tar = "/usr/local/bin/vtar";
 
 	if (elf_version(EV_CURRENT) == EV_NONE)
 		errx(1, "ELF library initialization failed: %s",
@@ -197,7 +200,7 @@ int main(int argc, char **argv)
 	}
 
 	if (work_dir) {
-		Permission p = Permission::READ | Permission::EXEC;
+		Permission p = Permission::READ;
 		if (extract) {
 			p |= Permission::WRITE;
 		}
@@ -207,10 +210,16 @@ int main(int argc, char **argv)
 	perms.AddPermission(real_tar, Permission::READ | Permission::EXEC);
 	perms.AddPermission("/lib", Permission::READ | Permission::EXEC);
 	perms.AddPermission("/usr/lib", Permission::READ | Permission::EXEC);
+	perms.AddPermission("/usr/local/lib", Permission::READ | Permission::EXEC);
 	perms.AddPermission("/usr/share/nls", Permission::READ);
 	perms.AddPermission("/usr/share/locale", Permission::READ);
-	perms.AddPermission("/etc", Permission::READ);
+	perms.AddPermission("/etc/libalias.conf", Permission::READ);
+	perms.AddPermission("/etc/libmap.conf", Permission::READ);
+	perms.AddPermission("/etc/pwd.db", Permission::READ);
+	perms.AddPermission("/etc/passwd", Permission::READ);
+	perms.AddPermission("/etc/nsswitch.conf", Permission::READ);
 	perms.AddPermission("/libexec", Permission::READ | Permission::EXEC);
+	perms.AddPermission("/var/run/ld-elf.so.hints", Permission::READ);
 
 	CapsicumSandbox sandbox(real_tar, perms, std::filesystem::current_path());
 
