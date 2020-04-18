@@ -100,7 +100,7 @@ Main::IncludeConfig(Interpreter & interp, const IncludeFile & file)
 		ConfigParser parser(path);
 
 		std::string errors;
-		if (!parser.Parse(errors)) {
+		if (!parser.Parse(errors, file.parserVars)) {
 			errx(1, "Could not parse build definition %s: %s",
 			    path.c_str(), errors.c_str());
 		}

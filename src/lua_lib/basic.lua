@@ -26,8 +26,8 @@ function factory.define_mkdir(...)
 	end
 end
 
-function factory.include_config(paths, config)
-	factory.internal.include_config(factory.listify(paths), config)
+function factory.include_config(paths, config, vars)
+	factory.internal.include_config(factory.listify(paths), config, vars)
 end
 
 function factory.include_script(paths, config)
@@ -84,6 +84,71 @@ function factory.evaluate_vars(str, vars)
 	end
 
 	return factory.internal.evaluate_vars(str, vars)
+end
+
+function factory.internal.eval_if(list, vars)
+
+	if #list == 5 then
+		if list[4] ~= 'else' then
+			print("Malformed if expr: 4th component must be 'else' not '" .. list[4] .. "'")
+		end
+	elseif #list ~= 3 then
+		print("Malformed if expr: should have 3 or 5 components")
+		os.exit(1)
+	end
+
+	local condVal = factory.internal.eval_expr(list[2], vars)
+	local cond
+
+	print("Cond: " .. condVal)
+
+	if condVal == "true" or condVal == "1" then
+		cond = True
+	elseif condVal == "false" or condVal == "0" then
+		cond = False
+	else
+		print("if expr: condition must be a boolean")
+		os.exit(1)
+	end
+
+	if cond then
+		return factory.internal.eval_expr(list[3], vars)
+	elseif #list == 5 then
+		return factory.internal.eval_expr(list[5], vars)
+	else
+		return {}
+	end
+end
+
+function factory.internal.eval_expr(list, vars)
+	if type(list) == 'string' then
+		return factory.internal.evaluate_vars(list, vars)
+	end
+
+	if type(list) ~= 'table' then
+		print("Malformed expr: expected a list")
+	end
+
+	if type(list[1]) ~= 'string' then
+		printf("Malformed expr: first element must be a string")
+	end
+
+	if list[1] == 'if' then
+		return factory.internal.eval_if(list, vars)
+	elseif #list == 1 then
+		return factory.internal.evaluate_vars(list[1], vars)
+	else
+		print("Undefined expr type '" .. list[1] .. "' (size " .. #list .. ")")
+		os.exit(1)
+	end
+end
+
+function factory.eval_expr(list, vars)
+	if type(list) == 'string' then
+		return {list}
+	end
+
+	return factory.internal.eval_expr(list, vars)
 end
 
 function factory.flat_list(...)

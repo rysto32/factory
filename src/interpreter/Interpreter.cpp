@@ -428,13 +428,22 @@ Interpreter::Include()
 	std::string_view funcName = GetIncludeFuncName(type);
 	Lua::Parameter files(funcName, "files", 1);
 	Lua::Parameter configArg(funcName, "config", 2);
+	Lua::Parameter parserArg(funcName, "parser_vars", 3);
 
 	auto fileList = GetStringList(lua, files);
 
 	Lua::Table configTable = lua.GetTable(configArg);
 	auto config = SerializeConfig(configTable);
 
-	includeQueue.emplace_back(std::move(fileList), type, std::move(config));
+	VarMap parserVars;
+	Lua::Table parserTable = lua.GetTable(parserArg);
+	parserTable.IterateMap([&parserVars](const char * key, const char * value)
+		{
+			parserVars.emplace(key, value);
+		});
+
+	includeQueue.emplace_back(std::move(fileList), type, std::move(config),
+	    std::move(parserVars));
 
 	return 0;
 }

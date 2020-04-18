@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2019 Ryan Stone
+ * Copyright (c) 2020 Ryan Stone
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,44 +26,12 @@
  * SUCH DAMAGE.
  */
 
-#ifndef VARIABLE_EXPANDER_H
-#define VARIABLE_EXPANDER_H
+#ifndef VARMAP_H
+#define VARMAP_H
 
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 
-#include "VarMap.h"
-
-class VariableExpander
-{
-public:
-	typedef std::unordered_map<std::string_view, std::string_view> VarMap;
-
-private:
-	VarMap vars;
-
-	std::string ExpandVar(std::string_view varName, std::unordered_set<std::string_view> & evaluatedVars);
-	void VarRemoveWord(std::string & expansion, std::string_view word);
-	void ApplyVarOption(std::string & expansion, char option, std::string_view param);
-	std::string EvaluateVarWithOptions(std::string_view str, size_t & i, char endVar,
-	    std::string_view varName, std::unordered_set<std::string_view> & evaluatedVars);
-	void EvaluateVar(std::string_view str, size_t & i, char varType, std::ostringstream & output,
-	    std::unordered_set<std::string_view> & evaluatedVars);
-
-	std::string ExpandVars(std::string_view, std::unordered_set<std::string_view> & evaluatedVars);
-
-public:
-	VariableExpander(VarMap &&);
-
-	VariableExpander(VariableExpander &&) = delete;
-	VariableExpander(const VariableExpander &) = delete;
-
-	VariableExpander & operator=(VariableExpander &&) = delete;
-	VariableExpander & operator=(const VariableExpander &) = delete;
-
-	std::string ExpandVars(std::string_view);
-};
+typedef std::unordered_map<std::string, std::string> VarMap;
 
 #endif
-

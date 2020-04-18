@@ -7,6 +7,10 @@ function make_lib_path(lib)
 	return factory.build_path(libdir, "lib" .. lib .. ".a")
 end
 
+my_vars = {
+	MK_MASTER = "0"
+}
+
 function define_obj_create(dir)
 	factory.define_command(dir, {'/lib', '/bin'}, {"/bin/mkdir", dir})
 end
@@ -122,7 +126,7 @@ definitions = {
 				parent_config.srcdir = factory.build_path(orig_srcdir, dir)
 				path = factory.build_path(parent_config.srcdir, "build.ucl")
 
-				factory.include_config(path, parent_config)
+				factory.include_config(path, parent_config, my_vars)
 			end
 		end
 	},
@@ -136,5 +140,5 @@ top_config = {
 }
 
 factory.add_definitions(definitions)
-factory.include_config("build.ucl", top_config)
+factory.include_config("build.ucl", top_config, my_vars)
 

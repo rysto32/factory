@@ -31,6 +31,7 @@
 #include "ConfigNode.h"
 #include "ConfigParser.h"
 #include "Path.h"
+#include "VarMap.h"
 #include "Visitor.h"
 
 #include <err.h>
@@ -507,14 +508,15 @@ int main(int argc, char **argv)
 
 	ConfigParser confParser(confFile);
 	std::string errors;
-	if (!confParser.Parse(errors)) {
+	VarMap variables;
+	if (!confParser.Parse(errors, variables)) {
 		fprintf(stderr, "Could not parse '%s': %s\n", confFile.c_str(), errors.c_str());
 		exit(1);
 	}
 
 	for (const std::string & path : optionFiles) {
 		ConfigParser optionParser(path);
-		if (!optionParser.Parse(errors)) {
+		if (!optionParser.Parse(errors, variables)) {
 			fprintf(stderr, "Could not parse '%s': %s\n", path.c_str(), errors.c_str());
 			exit(1);
 		}

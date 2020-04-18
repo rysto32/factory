@@ -32,6 +32,7 @@
 
 #include "ConfigNode.h"
 #include "IngestManager.h"
+#include "VarMap.h"
 #include "Visitor.h"
 
 #include <deque>
@@ -62,11 +63,14 @@ struct IncludeFile
 	std::vector<std::string> paths;
 	const Type type;
 	std::unique_ptr<ConfigNode> config;
+	VarMap parserVars;
 
-	IncludeFile(const std::vector<std::string> && p, Type t, std::unique_ptr<ConfigNode> && c)
+	IncludeFile(const std::vector<std::string> && p, Type t,
+	    std::unique_ptr<ConfigNode> && c, VarMap && v)
 	  : paths(p),
 	    type(t),
-	    config(std::move(c))
+	    config(std::move(c)),
+	    parserVars(std::move(v))
 	{
 	}
 
