@@ -8,14 +8,14 @@ function make_lib_path(lib)
 end
 
 function define_obj_create(dir)
-	factory.define_command(dir, {"/lib"}, {"/bin/mkdir", dir})
+	factory.define_command(dir, {'/lib', '/bin'}, {"/bin/mkdir", dir})
 end
 
 define_obj_create(objdirprefix)
 define_obj_create(libdir)
 define_obj_create(bindir)
 
-include_path = factory.build_path('.', "include")
+include_path = "include"
 
 definitions = {
 	{
@@ -52,16 +52,18 @@ definitions = {
 					"/usr/local/bin",
 					"/usr/include/",
 					"/usr/share",
-					"/usr/bin",
-					"/etc",
+					"/usr/lib",
 					"/lib",
+					"/usr/bin",
+					"/libexec",
+					"/etc",
 					srcdir,
 					srcpath,
 					include_path
 				}
 
 				options = {
-					statdirs = "/"
+					tmpdirs = objdir
 				}
 				factory.define_command({objpath}, inputs, arglist, options)
 
@@ -71,38 +73,43 @@ definitions = {
 			arglist = { parent_config["AR"], "crs", libpath}
 			factory.list_concat(arglist, objs)
 
-			factory.define_command(libpath, objs, arglist)
+			local ar_inputs = factory.flat_list(
+				'/usr/lib',
+				'/lib',
+				objs
+			)
+
+			factory.define_command(libpath, ar_inputs, arglist)
 		end,
 	},
 	{
 		name = "program",
 		process = function(parent_config, config)
-			libpaths = factory.map(make_lib_path, config["libs"])
-			stdlibs = factory.addprefix("-l", config["stdlibs"])
+			local libpaths = factory.map(make_lib_path, config["libs"])
+			local stdlibs = factory.addprefix("-l", config["stdlibs"])
 
-			prog_path = factory.build_path(bindir, config["path"])
-			arglist = factory.flat_list(
+			local prog_path = factory.build_path(bindir, config["path"])
+			local arglist = factory.flat_list(
 				parent_config["LD"],
 				"-o", prog_path,
 				libpaths,
 				stdlibs
 			)
 
-			inputs = factory.flat_list(
-				"/libexec",
+			local inputs = factory.flat_list(
 				"/usr/local/bin",
-				"/lib",
-				"/usr/lib",
-				"/usr/local/lib",
 				"/usr/share",
-				"/etc",
+				"/usr/lib",
+				"/lib",
 				"/usr/bin",
+				"/libexec",
+				"/etc",
 				libpaths
 			)
 
-			options = {
+			local options = {
 				tmpdirs = bindir,
-				statdirs = "/"
+				targets = { 'programs' }
 			}
 			factory.define_command(prog_path, inputs, arglist, options)
 		end
