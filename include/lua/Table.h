@@ -71,7 +71,7 @@ public:
 	void IterateList(const F & func)
 	{
 		if (!lua_istable(lua, stackIndex))
-			throw InterpreterException("Expected a table in %s", value.ToString().c_str());
+			throw InterpreterException("Expected a table in %s, got %s", value.ToString().c_str(), lua_typename(lua, stackIndex));
 
 		lua_pushnil(lua);
 		while (lua_next(lua, stackIndex) != 0) {
@@ -84,7 +84,7 @@ public:
 	void IterateMap(const F & func)
 	{
 		if (!lua_istable(lua, stackIndex))
-			throw InterpreterException("Expected a table in %s", value.ToString().c_str());
+			throw InterpreterException("Expected a table in %s, got %s", value.ToString().c_str(), lua_typename(lua, stackIndex));
 
 		lua_pushnil(lua);
 		while (lua_next(lua, stackIndex) != 0) {
