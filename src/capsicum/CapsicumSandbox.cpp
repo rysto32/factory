@@ -262,7 +262,7 @@ CapsicumSandbox::CreateEbpfRules()
 		.data = this,
 	};
 
-	error = gbpf_walk_elf(&walker, &ebpf->base, "/home/rstone/git/factory/src/capsicum/ebpf_progs/open/open.o");
+	error = gbpf_walk_elf(&walker, &ebpf->base, "/home/rstone/repos/factory/src/capsicum/ebpf_progs/open/open.o");
 	if (error != 0) {
 		err(1, "Could not walk EBPF object");
 	}

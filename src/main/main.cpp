@@ -113,7 +113,7 @@ Main::IncludeConfig(Interpreter & interp, const IncludeFile & file)
 int
 Main::Run(const std::unordered_set<std::string_view> &targets)
 {
-	interp.RunFile("/home/rstone/git/factory/src/lua_lib/basic.lua", ConfigNode(ConfigNodeList{}));
+	interp.RunFile("/home/rstone/repos/factory/src/lua_lib/basic.lua", ConfigNode(ConfigNodeList{}));
 	interp.RunFile("factory.lua", ConfigNode(ConfigNodeList{}));
 
 	while (true) {
