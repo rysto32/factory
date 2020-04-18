@@ -753,50 +753,54 @@ dowait4:
 	}
 }
 
-int defer_kevent(struct wait4_args *args, int error, struct kevent *ev)
+int defer_kevent(struct ebpf_defer_kevent_args *args)
 {
 	int prog_index;
 	void *next;
 
-	if (error != 0) {
-		set_errno(error);
+	if (args->error != 0) {
+		set_errno(args->error);
 		return (EBPF_ACTION_RETURN);
 	}
 
 	prog_index = 0;
 	next = ebpf_map_lookup_elem(&pdwait_prog, &prog_index);
 
-	pdwait4_defer(ev->ident, args->options, args, next);
+	pdwait4_defer(args->ev.ident, args->wait4_args->options,
+	    args->wait4_args, next);
 
 	/* If we got here we failed to jump to the next program */
 	return EBPF_ACTION_RETURN;
 }
 
-int defer_wait4(struct wait4_args *args, int error, int status, struct rusage *ru, int fd)
+int defer_wait4(struct ebpf_defer_wait4_args *args)
 {
 	pid_t pid;
+	int error;
 
-	if (unlikely(error != 0)) {
-		set_errno(error);
+	if (unlikely(args->error != 0)) {
+		set_errno(args->error);
 		set_syscall_retval(-1, 0);
 		return EBPF_ACTION_RETURN;
 	}
 
 	pid = get_syscall_retval();
 
-	if (args->status) {
-		error = copyout(&status, args->status, sizeof(status));
+	if (args->wait4_args->status) {
+		error = copyout(&args->status, args->wait4_args->status,
+		    sizeof(args->status));
 		if (unlikely(error != 0)) {
 			set_syscall_retval(-1, 0);
 			return EBPF_ACTION_RETURN;
 		}
 	}
-	if (args->rusage) {
-		error = copyout(ru, args->rusage, sizeof(*ru));
+	if (args->wait4_args->rusage) {
+		error = copyout(&args->ru, args->wait4_args->rusage,
+		    sizeof(args->ru));
 	}
 
-	if (!(args->options & WNOWAIT)) {
-		close(fd);
+	if (!(args->wait4_args->options & WNOWAIT)) {
+		close(args->fd);
 		ebpf_map_delete_elem(&pid_map, &pid);
 	}
 
