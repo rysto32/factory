@@ -29,6 +29,7 @@
 #include "ebpf/Map.h"
 
 #include <errno.h>
+#include <fcntl.h>
 
 namespace Ebpf {
 
@@ -43,6 +44,7 @@ Map::Map(GBPFDriver *ebpf, std::string && name, int fd)
     name(std::move(name)),
     fd(fd)
 {
+	fcntl(fd, F_SETFD, FD_CLOEXEC);
 }
 
 Map::Map(Map &&map)

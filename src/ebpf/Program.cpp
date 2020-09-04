@@ -29,6 +29,7 @@
 #include "ebpf/Program.h"
 
 #include <err.h>
+#include <fcntl.h>
 
 namespace Ebpf
 {
@@ -57,6 +58,7 @@ Program::Program(GBPFDriver *ebpf, std::string && n, int type, struct ebpf_inst 
 		err(1, "Could not load program '%s'", name.c_str());
 	}
 
+	fcntl(fd, F_SETFD, FD_CLOEXEC);
 // 	fprintf(stderr, "Map prog '%s' to FD %d\n", name.c_str(), fd);
 }
 

@@ -369,5 +369,7 @@ void
 CapsicumSandbox::ParentCleanup()
 {
 	/* Close all file descriptors we passed to the child process. */
+	probe_programs.clear();
+	maps.clear();
 	descriptors.clear();
 }
