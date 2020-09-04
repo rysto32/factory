@@ -1,6 +1,6 @@
 
 SUBDIRS := \
-	runner \
+	caprun \
 
 LIB :=	job
 

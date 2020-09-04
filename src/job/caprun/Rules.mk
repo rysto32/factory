@@ -1,8 +1,8 @@
 
-PROG :=	bin/runner
+PROG :=	bin/caprun
 
 PROG_LIBS := \
-	runner \
+	caprun \
 	job \
 	perm \
 	product \
@@ -18,7 +18,7 @@ PROG_STDLIBS := \
 	elf \
 	gbpf \
 
-LIB :=	runner
+LIB :=	caprun
 
 SRCS := \
-	Runner.cpp \
+	Caprun.cpp \
