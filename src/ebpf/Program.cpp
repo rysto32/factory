@@ -84,6 +84,7 @@ Program::Close()
 {
 	if (*this) {
 		gbpf_close_prog_desc(ebpf, fd);
+		fd = -1;
 	}
 }
 
