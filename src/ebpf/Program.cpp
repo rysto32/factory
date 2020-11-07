@@ -97,7 +97,7 @@ int
 Program::AttachProbe()
 {
 	return gbpf_attach_probe(ebpf, fd, "ebpf", "sc_rewrite", "",
-	    name.c_str(), "enter", 0);
+	    name.c_str(), "enter", EBPF_ATTACH_PERSISTENT);
 }
 
 }
