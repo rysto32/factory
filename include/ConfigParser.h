@@ -45,16 +45,6 @@ class ConfigParser
 	template <typename Container, typename AddNodeFunc>
 	static bool WalkConfig(const ucl_object_t *obj, Container & node, std::string & errors, const AddNodeFunc & AddNode);
 
-	static bool IfMacroHandler(const unsigned char *data, size_t len,
-	    const ucl_object_t *arguments, void* ud);
-	bool IfMacro(const unsigned char *data, size_t len,
-	    const ucl_object_t *args, ucl_parser *parser);
-
-	static bool AppendMacroHandler(const unsigned char *data, size_t len,
-	    const ucl_object_t *arguments, const ucl_object_t *context, void* ud);
-	bool AppendMacro(const unsigned char *data, size_t len,
-	    const ucl_object_t *args, const ucl_object_t *context, ucl_parser *parser);
-
 	static bool VariableHandler(const unsigned char *data, size_t len,
 	    unsigned char **replace, size_t *replace_len, bool *need_free, void* ud);
 
