@@ -15,6 +15,25 @@ function define_obj_create(dir)
 	factory.define_command(dir, {'/lib', '/bin'}, {"/bin/mkdir", dir})
 end
 
+function get_var(defs, key)
+	local val, val1
+
+	val = defs[key]
+	val1 = defs[key .. ".1"]
+	if val and val1
+	then
+		return factory.list_concat(val, val1)
+	elseif val
+	then
+		return val
+	elseif val1
+	then
+		return val1
+	else
+		return {}
+	end
+end
+
 define_obj_create(objdirprefix)
 define_obj_create(libdir)
 define_obj_create(bindir)
@@ -25,13 +44,13 @@ definitions = {
 	{
 		name = "library",
 		process = function (parent_config, defs)
-			libpath = make_lib_path(defs["name"])
+			libpath = make_lib_path(get_var(defs, "name"))
 
 			objdir = factory.build_path(objdirprefix, "objects", parent_config.srcdir)
 			define_obj_create(objdir)
 
 			objs = {}
-			for i, src in ipairs(defs["srcs"]) do
+			for i, src in ipairs(get_var(defs, "srcs")) do
 				if (parent_config.srcdir == '') then
 					srcdir = "."
 				else
@@ -89,10 +108,10 @@ definitions = {
 	{
 		name = "program",
 		process = function(parent_config, config)
-			local libpaths = factory.map(make_lib_path, config["libs"])
-			local stdlibs = factory.addprefix("-l", config["stdlibs"])
+			local libpaths = factory.map(make_lib_path, get_var(config, "libs"))
+			local stdlibs = factory.addprefix("-l", get_var(config, "stdlibs"))
 
-			local prog_path = factory.build_path(bindir, config["path"])
+			local prog_path = factory.build_path(bindir, get_var(config, "path"))
 			local arglist = factory.flat_list(
 				parent_config["LD"],
 				"-o", prog_path,
