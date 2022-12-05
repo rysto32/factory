@@ -32,7 +32,6 @@
 
 #include "ConfigNode.h"
 #include "IngestManager.h"
-#include "Visitor.h"
 
 #include <deque>
 #include <lua.hpp>
