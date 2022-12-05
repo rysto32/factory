@@ -1,4 +1,7 @@
 
+-- A namespace for lua functions that we don't want to expose to users
+factory.private = {}
+
 function factory.add_definitions(defs)
 	factory.internal.add_definitions(defs)
 end
@@ -118,6 +121,50 @@ function factory.map(func, list)
 	end
 
 	return result
+end
+
+function factory.private.string_is_true(s)
+	local lower = s:lower()
+
+	return lower == 'true' or lower == '1'
+end
+
+function factory.private.string_is_false(s)
+	local lower = s:lower()
+
+	return lower == 'false' or lower == '0'
+end
+
+function factory.private.entry_matches(entry)
+	local match = entry['match']
+	local cond = match['cond']
+	if cond ~= nil then
+		if factory.private.string_is_false(cond) then
+			return false
+		elseif not factory.private.string_is_true(cond) then
+			error('test node must evaluate to true or false, not ' .. cond)
+		end
+	end
+
+	return true
+end
+
+function factory.read_config_node(node)
+	local config = factory.listify(node['std'])
+
+	local opt = node['opt']
+	if opt == nil then
+		return config
+	end
+
+	local _, entry
+	for _, entry in ipairs(opt) do
+		if factory.private.entry_matches(entry) then
+			factory.list_concat(config, factory.listify(entry['result']))
+		end
+	end
+
+	return config
 end
 
 function factory.realpath(path)

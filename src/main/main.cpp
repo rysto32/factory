@@ -95,12 +95,13 @@ void
 Main::IncludeConfig(Interpreter & interp, const IncludeFile & file)
 {
 	std::vector<ConfigNodePtr> configList;
+	const ConfigPairMap * config = std::get_if<ConfigPairMap>(&file.config->GetValue());
 
 	for (const std::string & path : file.paths) {
 		ConfigParser parser(path);
 
 		std::string errors;
-		if (!parser.Parse(errors)) {
+		if (!parser.Parse(errors, config)) {
 			errx(1, "Could not parse build definition %s: %s",
 			    path.c_str(), errors.c_str());
 		}

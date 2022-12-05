@@ -35,6 +35,7 @@
 #include "PermissionList.h"
 #include "VariableExpander.h"
 #include "VectorUtil.h"
+#include "Visitor.h"
 
 #include "lua/Function.h"
 #include "lua/NamedValue.h"

@@ -77,7 +77,7 @@ AppendList()
 }
 
 bool
-ConfigParser::Parse(std::string & errors)
+ConfigParser::Parse(std::string & errors, const ConfigPairMap* parent_conf)
 {
 	auto parser = std::unique_ptr<ucl_parser, UclParserDeleter>(ucl_parser_new(0));
 
@@ -101,7 +101,9 @@ ConfigParser::Parse(std::string & errors)
 		errors = "Could not set " + parent.string() + " as parser include path";
 		return false;
 	}
-	
+
+	void *varsArg = const_cast<ConfigPairMap*>(parent_conf);
+	ucl_parser_set_variables_handler(parser.get(), VariableHandler, varsArg);
 
 	if (!ucl_parser_add_file_full(parser.get(), filename.c_str(), 0,
 	    UCL_DUPLICATE_MERGE, UCL_PARSE_UCL)) {
@@ -186,3 +188,37 @@ ConfigParser::WalkConfig(const ucl_object_t *parentObj, Container & parent, std:
 
 	return true;
 }
+
+bool
+ConfigParser::VariableHandler(const unsigned char *data, size_t len,
+    unsigned char **replace, size_t *replace_len, bool *need_free, void* ud)
+{
+	if (!ud) {
+		return false;
+	}
+
+	/* Work around libucl bug. */
+	if (data[len - 1] == '}') {
+		--len;
+	}
+
+	const ConfigPairMap & vars = *reinterpret_cast<const ConfigPairMap*>(ud);
+
+	// XXX When we have C++20 use heterogeneous lookup to avoid the copy.
+	std::string name(reinterpret_cast<const char*>(data), len);
+	fprintf(stderr, "eval variable '%s' in %p\n", name.c_str(), ud);
+
+	auto it = vars.find(name);
+	if (it == vars.end()) {
+		return false;
+	}
+
+	auto value = it->second->EvalAsString();
+	fprintf(stderr, "expand to '%s' (size=%zd)\n", value.data(), value.size());
+
+	*replace = reinterpret_cast<unsigned char*>(const_cast<char*>((value.data())));
+	*replace_len = value.size();
+	*need_free = false;
+	return true;
+}
+

@@ -1,7 +1,8 @@
+
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2019 Ryan Stone
+ * Copyright (c) 2022 Ryan Stone
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,49 +27,54 @@
  * SUCH DAMAGE.
  */
 
-#ifndef CONFIG_PARSER_H
-#define CONFIG_PARSER_H
-
 #include "ConfigNode.h"
-#include "Path.h"
 
-#include <string>
+#include "Visitor.h"
 
-#include "ucl.h"
+#include <err.h>
+#include <sstream>
 
-class ConfigParser
+const std::string_view
+ConfigNode::EvalAsString() const
 {
-	Path filename;
-	ConfigNodePtr top;
-
-	template <typename Container, typename AddNodeFunc>
-	static bool WalkConfig(const ucl_object_t *obj, Container & node, std::string & errors, const AddNodeFunc & AddNode);
-
-	static bool VariableHandler(const unsigned char *data, size_t len,
-	    unsigned char **replace, size_t *replace_len, bool *need_free, void* ud);
-
-public:
-	explicit ConfigParser(const Path & file)
-	  : filename(file)
-	{
+	/* Short-circuit the common/cheap case. */
+	if (const std::string * str = std::get_if<std::string>(&value)) {
+		return *str;
 	}
 
-	ConfigParser(const ConfigParser &) = delete;
-	ConfigParser(ConfigParser &&) = delete;
-	ConfigParser &operator=(const ConfigParser &) = delete;
-	ConfigParser &operator=(ConfigParser &&) = delete;
-
-	bool Parse(std::string & errors, const ConfigPairMap *parent_conf);
-
-	const ConfigNode & GetConfig() const
-	{
-		return *top;
+	if (stringForm) {
+		return *stringForm;
 	}
 
-	ConfigNodePtr&& TakeConfig()
-	{
-		return std::move(top);
-	}
-};
+	std::visit(make_visitor(
+		[this](int64_t value)
+		{
+			*stringForm = std::to_string(value);
+		},
+		[this](bool value)
+		{
+			*stringForm = std::to_string(value);
+		},
+		[this](const ConfigNodeList & list)
+		{
+			std::ostringstream str;
+			const char *sep = "";
+			for (auto & node : list) {
+				str << sep << node->EvalAsString();
+				sep = " ";
+			}
+			*stringForm = str.str();
+		},
+		[](const ConfigPairMap & map)
+		{
+			errx(1, "%s: Cannot convert map to string", __func__);
+		},
+		[] (const std::string &)
+		{
+			// Impossible, but we must satisfy the compiler.
+			abort();
+		}
+	), value);
 
-#endif
+	return *stringForm;
+}

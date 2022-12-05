@@ -31,6 +31,7 @@
 #define CONFIG_NODE_H
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <variant>
@@ -50,6 +51,16 @@ public:
 private:
 
 	ValueType value;
+
+	/*
+	 * A cache of this node, converted to a string.  We cache it for two
+	 * reasons:
+	 * 1. Performance in case this node is evaluated multiple times.
+	 * 2. So that our caller can depend on the returned string not being
+	 *    freed.  This will be invoked from code that interacts with C
+	 *    libraries so memory management here is awkward.
+	 */
+	mutable std::optional<std::string> stringForm;
 
 public:
 	ConfigNode(ValueType && v)
@@ -73,6 +84,8 @@ public:
 	{
 		return value;
 	}
+
+	const std::string_view EvalAsString() const;
 };
 
 #endif

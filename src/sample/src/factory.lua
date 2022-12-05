@@ -27,7 +27,7 @@ definitions = {
 			define_obj_create(objdir)
 
 			objs = {}
-			for i, src in ipairs(defs["srcs"]) do
+			for i, src in ipairs(factory.read_config_node(defs["srcs"])) do
 				if (parent_config.srcdir == '') then
 					srcdir = "."
 				else
@@ -85,8 +85,8 @@ definitions = {
 	{
 		name = "program",
 		process = function(parent_config, config)
-			local libpaths = factory.map(make_lib_path, config["libs"])
-			local stdlibs = factory.addprefix("-l", config["stdlibs"])
+			local libpaths = factory.map(make_lib_path, factory.read_config_node(config["libs"]))
+			local stdlibs = factory.addprefix("-l", factory.read_config_node(config["syslibs"]))
 
 			local prog_path = factory.build_path(bindir, config["path"])
 			local arglist = factory.flat_list(
@@ -118,7 +118,7 @@ definitions = {
 		name = "subdirs",
 		process = function(parent_config, config)
 			orig_srcdir = parent_config.srcdir
-			for _, dir in ipairs(config) do
+			for _, dir in ipairs(factory.read_config_node(config)) do
 				parent_config.srcdir = factory.build_path(orig_srcdir, dir)
 				path = factory.build_path(parent_config.srcdir, "build.ucl")
 
@@ -133,6 +133,7 @@ top_config = {
 	CXX = "/usr/bin/c++",
 	LD = "/usr/bin/c++",
 	srcdir = "",
+	MK_MASTER=1,
 }
 
 factory.add_definitions(definitions)
